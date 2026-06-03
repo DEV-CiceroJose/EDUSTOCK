@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+/* ============================================================
+   GESTOR ESCOLAR — Dashboard de Estoque & Refeitório
+   Estética: sálvia + creme, soft-UI moderno, cantos suaves
+   ============================================================ */
+
+@theme {
+  /* Superfícies */
+  --color-canvas: #f3efe4;
+  --color-surface: #fbf9f3;
+  --color-surface-2: #f1ece0;
+  --color-line: #e4ddcc;
+
+  /* Marca (verde-sálvia profundo) */
+  --color-brand: #214d3f;
+  --color-brand-700: #1a3e33;
+  --color-brand-500: #2f7a5b;
+  --color-brand-300: #6aa98c;
+  --color-brand-tint: #e7efe8;
+
+  /* Acento quente (cozinha / CTA) */
+  --color-accent: #e07a3e;
+  --color-accent-tint: #fbe9d9;
+
+  /* Texto */
+  --color-ink: #20281f;
+  --color-ink-soft: #5d685a;
+  --color-ink-faint: #8b9388;
+
+  /* Status */
+  --color-ok: #2f8f5b;
+  --color-ok-tint: #e1f1e6;
+  --color-low: #c98a16;
+  --color-low-tint: #fbeecd;
+  --color-out: #c14444;
+  --color-out-tint: #fbe2e0;
+
+  /* Tipografia */
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-body: "Hanken Grotesk", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+
+  /* Sombras suaves */
+  --shadow-soft: 0 1px 2px rgba(33, 40, 31, 0.05), 0 8px 24px -12px rgba(33, 40, 31, 0.18);
+  --shadow-pop: 0 2px 6px rgba(33, 40, 31, 0.08), 0 18px 40px -16px rgba(33, 40, 31, 0.28);
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  color: var(--color-ink);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(47, 122, 91, 0.08), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(224, 122, 62, 0.06), transparent 55%),
+    var(--color-canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+.font-mono { font-family: var(--font-mono); }
+
+/* ---------- Componentes base ---------- */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+}
+.card-flat {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+}
+
+/* Inputs */
+.field {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-line);
+  border-radius: 12px;
+  padding: 0.66rem 0.9rem;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.field::placeholder { color: var(--color-ink-faint); }
+.field:focus {
+  border-color: var(--color-brand-500);
+  box-shadow: 0 0 0 4px rgba(47, 122, 91, 0.12);
+}
+select.field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235d685a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  padding-right: 2.2rem;
+}
+
+/* Botões */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 12px;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
+  user-select: none;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn-brand { background: var(--color-brand); color: #f4f1e7; box-shadow: 0 8px 18px -10px rgba(33, 62, 51, 0.8); }
+.btn-brand:hover { background: var(--color-brand-700); }
+.btn-accent { background: var(--color-accent); color: #fff; box-shadow: 0 8px 18px -10px rgba(224, 122, 62, 0.9); }
+.btn-accent:hover { filter: brightness(1.04); }
+.btn-ghost { background: var(--color-surface); color: var(--color-ink); border-color: var(--color-line); }
+.btn-ghost:hover { background: var(--color-surface-2); }
+.btn-soft { background: var(--color-brand-tint); color: var(--color-brand); }
+.btn-soft:hover { background: #ddeadf; }
+
+/* Pílula de status */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+.tag-ok { background: var(--color-ok-tint); color: var(--color-ok); }
+.tag-low { background: var(--color-low-tint); color: var(--color-low); }
+.tag-out { background: var(--color-out-tint); color: var(--color-out); }
+.dot { width: 0.42rem; height: 0.42rem; border-radius: 999px; background: currentColor; }
+
+::selection { background: rgba(47, 122, 91, 0.25); }
+
+/* Scrollbar discreta */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: #d6cdb9; border-radius: 999px; border: 3px solid var(--color-canvas); }
+
+/* Ticker do rodapé */
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee { animation: marquee 34s linear infinite; }
+.marquee:hover { animation-play-state: paused; }
+
+/* Barrinha de nível de estoque */
+.meter { height: 6px; border-radius: 999px; background: var(--color-surface-2); overflow: hidden; }
+.meter > span { display: block; height: 100%; border-radius: 999px; }

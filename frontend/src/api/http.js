@@ -1,0 +1,43 @@
+/* ------------------------------------------------------------------
+   Cliente HTTP para a API REST real do Django (DRF).
+   Ativado quando VITE_USE_MOCK=false.
+   Contrato esperado dos endpoints (ViewSets DRF):
+     GET    /api/produtos/?search=
+     POST   /api/produtos/
+     GET    /api/produtos/:id/
+     PATCH  /api/produtos/:id/
+     DELETE /api/produtos/:id/
+     ...idem /api/categorias/
+------------------------------------------------------------------ */
+
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
+
+async function req(path, { method = "GET", body } = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) {
+    let detail
+    try { detail = await res.json() } catch { detail = res.statusText }
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail))
+  }
+  if (res.status === 204) return null
+  return res.json()
+}
+
+export const httpProdutos = {
+  list: (q) => req(`/produtos/${q ? `?search=${encodeURIComponent(q)}` : ""}`),
+  get: (id) => req(`/produtos/${id}/`),
+  create: (data) => req(`/produtos/`, { method: "POST", body: data }),
+  update: (id, data) => req(`/produtos/${id}/`, { method: "PATCH", body: data }),
+  remove: (id) => req(`/produtos/${id}/`, { method: "DELETE" }),
+}
+
+export const httpCategorias = {
+  list: () => req(`/categorias/`),
+  create: (data) => req(`/categorias/`, { method: "POST", body: data }),
+  remove: (id) => req(`/categorias/${id}/`, { method: "DELETE" }),
+}

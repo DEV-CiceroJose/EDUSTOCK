@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="bg-white p-6 rounded-xl shadow max-w-md mx-auto text-center">
+    <h2 class="text-lg font-bold mb-4">Confirmar exclusão</h2>
+    <p class="mb-4">Deseja deletar <strong>{{ produto.nome }}</strong>?</p>
+
+    <form method="post" class="flex gap-4 justify-center">
+        {% csrf_token %}
+        <button class="bg-red-500 text-white px-4 py-2 rounded">Sim</button>
+        <a href="{% url 'lista_produtos' %}" class="bg-gray-300 px-4 py-2 rounded">Cancelar</a>
+    </form>
+</div>
+{% endblock %}
