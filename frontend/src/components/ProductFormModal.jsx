@@ -5,7 +5,7 @@ import Modal from "./Modal"
 import { useToast } from "./Toast"
 
 const VAZIO = {
-  nome: "", numero_nota_fiscal: "", grupo: "",
+  nome: "", numero_nota_fiscal: "", grupo: "", fornecedor: "",
   quantidade: "", unidade: "UN", estoque_minimo: "",
   perecivel: false, periodicidade: "EVENTUAL", validade: "", preco: "",
 }
@@ -22,7 +22,7 @@ function Campo({ label, hint, children, full }) {
   )
 }
 
-export default function ProductFormModal({ open, produto, grupos, onClose, onSaved }) {
+export default function ProductFormModal({ open, produto, grupos, fornecedores = [], onClose, onSaved }) {
   const editando = Boolean(produto)
   const [form, setForm] = useState(VAZIO)
   const [erros, setErros] = useState({})
@@ -47,6 +47,7 @@ export default function ProductFormModal({ open, produto, grupos, onClose, onSav
         nome: produto.nome ?? "",
         numero_nota_fiscal: produto.numero_nota_fiscal ?? "",
         grupo: String(produto.grupo ?? ""),
+        fornecedor: String(produto.fornecedor ?? ""),
         quantidade: String(produto.quantidade ?? ""),
         unidade: produto.unidade ?? "UN",
         estoque_minimo: String(produto.estoque_minimo ?? ""),
@@ -79,11 +80,12 @@ export default function ProductFormModal({ open, produto, grupos, onClose, onSav
     if (!validar()) return
     setSalvando(true)
     try {
+      const payload = { ...form, fornecedor: form.fornecedor || null }
       if (editando) {
-        await produtosApi.update(produto.id, form)
+        await produtosApi.update(produto.id, payload)
         toast("Item atualizado")
       } else {
-        await produtosApi.create(form)
+        await produtosApi.create(payload)
         toast("Item cadastrado")
       }
       onSaved?.()
@@ -149,6 +151,15 @@ export default function ProductFormModal({ open, produto, grupos, onClose, onSav
           <select className="field" value={form.periodicidade} onChange={set("periodicidade")}>
             {PERIODICIDADES.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+        </Campo>
+
+        <Campo label="Fornecedor" hint="opcional">
+          <select className="field" value={form.fornecedor} onChange={set("fornecedor")}>
+            <option value="">— sem fornecedor —</option>
+            {fornecedores.map((f) => (
+              <option key={f.id} value={f.id}>{f.nome}</option>
             ))}
           </select>
         </Campo>
