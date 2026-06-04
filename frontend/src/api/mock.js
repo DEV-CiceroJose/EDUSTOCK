@@ -3,7 +3,7 @@
    Hierarquia: Categoria -> Grupo -> Produto. Persiste em localStorage.
 ------------------------------------------------------------------ */
 
-const KEY = "easystock:db:v2"
+const KEY = "easystock:db:v3"
 const delay = (ms = 220) => new Promise((r) => setTimeout(r, ms))
 
 function seed() {
@@ -24,13 +24,17 @@ function seed() {
     { id: 3, nome: "Geral", categoria: 2 },
     { id: 4, nome: "Geral", categoria: 3 },
   ]
-  const produtos = [
-    { id: 1, nome: "Arroz Branco Tipo 1", numero_nota_fiscal: "NF-00231", grupo: 1, quantidade: 48, unidade: "KG", estoque_minimo: 20, perecivel: true, periodicidade: "MENSAL", validade: emDias(95), preco: "5.40" },
-    { id: 2, nome: "Feijão Carioca", numero_nota_fiscal: "NF-00231", grupo: 2, quantidade: 12, unidade: "KG", estoque_minimo: 15, perecivel: true, periodicidade: "MENSAL", validade: emDias(20), preco: "8.20" },
-    { id: 3, nome: "Detergente Neutro", numero_nota_fiscal: "NF-00198", grupo: 3, quantidade: 64, unidade: "UN", estoque_minimo: 20, perecivel: false, periodicidade: "EVENTUAL", validade: emDias(310), preco: "2.15" },
-    { id: 4, nome: "Resma Papel A4", numero_nota_fiscal: "NF-00210", grupo: 4, quantidade: 25, unidade: "PC", estoque_minimo: 10, perecivel: false, periodicidade: "EVENTUAL", validade: null, preco: "23.00" },
+  const fornecedores = [
+    { id: 1, nome: "Atacadão Escolar", documento: "12.345.678/0001-99", endereco: "Av. Central, 100", telefone: "(81) 99999-0000", email: "vendas@atacadao.com", emite_nota_fiscal: true, aceita_fiado: false, ativo: true, observacao: "" },
+    { id: 2, nome: "Mercadinho do Zé", documento: "", endereco: "Rua 5, 23", telefone: "(81) 98888-1111", email: "", emite_nota_fiscal: false, aceita_fiado: true, ativo: true, observacao: "Aceita fiado quando a verba atrasa." },
   ]
-  return { categorias, grupos, produtos, seqC: 4, seqG: 5, seqP: 5 }
+  const produtos = [
+    { id: 1, nome: "Arroz Branco Tipo 1", numero_nota_fiscal: "NF-00231", grupo: 1, fornecedor: 1, quantidade: 48, unidade: "KG", estoque_minimo: 20, perecivel: true, periodicidade: "MENSAL", validade: emDias(95), preco: "5.40" },
+    { id: 2, nome: "Feijão Carioca", numero_nota_fiscal: "NF-00231", grupo: 2, fornecedor: 1, quantidade: 12, unidade: "KG", estoque_minimo: 15, perecivel: true, periodicidade: "MENSAL", validade: emDias(20), preco: "8.20" },
+    { id: 3, nome: "Detergente Neutro", numero_nota_fiscal: "NF-00198", grupo: 3, fornecedor: 2, quantidade: 64, unidade: "UN", estoque_minimo: 20, perecivel: false, periodicidade: "EVENTUAL", validade: emDias(310), preco: "2.15" },
+    { id: 4, nome: "Resma Papel A4", numero_nota_fiscal: "NF-00210", grupo: 4, fornecedor: null, quantidade: 25, unidade: "PC", estoque_minimo: 10, perecivel: false, periodicidade: "EVENTUAL", validade: null, preco: "23.00" },
+  ]
+  return { categorias, grupos, fornecedores, produtos, seqC: 4, seqG: 5, seqF: 3, seqP: 5 }
 }
 
 function load() {
@@ -50,11 +54,14 @@ function save(db) {
 function expand(p, db) {
   const grupo = db.grupos.find((g) => g.id === Number(p.grupo))
   const cat = grupo ? db.categorias.find((c) => c.id === Number(grupo.categoria)) : null
+  const forn = p.fornecedor ? db.fornecedores.find((f) => f.id === Number(p.fornecedor)) : null
   return {
     ...p,
     grupo_nome: grupo ? grupo.nome : "—",
     categoria: cat ? cat.id : null,
     categoria_nome: cat ? cat.name : "—",
+    fornecedor: p.fornecedor ?? null,
+    fornecedor_nome: forn ? forn.nome : null,
     criado_por_nome: "voce",
     criado_em: p.criado_em ?? new Date().toISOString(),
     atualizado_em: new Date().toISOString(),
@@ -128,6 +135,50 @@ export const mockGrupos = {
   },
 }
 
+export const mockFornecedores = {
+  async list() {
+    await delay(120)
+    const db = load()
+    return [...db.fornecedores].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+  },
+  async create(data) {
+    await delay()
+    const db = load()
+    const novo = {
+      id: db.seqF++,
+      nome: String(data.nome).trim(),
+      documento: data.documento || "",
+      endereco: data.endereco || "",
+      telefone: data.telefone || "",
+      email: data.email || "",
+      emite_nota_fiscal: data.emite_nota_fiscal ?? true,
+      aceita_fiado: Boolean(data.aceita_fiado),
+      ativo: data.ativo ?? true,
+      observacao: data.observacao || "",
+    }
+    db.fornecedores.push(novo)
+    save(db)
+    return novo
+  },
+  async update(id, data) {
+    await delay()
+    const db = load()
+    const i = db.fornecedores.findIndex((f) => f.id === Number(id))
+    if (i === -1) throw new Error("Fornecedor não encontrado")
+    db.fornecedores[i] = { ...db.fornecedores[i], ...data }
+    save(db)
+    return db.fornecedores[i]
+  },
+  async remove(id) {
+    await delay()
+    const db = load()
+    const emUso = db.produtos.some((p) => Number(p.fornecedor) === Number(id))
+    if (emUso) throw new Error("Fornecedor vinculado a produtos — desative em vez de excluir.")
+    db.fornecedores = db.fornecedores.filter((f) => f.id !== Number(id))
+    save(db)
+  },
+}
+
 export const mockCategorias = {
   async list() {
     await delay(120)
@@ -155,6 +206,7 @@ function normalize(data) {
     nome: data.nome,
     numero_nota_fiscal: data.numero_nota_fiscal || null,
     grupo: Number(data.grupo),
+    fornecedor: data.fornecedor ? Number(data.fornecedor) : null,
     quantidade: Number(data.quantidade),
     unidade: data.unidade,
     estoque_minimo: Number(data.estoque_minimo) || 0,

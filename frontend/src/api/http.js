@@ -54,3 +54,10 @@ export const httpBensPermanentes = {
   update: (id, data) => req(`/bens-permanentes/${id}/`, { method: "PATCH", body: data }),
   remove: (id) => req(`/bens-permanentes/${id}/`, { method: "DELETE" }),
 }
+
+export const httpFornecedores = {
+  list: () => req(`/fornecedores/`),
+  create: (data) => req(`/fornecedores/`, { method: "POST", body: data }),
+  update: (id, data) => req(`/fornecedores/${id}/`, { method: "PATCH", body: data }),
+  remove: (id) => req(`/fornecedores/${id}/`, { method: "DELETE" }),
+}
