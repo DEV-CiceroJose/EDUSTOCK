@@ -13,12 +13,14 @@ class ProdutoSerializer(serializers.ModelSerializer):
     categoria = serializers.IntegerField(source="grupo.categoria_id", read_only=True)
     categoria_nome = serializers.CharField(source="grupo.categoria.name", read_only=True)
     criado_por_nome = serializers.CharField(source="criado_por.username", read_only=True)
+    fornecedor_nome = serializers.CharField(source="fornecedor.nome", read_only=True, allow_null=True, default=None)
 
     class Meta:
         model = Produto
         fields = [
             "id", "nome", "numero_nota_fiscal",
-            "grupo", "grupo_nome", "categoria", "categoria_nome",
+            "grupo", "grupo_nome", "fornecedor", "fornecedor_nome",
+            "categoria", "categoria_nome",
             "quantidade", "unidade", "estoque_minimo", "perecivel", "periodicidade",
             "validade", "preco",
             "criado_por_nome", "criado_em", "atualizado_em",

@@ -95,3 +95,28 @@ class FornecedorApiTest(APITestCase):
         self.client.post("/api/fornecedores/", {"nome": "Distribuidora Sul"}, format="json")
         resp = self.client.get("/api/fornecedores/?search=papel")
         self.assertEqual([f["nome"] for f in resp.data], ["Papelaria Central"])
+
+
+class ProdutoFornecedorApiTest(APITestCase):
+    def setUp(self):
+        self.cat = Categoria.objects.create(name="Alimentos")
+        self.grupo = Grupo.objects.create(nome="Geral", categoria=self.cat)
+
+    def test_produto_expoe_e_aceita_fornecedor(self):
+        from core.models import Fornecedor
+        f = Fornecedor.objects.create(nome="Atacadão")
+        resp = self.client.post("/api/produtos/", {
+            "nome": "Arroz", "grupo": self.grupo.id, "quantidade": "1",
+            "unidade": "KG", "fornecedor": f.id,
+        }, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(resp.data["fornecedor"], f.id)
+        self.assertEqual(resp.data["fornecedor_nome"], "Atacadão")
+
+    def test_produto_sem_fornecedor_tem_nome_nulo(self):
+        resp = self.client.post("/api/produtos/", {
+            "nome": "Feijão", "grupo": self.grupo.id, "quantidade": "1", "unidade": "KG",
+        }, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertIsNone(resp.data["fornecedor"])
+        self.assertIsNone(resp.data["fornecedor_nome"])

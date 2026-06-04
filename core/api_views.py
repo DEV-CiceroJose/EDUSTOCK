@@ -18,14 +18,17 @@ class ProdutoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Produto.objects.select_related(
-            "grupo__categoria", "criado_por", "atualizado_por"
+            "grupo__categoria", "fornecedor", "criado_por", "atualizado_por"
         ).all()
         grupo = self.request.query_params.get("grupo")
         categoria = self.request.query_params.get("categoria")
+        fornecedor = self.request.query_params.get("fornecedor")
         if grupo:
             qs = qs.filter(grupo_id=grupo)
         if categoria:
             qs = qs.filter(grupo__categoria_id=categoria)
+        if fornecedor:
+            qs = qs.filter(fornecedor_id=fornecedor)
         return qs
 
     def perform_create(self, serializer):
