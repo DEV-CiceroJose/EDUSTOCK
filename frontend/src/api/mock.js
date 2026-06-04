@@ -56,6 +56,7 @@ function expand(p, db) {
     categoria: cat ? cat.id : null,
     categoria_nome: cat ? cat.name : "—",
     criado_por_nome: "voce",
+    criado_em: p.criado_em ?? new Date().toISOString(),
     atualizado_em: new Date().toISOString(),
   }
 }

@@ -1,5 +1,5 @@
 from rest_framework.test import APITestCase
-from core.models import Categoria, Grupo
+from core.models import Categoria, Grupo, Produto
 
 
 class GrupoApiTest(APITestCase):
@@ -14,9 +14,6 @@ class GrupoApiTest(APITestCase):
         resp = self.client.get("/api/grupos/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data), 1)
-
-
-from core.models import Produto
 
 
 class ProdutoApiTest(APITestCase):
