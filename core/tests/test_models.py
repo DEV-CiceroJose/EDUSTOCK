@@ -50,3 +50,19 @@ class BemPermanenteModelTest(TestCase):
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 BemPermanente.objects.create(nome="B", numero_patrimonio="PAT-9")
+
+
+class ProdutoFinalTest(TestCase):
+    def test_grupo_obrigatorio_e_categoria_removida(self):
+        cat = Categoria.objects.create(name="Limpeza")
+        grupo = Grupo.objects.create(nome="Geral", categoria=cat)
+        p = Produto.objects.create(nome="Sabão", grupo=grupo, quantidade=5, unidade="UN")
+        # categoria não é mais campo do Produto
+        self.assertFalse(hasattr(p, "categoria"))
+
+    def test_categoria_em_uso_protegida(self):
+        from django.db.models import ProtectedError
+        cat = Categoria.objects.create(name="Papelaria")
+        Grupo.objects.create(nome="Geral", categoria=cat)
+        with self.assertRaises(ProtectedError):
+            cat.delete()

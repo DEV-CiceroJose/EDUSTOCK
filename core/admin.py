@@ -18,7 +18,7 @@ class ProdutoAdmin(admin.ModelAdmin):
     list_display = (
         'nome',
         'numero_nota_fiscal',
-        'categoria',
+        'grupo',
         'quantidade',
         'unidade',
         'validade',
@@ -30,7 +30,7 @@ class ProdutoAdmin(admin.ModelAdmin):
 
     # 🔍 Filtros laterais
     list_filter = (
-        'categoria',
+        'grupo',
         'numero_nota_fiscal',
         'unidade',
         'validade',
@@ -54,7 +54,7 @@ class ProdutoAdmin(admin.ModelAdmin):
     # 🧩 Organização dos campos no formulário
     fieldsets = (
         ('Informações do Produto', {
-            'fields': ('nome', 'numero_nota_fiscal', 'categoria', 'quantidade', 'unidade')
+            'fields': ('nome', 'numero_nota_fiscal', 'grupo', 'quantidade', 'unidade')
         }),
         ('Detalhes', {
             'fields': ('validade', 'preco')

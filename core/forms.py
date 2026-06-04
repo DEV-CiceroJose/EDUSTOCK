@@ -12,7 +12,7 @@ class ProdutoForm(forms.ModelForm):
         fields = [
             'nome',
             'numero_nota_fiscal',
-            'categoria',
+            'grupo',
             'quantidade',
             'unidade',
             'validade',
@@ -22,7 +22,7 @@ class ProdutoForm(forms.ModelForm):
             'validade': DateInputBR(attrs={'class': 'form-control'}),
             'nome': forms.TextInput(attrs={'class': 'form-control'}),
             'numero_nota_fiscal': forms.TextInput(attrs={'class': 'form-control'}),
-            'categoria': forms.Select(attrs={'class': 'form-control'}),
+            'grupo': forms.Select(attrs={'class': 'form-control'}),
             'quantidade': forms.NumberInput(attrs={'class': 'form-control'}),
             'unidade': forms.Select(attrs={'class': 'form-control'}),
             'preco': forms.NumberInput(attrs={'class': 'form-control'}),

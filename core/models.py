@@ -58,15 +58,7 @@ class Produto(models.Model):
     numero_nota_fiscal = models.CharField(
         "Número da Nota Fiscal", max_length=12, null=True, blank=True
     )
-    # categoria mantida temporariamente; removida na migração 0006
-    categoria = models.ForeignKey(
-        "Categoria", on_delete=models.PROTECT, null=True, blank=True,
-        related_name="produtos_legado",
-    )
-    grupo = models.ForeignKey(
-        "Grupo", on_delete=models.PROTECT, null=True, blank=True,
-        related_name="produtos",
-    )
+    grupo = models.ForeignKey("Grupo", on_delete=models.PROTECT, related_name="produtos")
     quantidade = models.DecimalField("Quantidade", max_digits=10, decimal_places=3, default=0)
     unidade = models.CharField(max_length=2, choices=UNIDADE_CHOICES)
     estoque_minimo = models.DecimalField(
