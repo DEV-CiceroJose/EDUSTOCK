@@ -60,3 +60,38 @@ class BemPermanenteApiTest(APITestCase):
 
         resp = self.client.delete(f"/api/bens-permanentes/{bem_id}/")
         self.assertEqual(resp.status_code, 204)
+
+
+class FornecedorApiTest(APITestCase):
+    def test_crud_e_filtro(self):
+        resp = self.client.post("/api/fornecedores/", {
+            "nome": "Atacadão", "documento": "12.345.678/0001-99",
+            "emite_nota_fiscal": True, "aceita_fiado": False,
+        }, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertTrue(resp.data["ativo"])
+
+        # cria um fiado/inativo
+        self.client.post("/api/fornecedores/", {
+            "nome": "Seu Zé (fiado)", "emite_nota_fiscal": False,
+            "aceita_fiado": True, "ativo": False,
+        }, format="json")
+
+        # lista todos
+        resp = self.client.get("/api/fornecedores/")
+        self.assertEqual(len(resp.data), 2)
+
+        # filtro aceita_fiado=true
+        resp = self.client.get("/api/fornecedores/?aceita_fiado=true")
+        nomes = [f["nome"] for f in resp.data]
+        self.assertEqual(nomes, ["Seu Zé (fiado)"])
+
+        # filtro ativo=false
+        resp = self.client.get("/api/fornecedores/?ativo=false")
+        self.assertEqual(len(resp.data), 1)
+
+    def test_busca_por_nome(self):
+        self.client.post("/api/fornecedores/", {"nome": "Papelaria Central"}, format="json")
+        self.client.post("/api/fornecedores/", {"nome": "Distribuidora Sul"}, format="json")
+        resp = self.client.get("/api/fornecedores/?search=papel")
+        self.assertEqual([f["nome"] for f in resp.data], ["Papelaria Central"])

@@ -1,7 +1,8 @@
 from rest_framework import viewsets, filters
-from .models import Produto, Categoria, Grupo, BemPermanente
+from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor
 from .serializers import (
-    ProdutoSerializer, CategoriaSerializer, GrupoSerializer, BemPermanenteSerializer,
+    ProdutoSerializer, CategoriaSerializer, GrupoSerializer,
+    BemPermanenteSerializer, FornecedorSerializer,
 )
 
 
@@ -44,6 +45,28 @@ class GrupoViewSet(viewsets.ModelViewSet):
 class BemPermanenteViewSet(viewsets.ModelViewSet):
     queryset = BemPermanente.objects.all()
     serializer_class = BemPermanenteSerializer
+
+    def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(criado_por=user, atualizado_por=user)
+
+    def perform_update(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(atualizado_por=user)
+
+
+class FornecedorViewSet(viewsets.ModelViewSet):
+    serializer_class = FornecedorSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["nome", "documento"]
+
+    def get_queryset(self):
+        qs = Fornecedor.objects.all()
+        for campo in ("emite_nota_fiscal", "aceita_fiado", "ativo"):
+            valor = self.request.query_params.get(campo)
+            if valor is not None:
+                qs = qs.filter(**{campo: valor.lower() in ("1", "true", "sim")})
+        return qs
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
