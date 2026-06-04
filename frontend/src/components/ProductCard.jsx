@@ -8,9 +8,9 @@ const BAR = { ok: "var(--color-ok)", low: "var(--color-low)", out: "var(--color-
 
 export default function ProductCard({ produto, index = 0, busy, onAdd, onRemove, onDetails }) {
   const st = categoryStyle(produto.categoria_nome, index)
-  const stock = stockStatus(produto.quantidade)
+  const stock = stockStatus(produto.quantidade, produto.estoque_minimo)
   const val = validadeStatus(produto.validade)
-  const pct = stockPercent(produto.quantidade)
+  const pct = stockPercent(produto.quantidade, produto.estoque_minimo)
 
   return (
     <motion.div
@@ -46,7 +46,10 @@ export default function ProductCard({ produto, index = 0, busy, onAdd, onRemove,
               {Icon.detail(16)}
             </button>
           </div>
-          <div className="truncate text-xs text-ink-faint">{produto.categoria_nome}</div>
+          <div className="truncate text-xs text-ink-faint">
+            {produto.categoria_nome}
+            {produto.grupo_nome ? ` › ${produto.grupo_nome}` : ""}
+          </div>
 
           <div className="mt-1.5 flex items-baseline gap-1">
             <span className="font-display text-2xl font-bold leading-none">{qtd(produto.quantidade)}</span>

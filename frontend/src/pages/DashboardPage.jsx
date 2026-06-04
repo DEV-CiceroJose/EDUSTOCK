@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { produtosApi, categoriasApi } from "../api"
+import { produtosApi, categoriasApi, gruposApi } from "../api"
 import { brl, stockStatus, validadeStatus } from "../lib/format"
 import { Icon } from "../lib/icons.jsx"
 
@@ -26,10 +26,11 @@ const TABS = [
 export default function DashboardPage() {
   const [produtos, setProdutos] = useState([])
   const [categorias, setCategorias] = useState([])
+  const [grupos, setGrupos] = useState([])
   const [loading, setLoading] = useState(true)
 
   const [tab, setTab] = useState("inv")
-  const [cat, setCat] = useState("all")
+  const [cat, setCat] = useState({ tipo: "all" })
   const [search, setSearch] = useState("")
   const [termo, setTermo] = useState("")
 
@@ -50,9 +51,12 @@ export default function DashboardPage() {
   async function carregar() {
     setLoading(true)
     try {
-      const [p, c] = await Promise.all([produtosApi.list(termo), categoriasApi.list()])
+      const [p, c, g] = await Promise.all([
+        produtosApi.list(termo), categoriasApi.list(), gruposApi.list(),
+      ])
       setProdutos(p)
       setCategorias(c)
+      setGrupos(g)
     } finally {
       setLoading(false)
     }
@@ -60,20 +64,24 @@ export default function DashboardPage() {
   useEffect(() => { carregar() }, [termo]) // eslint-disable-line
 
   const counts = useMemo(() => {
-    const m = {}
-    for (const p of produtos) m[p.categoria] = (m[p.categoria] || 0) + 1
-    return m
+    const cat = {}, grupo = {}
+    for (const p of produtos) {
+      if (p.categoria != null) cat[p.categoria] = (cat[p.categoria] || 0) + 1
+      grupo[p.grupo] = (grupo[p.grupo] || 0) + 1
+    }
+    return { cat, grupo }
   }, [produtos])
 
-  const visiveis = useMemo(
-    () => (cat === "all" ? produtos : produtos.filter((p) => p.categoria === cat)),
-    [produtos, cat]
-  )
+  const visiveis = useMemo(() => {
+    if (cat.tipo === "cat") return produtos.filter((p) => p.categoria === cat.id)
+    if (cat.tipo === "grupo") return produtos.filter((p) => p.grupo === cat.id)
+    return produtos
+  }, [produtos, cat])
 
   const alerts = useMemo(() => {
     const a = []
     for (const p of produtos) {
-      const s = stockStatus(p.quantidade)
+      const s = stockStatus(p.quantidade, p.estoque_minimo)
       const v = validadeStatus(p.validade)
       if (s.code === "out") a.push({ id: `o${p.id}`, code: "out", label: `Esgotado — ${p.nome}`, produtoId: p.id })
       else if (s.code === "low") a.push({ id: `l${p.id}`, code: "low", label: `Estoque baixo — ${p.nome} (${p.categoria_nome})`, produtoId: p.id })
@@ -87,7 +95,7 @@ export default function DashboardPage() {
     let valor = 0, baixo = 0, vencidos = 0
     for (const p of produtos) {
       if (p.preco) valor += Number(p.preco) * Number(p.quantidade)
-      if (stockStatus(p.quantidade).code !== "ok") baixo++
+      if (stockStatus(p.quantidade, p.estoque_minimo).code !== "ok") baixo++
       if (validadeStatus(p.validade).code === "expired") vencidos++
     }
     return { valor, baixo, vencidos, total: produtos.length }
@@ -159,6 +167,7 @@ export default function DashboardPage() {
                   {/* Categorias */}
                   <CategoryRail
                     categorias={categorias}
+                    grupos={grupos}
                     counts={counts}
                     total={produtos.length}
                     active={cat}
@@ -173,7 +182,7 @@ export default function DashboardPage() {
                         <h2 className="font-display text-2xl font-bold leading-none">Inventário</h2>
                         <p className="mt-1 text-sm text-ink-faint">
                           {visiveis.length} {visiveis.length === 1 ? "item" : "itens"}
-                          {cat !== "all" && " nesta categoria"}
+                          {cat.tipo !== "all" && " no filtro atual"}
                           {termo && ` para “${termo}”`}
                         </p>
                       </div>
@@ -248,7 +257,7 @@ export default function DashboardPage() {
       <ProductFormModal
         open={addOpen || !!editProduto}
         produto={editProduto}
-        categorias={categorias}
+        grupos={grupos}
         onClose={() => { setAddOpen(false); setEditProduto(null) }}
         onSaved={carregar}
       />

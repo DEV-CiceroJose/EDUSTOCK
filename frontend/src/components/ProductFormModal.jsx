@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { produtosApi } from "../api"
-import { UNIDADES } from "../api/units"
+import { UNIDADES, PERIODICIDADES } from "../api/units"
 import Modal from "./Modal"
 import { useToast } from "./Toast"
 
 const VAZIO = {
-  nome: "", numero_nota_fiscal: "", categoria: "",
-  quantidade: "", unidade: "UN", validade: "", preco: "",
+  nome: "", numero_nota_fiscal: "", grupo: "",
+  quantidade: "", unidade: "UN", estoque_minimo: "",
+  perecivel: false, periodicidade: "EVENTUAL", validade: "", preco: "",
 }
 
 function Campo({ label, hint, children, full }) {
@@ -21,12 +22,23 @@ function Campo({ label, hint, children, full }) {
   )
 }
 
-export default function ProductFormModal({ open, produto, categorias, onClose, onSaved }) {
+export default function ProductFormModal({ open, produto, grupos, onClose, onSaved }) {
   const editando = Boolean(produto)
   const [form, setForm] = useState(VAZIO)
   const [erros, setErros] = useState({})
   const [salvando, setSalvando] = useState(false)
   const toast = useToast()
+
+  // Agrupa os grupos por categoria para o <optgroup>
+  const porCategoria = useMemo(() => {
+    const m = new Map()
+    for (const g of grupos) {
+      const k = g.categoria_nome || "Sem categoria"
+      if (!m.has(k)) m.set(k, [])
+      m.get(k).push(g)
+    }
+    return [...m.entries()]
+  }, [grupos])
 
   useEffect(() => {
     if (!open) return
@@ -34,25 +46,30 @@ export default function ProductFormModal({ open, produto, categorias, onClose, o
       setForm({
         nome: produto.nome ?? "",
         numero_nota_fiscal: produto.numero_nota_fiscal ?? "",
-        categoria: String(produto.categoria ?? ""),
+        grupo: String(produto.grupo ?? ""),
         quantidade: String(produto.quantidade ?? ""),
         unidade: produto.unidade ?? "UN",
+        estoque_minimo: String(produto.estoque_minimo ?? ""),
+        perecivel: Boolean(produto.perecivel),
+        periodicidade: produto.periodicidade ?? "EVENTUAL",
         validade: produto.validade ?? "",
         preco: produto.preco ?? "",
       })
     } else {
-      setForm({ ...VAZIO, categoria: categorias[0] ? String(categorias[0].id) : "" })
+      setForm({ ...VAZIO, grupo: grupos[0] ? String(grupos[0].id) : "" })
     }
     setErros({})
-  }, [open, produto, categorias])
+  }, [open, produto, grupos])
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const set = (k) => (e) =>
+    setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }))
 
   function validar() {
     const e = {}
     if (!form.nome.trim()) e.nome = "Informe o nome"
-    if (!form.categoria) e.categoria = "Selecione"
+    if (!form.grupo) e.grupo = "Selecione um grupo"
     if (form.quantidade === "" || Number(form.quantidade) < 0) e.quantidade = "Inválida"
+    if (form.estoque_minimo !== "" && Number(form.estoque_minimo) < 0) e.estoque_minimo = "Inválido"
     setErros(e)
     return Object.keys(e).length === 0
   }
@@ -92,14 +109,18 @@ export default function ProductFormModal({ open, produto, categorias, onClose, o
           {erros.nome && <p className="mt-1 text-xs text-out">{erros.nome}</p>}
         </Campo>
 
-        <Campo label="Categoria">
-          <select className="field" value={form.categoria} onChange={set("categoria")}>
+        <Campo label="Grupo">
+          <select className="field" value={form.grupo} onChange={set("grupo")}>
             <option value="">— selecione —</option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+            {porCategoria.map(([cat, gs]) => (
+              <optgroup key={cat} label={cat}>
+                {gs.map((g) => (
+                  <option key={g.id} value={g.id}>{g.nome}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
-          {erros.categoria && <p className="mt-1 text-xs text-out">{erros.categoria}</p>}
+          {erros.grupo && <p className="mt-1 text-xs text-out">{erros.grupo}</p>}
         </Campo>
 
         <Campo label="Nota Fiscal" hint="opcional">
@@ -111,10 +132,23 @@ export default function ProductFormModal({ open, produto, categorias, onClose, o
           {erros.quantidade && <p className="mt-1 text-xs text-out">{erros.quantidade}</p>}
         </Campo>
 
+        <Campo label="Estoque mínimo" hint="alerta de reposição">
+          <input type="number" step="any" min="0" className="field" value={form.estoque_minimo} onChange={set("estoque_minimo")} placeholder="0" />
+          {erros.estoque_minimo && <p className="mt-1 text-xs text-out">{erros.estoque_minimo}</p>}
+        </Campo>
+
         <Campo label="Unidade">
           <select className="field" value={form.unidade} onChange={set("unidade")}>
             {UNIDADES.map((u) => (
               <option key={u.value} value={u.value}>{u.value} · {u.label}</option>
+            ))}
+          </select>
+        </Campo>
+
+        <Campo label="Periodicidade">
+          <select className="field" value={form.periodicidade} onChange={set("periodicidade")}>
+            {PERIODICIDADES.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
             ))}
           </select>
         </Campo>
@@ -126,6 +160,11 @@ export default function ProductFormModal({ open, produto, categorias, onClose, o
         <Campo label="Preço unitário" hint="R$ · opcional">
           <input type="number" step="0.01" min="0" className="field" value={form.preco} onChange={set("preco")} placeholder="0,00" />
         </Campo>
+
+        <label className="flex items-center gap-2 sm:col-span-2">
+          <input type="checkbox" checked={form.perecivel} onChange={set("perecivel")} className="h-4 w-4" />
+          <span className="text-sm font-semibold">Item perecível</span>
+        </label>
 
         <div className="mt-1 flex justify-end gap-2 sm:col-span-2">
           <button type="button" onClick={onClose} className="btn btn-ghost">Cancelar</button>
