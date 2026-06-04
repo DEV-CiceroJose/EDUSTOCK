@@ -155,6 +155,8 @@ export const mockFornecedores = {
       aceita_fiado: Boolean(data.aceita_fiado),
       ativo: data.ativo ?? true,
       observacao: data.observacao || "",
+      criado_em: new Date().toISOString(),
+      atualizado_em: new Date().toISOString(),
     }
     db.fornecedores.push(novo)
     save(db)

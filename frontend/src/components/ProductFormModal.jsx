@@ -40,6 +40,16 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
     return [...m.entries()]
   }, [grupos])
 
+  // Lista de opções de fornecedor: ativos + o fornecedor atual do produto
+  // (mesmo inativo), para não desvincular silenciosamente ao editar.
+  const opcoesFornecedor = useMemo(() => {
+    const lista = [...fornecedores]
+    if (produto?.fornecedor && !lista.some((f) => f.id === produto.fornecedor)) {
+      lista.unshift({ id: produto.fornecedor, nome: `${produto.fornecedor_nome ?? "Fornecedor"} (inativo)` })
+    }
+    return lista
+  }, [fornecedores, produto])
+
   useEffect(() => {
     if (!open) return
     if (produto) {
@@ -158,7 +168,7 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
         <Campo label="Fornecedor" hint="opcional">
           <select className="field" value={form.fornecedor} onChange={set("fornecedor")}>
             <option value="">— sem fornecedor —</option>
-            {fornecedores.map((f) => (
+            {opcoesFornecedor.map((f) => (
               <option key={f.id} value={f.id}>{f.nome}</option>
             ))}
           </select>
