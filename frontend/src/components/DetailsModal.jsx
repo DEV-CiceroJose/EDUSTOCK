@@ -48,7 +48,9 @@ export default function DetailsModal({ produto, onClose, onEdit, onDelete }) {
             </span>
           ) : "Sem validade"}
         </Linha>
-        <Linha label="Nota Fiscal">{produto.numero_nota_fiscal || "—"}</Linha>
+        {produto.numero_nota_fiscal && (
+          <Linha label="NF (legado)">{produto.numero_nota_fiscal}</Linha>
+        )}
         <Linha label="Estoque mínimo">{qtd(produto.estoque_minimo)} {unidadeLabel(produto.unidade).toLowerCase()}</Linha>
         <Linha label="Periodicidade">{produto.periodicidade ?? "—"}</Linha>
         <Linha label="Fornecedor">{produto.fornecedor_nome || "—"}</Linha>

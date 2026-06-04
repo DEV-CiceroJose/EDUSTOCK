@@ -96,3 +96,36 @@ class FornecedorModelTest(TestCase):
         Produto.objects.create(nome="Item", grupo=grupo, quantidade=1, unidade="UN", fornecedor=f)
         with self.assertRaises(ProtectedError):
             f.delete()
+
+
+class MovimentacaoModelTest(TestCase):
+    def _produto(self):
+        cat = Categoria.objects.create(name="Alimentos")
+        grupo = Grupo.objects.create(nome="Geral", categoria=cat)
+        return Produto.objects.create(nome="Arroz", grupo=grupo, quantidade=10, unidade="KG")
+
+    def test_cria_movimentacao_e_entrada(self):
+        from core.models import Entrada, Movimentacao
+        p = self._produto()
+        e = Entrada.objects.create(numero_nota_fiscal="NF-1")
+        m = Movimentacao.objects.create(produto=p, tipo=Movimentacao.ENTRADA, quantidade=5, entrada=e, preco_unitario="2.00")
+        self.assertEqual(m.entrada, e)
+        self.assertEqual(list(e.itens.all()), [m])
+        self.assertEqual(str(m), "ENTRADA 5.000 Arroz")
+
+    def test_entrada_total(self):
+        from core.models import Entrada, Movimentacao
+        p = self._produto()
+        e = Entrada.objects.create()
+        Movimentacao.objects.create(produto=p, tipo=Movimentacao.ENTRADA, quantidade=3, entrada=e, preco_unitario="2.00")
+        Movimentacao.objects.create(produto=p, tipo=Movimentacao.ENTRADA, quantidade=2, entrada=e, preco_unitario="5.00")
+        from decimal import Decimal
+        self.assertEqual(e.total, Decimal("16.00"))
+
+    def test_produto_com_movimentacao_protegido(self):
+        from django.db.models import ProtectedError
+        from core.models import Movimentacao
+        p = self._produto()
+        Movimentacao.objects.create(produto=p, tipo=Movimentacao.SAIDA, quantidade=1)
+        with self.assertRaises(ProtectedError):
+            p.delete()

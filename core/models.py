@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 class Perfil(models.Model):
@@ -152,3 +153,60 @@ class BemPermanente(models.Model):
 
     def __str__(self):
         return self.nome
+
+
+class Entrada(models.Model):
+    fornecedor = models.ForeignKey(
+        "Fornecedor", on_delete=models.PROTECT, null=True, blank=True, related_name="entradas"
+    )
+    numero_nota_fiscal = models.CharField(max_length=20, blank=True)
+    data = models.DateField(default=timezone.localdate)
+    observacao = models.TextField(blank=True)
+    criado_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="entradas_criadas"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data", "-id"]
+        verbose_name = "Entrada"
+        verbose_name_plural = "Entradas"
+
+    def __str__(self):
+        return f"Entrada {self.data} - {self.fornecedor or 'sem fornecedor'}"
+
+    @property
+    def total(self):
+        from decimal import Decimal
+        return sum(
+            (m.quantidade * m.preco_unitario for m in self.itens.all() if m.preco_unitario),
+            Decimal("0"),
+        )
+
+
+class Movimentacao(models.Model):
+    ENTRADA = "ENTRADA"
+    SAIDA = "SAIDA"
+    TIPO_CHOICES = [(ENTRADA, "Entrada"), (SAIDA, "Saída")]
+
+    produto = models.ForeignKey("Produto", on_delete=models.PROTECT, related_name="movimentacoes")
+    tipo = models.CharField(max_length=7, choices=TIPO_CHOICES)
+    quantidade = models.DecimalField(max_digits=10, decimal_places=3)
+    preco_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    entrada = models.ForeignKey(
+        Entrada, on_delete=models.CASCADE, null=True, blank=True, related_name="itens"
+    )
+    motivo = models.CharField(max_length=120, blank=True)
+    data = models.DateField(default=timezone.localdate)
+    criado_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="movimentacoes_criadas"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data", "-id"]
+        verbose_name = "Movimentação"
+        verbose_name_plural = "Movimentações"
+
+    def __str__(self):
+        return f"{self.tipo} {self.quantidade:.3f} {self.produto.nome}"

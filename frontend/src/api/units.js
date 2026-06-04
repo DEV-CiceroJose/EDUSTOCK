@@ -16,3 +16,10 @@ export const PERIODICIDADES = [
   { value: "MENSAL", label: "Mensal" },
   { value: "EVENTUAL", label: "Eventual" },
 ]
+
+export const MOTIVOS_SAIDA = [
+  { value: "consumo", label: "Consumo" },
+  { value: "perda", label: "Perda" },
+  { value: "ajuste", label: "Ajuste" },
+  { value: "outro", label: "Outro" },
+]
