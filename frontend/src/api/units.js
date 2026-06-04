@@ -9,3 +9,10 @@ export const UNIDADES = [
 
 export const unidadeLabel = (v) =>
   UNIDADES.find((u) => u.value === v)?.label ?? v
+
+// Espelha Produto.PERIODICIDADE_CHOICES
+export const PERIODICIDADES = [
+  { value: "SEMANAL", label: "Semanal" },
+  { value: "MENSAL", label: "Mensal" },
+  { value: "EVENTUAL", label: "Eventual" },
+]

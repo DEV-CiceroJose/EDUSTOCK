@@ -41,3 +41,16 @@ export const httpCategorias = {
   create: (data) => req(`/categorias/`, { method: "POST", body: data }),
   remove: (id) => req(`/categorias/${id}/`, { method: "DELETE" }),
 }
+
+export const httpGrupos = {
+  list: () => req(`/grupos/`),
+  create: (data) => req(`/grupos/`, { method: "POST", body: data }),
+  remove: (id) => req(`/grupos/${id}/`, { method: "DELETE" }),
+}
+
+export const httpBensPermanentes = {
+  list: () => req(`/bens-permanentes/`),
+  create: (data) => req(`/bens-permanentes/`, { method: "POST", body: data }),
+  update: (id, data) => req(`/bens-permanentes/${id}/`, { method: "PATCH", body: data }),
+  remove: (id) => req(`/bens-permanentes/${id}/`, { method: "DELETE" }),
+}

@@ -1,10 +1,9 @@
 /* ------------------------------------------------------------------
    Mock que ESPELHA o contrato da API REST do Django (DRF).
-   Persiste em localStorage para o app funcionar sem backend.
-   Quando o Django estiver no ar, basta VITE_USE_MOCK=false.
+   Hierarquia: Categoria -> Grupo -> Produto. Persiste em localStorage.
 ------------------------------------------------------------------ */
 
-const KEY = "easystock:db:v1"
+const KEY = "easystock:db:v2"
 const delay = (ms = 220) => new Promise((r) => setTimeout(r, ms))
 
 function seed() {
@@ -15,22 +14,23 @@ function seed() {
     return x.toISOString().slice(0, 10)
   }
   const categorias = [
-    { id: 1, name: "Material de Limpeza" },
-    { id: 2, name: "Gêneros Alimentícios" },
-    { id: 3, name: "Material de Escritório" },
-    { id: 4, name: "Higiene" },
+    { id: 1, name: "Alimentos" },
+    { id: 2, name: "Limpeza" },
+    { id: 3, name: "Papelaria" },
+  ]
+  const grupos = [
+    { id: 1, nome: "Carboidratos", categoria: 1 },
+    { id: 2, nome: "Leguminosas", categoria: 1 },
+    { id: 3, nome: "Geral", categoria: 2 },
+    { id: 4, nome: "Geral", categoria: 3 },
   ]
   const produtos = [
-    { id: 1, nome: "Arroz Branco Tipo 1", numero_nota_fiscal: "NF-00231", categoria: 2, quantidade: 48, unidade: "KG", validade: emDias(95), preco: "5.40" },
-    { id: 2, nome: "Feijão Carioca", numero_nota_fiscal: "NF-00231", categoria: 2, quantidade: 30, unidade: "KG", validade: emDias(20), preco: "8.20" },
-    { id: 3, nome: "Detergente Neutro", numero_nota_fiscal: "NF-00198", categoria: 1, quantidade: 64, unidade: "UN", validade: emDias(310), preco: "2.15" },
-    { id: 4, nome: "Água Sanitária 5L", numero_nota_fiscal: "NF-00198", categoria: 1, quantidade: 12, unidade: "CX", validade: emDias(8), preco: "14.90" },
-    { id: 5, nome: "Resma Papel A4", numero_nota_fiscal: "NF-00210", categoria: 3, quantidade: 25, unidade: "PC", validade: null, preco: "23.00" },
-    { id: 6, nome: "Óleo de Soja 900ml", numero_nota_fiscal: "NF-00231", categoria: 2, quantidade: 40, unidade: "UN", validade: emDias(-3), preco: "6.75" },
-    { id: 7, nome: "Sabonete Líquido", numero_nota_fiscal: "NF-00255", categoria: 4, quantidade: 18, unidade: "L", validade: emDias(140), preco: "11.30" },
-    { id: 8, nome: "Caneta Esferográfica Azul", numero_nota_fiscal: "NF-00210", categoria: 3, quantidade: 200, unidade: "UN", validade: null, preco: "0.90" },
+    { id: 1, nome: "Arroz Branco Tipo 1", numero_nota_fiscal: "NF-00231", grupo: 1, quantidade: 48, unidade: "KG", estoque_minimo: 20, perecivel: true, periodicidade: "MENSAL", validade: emDias(95), preco: "5.40" },
+    { id: 2, nome: "Feijão Carioca", numero_nota_fiscal: "NF-00231", grupo: 2, quantidade: 12, unidade: "KG", estoque_minimo: 15, perecivel: true, periodicidade: "MENSAL", validade: emDias(20), preco: "8.20" },
+    { id: 3, nome: "Detergente Neutro", numero_nota_fiscal: "NF-00198", grupo: 3, quantidade: 64, unidade: "UN", estoque_minimo: 20, perecivel: false, periodicidade: "EVENTUAL", validade: emDias(310), preco: "2.15" },
+    { id: 4, nome: "Resma Papel A4", numero_nota_fiscal: "NF-00210", grupo: 4, quantidade: 25, unidade: "PC", estoque_minimo: 10, perecivel: false, periodicidade: "EVENTUAL", validade: null, preco: "23.00" },
   ]
-  return { categorias, produtos, seqC: 5, seqP: 9 }
+  return { categorias, grupos, produtos, seqC: 4, seqG: 5, seqP: 5 }
 }
 
 function load() {
@@ -47,10 +47,17 @@ function save(db) {
   localStorage.setItem(KEY, JSON.stringify(db))
 }
 
-// Acrescenta o nome da categoria (como um serializer DRF faria com source=)
 function expand(p, db) {
-  const cat = db.categorias.find((c) => c.id === Number(p.categoria))
-  return { ...p, categoria_nome: cat ? cat.name : "—", criado_por_nome: "voce", atualizado_em: new Date().toISOString() }
+  const grupo = db.grupos.find((g) => g.id === Number(p.grupo))
+  const cat = grupo ? db.categorias.find((c) => c.id === Number(grupo.categoria)) : null
+  return {
+    ...p,
+    grupo_nome: grupo ? grupo.nome : "—",
+    categoria: cat ? cat.id : null,
+    categoria_nome: cat ? cat.name : "—",
+    criado_por_nome: "voce",
+    atualizado_em: new Date().toISOString(),
+  }
 }
 
 export const mockProdutos = {
@@ -96,6 +103,30 @@ export const mockProdutos = {
   },
 }
 
+export const mockGrupos = {
+  async list() {
+    await delay(120)
+    const db = load()
+    return db.grupos
+      .map((g) => ({ ...g, categoria_nome: db.categorias.find((c) => c.id === g.categoria)?.name ?? "—" }))
+      .sort((a, b) => (a.categoria_nome + a.nome).localeCompare(b.categoria_nome + b.nome, "pt-BR"))
+  },
+  async create(data) {
+    await delay()
+    const db = load()
+    const novo = { id: db.seqG++, nome: String(data.nome).trim(), categoria: Number(data.categoria) }
+    db.grupos.push(novo)
+    save(db)
+    return novo
+  },
+  async remove(id) {
+    await delay()
+    const db = load()
+    db.grupos = db.grupos.filter((g) => g.id !== Number(id))
+    save(db)
+  },
+}
+
 export const mockCategorias = {
   async list() {
     await delay(120)
@@ -122,9 +153,12 @@ function normalize(data) {
   return {
     nome: data.nome,
     numero_nota_fiscal: data.numero_nota_fiscal || null,
-    categoria: Number(data.categoria),
+    grupo: Number(data.grupo),
     quantidade: Number(data.quantidade),
     unidade: data.unidade,
+    estoque_minimo: Number(data.estoque_minimo) || 0,
+    perecivel: Boolean(data.perecivel),
+    periodicidade: data.periodicidade || "EVENTUAL",
     validade: data.validade || null,
     preco: data.preco === "" || data.preco == null ? null : String(data.preco),
   }
