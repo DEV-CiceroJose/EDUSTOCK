@@ -46,3 +46,20 @@ class ProdutoApiTest(APITestCase):
         self.assertEqual(resp.status_code, 200)
         nomes = [p["nome"] for p in resp.data]
         self.assertEqual(nomes, ["Arroz"])
+
+
+class BemPermanenteApiTest(APITestCase):
+    def test_crud_basico(self):
+        resp = self.client.post("/api/bens-permanentes/", {
+            "nome": "Projetor", "numero_patrimonio": "PAT-77",
+            "localizacao": "Sala 3", "responsavel": "Coordenação",
+            "estado_conservacao": "BOM",
+        }, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        bem_id = resp.data["id"]
+
+        resp = self.client.get("/api/bens-permanentes/")
+        self.assertEqual(len(resp.data), 1)
+
+        resp = self.client.delete(f"/api/bens-permanentes/{bem_id}/")
+        self.assertEqual(resp.status_code, 204)

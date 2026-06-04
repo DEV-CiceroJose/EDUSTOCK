@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Produto, Categoria, Grupo
+from .models import Produto, Categoria, Grupo, BemPermanente
 
 
 class CategoriaSerializer(serializers.ModelSerializer):
@@ -32,3 +32,14 @@ class GrupoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Grupo
         fields = ["id", "nome", "categoria", "categoria_nome"]
+
+
+class BemPermanenteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BemPermanente
+        fields = [
+            "id", "nome", "numero_patrimonio", "localizacao", "responsavel",
+            "estado_conservacao", "data_aquisicao", "observacao",
+            "criado_em", "atualizado_em",
+        ]
+        read_only_fields = ["criado_em", "atualizado_em"]

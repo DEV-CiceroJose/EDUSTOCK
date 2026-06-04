@@ -1,6 +1,8 @@
 from rest_framework import viewsets, filters
-from .models import Produto, Categoria, Grupo
-from .serializers import ProdutoSerializer, CategoriaSerializer, GrupoSerializer
+from .models import Produto, Categoria, Grupo, BemPermanente
+from .serializers import (
+    ProdutoSerializer, CategoriaSerializer, GrupoSerializer, BemPermanenteSerializer,
+)
 
 
 class CategoriaViewSet(viewsets.ModelViewSet):
@@ -37,3 +39,16 @@ class ProdutoViewSet(viewsets.ModelViewSet):
 class GrupoViewSet(viewsets.ModelViewSet):
     queryset = Grupo.objects.select_related("categoria").all()
     serializer_class = GrupoSerializer
+
+
+class BemPermanenteViewSet(viewsets.ModelViewSet):
+    queryset = BemPermanente.objects.all()
+    serializer_class = BemPermanenteSerializer
+
+    def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(criado_por=user, atualizado_por=user)
+
+    def perform_update(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        serializer.save(atualizado_por=user)
