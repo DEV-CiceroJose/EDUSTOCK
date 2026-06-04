@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { produtosApi, categoriasApi, gruposApi, fornecedoresApi } from "../api"
+import { produtosApi, categoriasApi, gruposApi, fornecedoresApi, movimentacoesApi, entradasApi } from "../api"
 import { brl, stockStatus, validadeStatus } from "../lib/format"
 import { Icon } from "../lib/icons.jsx"
 
@@ -109,15 +109,17 @@ export default function DashboardPage() {
   }, [produtos])
 
   async function ajustar(produto, delta) {
-    const nova = Math.max(0, Number(produto.quantidade) + delta)
     setBusyId(produto.id)
-    // otimista
-    setProdutos((list) => list.map((x) => (x.id === produto.id ? { ...x, quantidade: nova } : x)))
     try {
-      await produtosApi.update(produto.id, { ...produto, quantidade: nova })
+      await movimentacoesApi.create({
+        produto: produto.id,
+        tipo: delta > 0 ? "ENTRADA" : "SAIDA",
+        quantidade: Math.abs(delta),
+        motivo: "ajuste rápido",
+      })
+      await carregar()
     } catch (e) {
-      toast("Falha ao atualizar", "danger")
-      carregar()
+      toast(String(e.message || "Falha ao ajustar"), "danger")
     } finally {
       setBusyId(null)
     }
