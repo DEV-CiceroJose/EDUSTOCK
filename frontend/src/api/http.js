@@ -61,3 +61,13 @@ export const httpFornecedores = {
   update: (id, data) => req(`/fornecedores/${id}/`, { method: "PATCH", body: data }),
   remove: (id) => req(`/fornecedores/${id}/`, { method: "DELETE" }),
 }
+
+export const httpMovimentacoes = {
+  list: (qs = "") => req(`/movimentacoes/${qs ? `?${qs}` : ""}`),
+  create: (data) => req(`/movimentacoes/`, { method: "POST", body: data }),
+}
+
+export const httpEntradas = {
+  list: () => req(`/entradas/`),
+  create: (data) => req(`/entradas/`, { method: "POST", body: data }),
+}

@@ -3,7 +3,7 @@
    Hierarquia: Categoria -> Grupo -> Produto. Persiste em localStorage.
 ------------------------------------------------------------------ */
 
-const KEY = "easystock:db:v3"
+const KEY = "easystock:db:v4"
 const delay = (ms = 220) => new Promise((r) => setTimeout(r, ms))
 
 function seed() {
@@ -34,7 +34,11 @@ function seed() {
     { id: 3, nome: "Detergente Neutro", numero_nota_fiscal: "NF-00198", grupo: 3, fornecedor: 2, quantidade: 64, unidade: "UN", estoque_minimo: 20, perecivel: false, periodicidade: "EVENTUAL", validade: emDias(310), preco: "2.15" },
     { id: 4, nome: "Resma Papel A4", numero_nota_fiscal: "NF-00210", grupo: 4, fornecedor: null, quantidade: 25, unidade: "PC", estoque_minimo: 10, perecivel: false, periodicidade: "EVENTUAL", validade: null, preco: "23.00" },
   ]
-  return { categorias, grupos, fornecedores, produtos, seqC: 4, seqG: 5, seqF: 3, seqP: 5 }
+  return {
+    categorias, grupos, fornecedores, produtos,
+    movimentacoes: [], entradas: [],
+    seqC: 4, seqG: 5, seqF: 3, seqP: 5, seqM: 1, seqE: 1,
+  }
 }
 
 function load() {
@@ -178,6 +182,93 @@ export const mockFornecedores = {
     if (emUso) throw new Error("Fornecedor vinculado a produtos — desative em vez de excluir.")
     db.fornecedores = db.fornecedores.filter((f) => f.id !== Number(id))
     save(db)
+  },
+}
+
+function ajustarSaldo(db, produtoId, tipo, quantidade) {
+  const p = db.produtos.find((x) => x.id === Number(produtoId))
+  if (!p) throw new Error("Produto não encontrado")
+  const q = Number(quantidade)
+  if (q <= 0) throw new Error("A quantidade deve ser maior que zero.")
+  if (tipo === "SAIDA") {
+    if (q > Number(p.quantidade)) throw new Error(`Saída de ${q} excede o saldo (${p.quantidade}).`)
+    p.quantidade = Number(p.quantidade) - q
+  } else {
+    p.quantidade = Number(p.quantidade) + q
+  }
+  return p
+}
+
+export const mockMovimentacoes = {
+  async list(qs = "") {
+    await delay(120)
+    const db = load()
+    const params = new URLSearchParams(qs)
+    let itens = db.movimentacoes.map((m) => ({
+      ...m,
+      produto_nome: db.produtos.find((p) => p.id === Number(m.produto))?.nome ?? "—",
+    }))
+    if (params.get("produto")) itens = itens.filter((m) => Number(m.produto) === Number(params.get("produto")))
+    if (params.get("tipo")) itens = itens.filter((m) => m.tipo === params.get("tipo"))
+    return itens.sort((a, b) => (b.data + String(b.id)).localeCompare(a.data + String(a.id)))
+  },
+  async create(data) {
+    await delay()
+    const db = load()
+    ajustarSaldo(db, data.produto, data.tipo, data.quantidade)
+    const nova = {
+      id: db.seqM++, produto: Number(data.produto), tipo: data.tipo,
+      quantidade: Number(data.quantidade), preco_unitario: data.preco_unitario ?? null,
+      entrada: data.entrada ?? null, motivo: data.motivo || "",
+      data: data.data || new Date().toISOString().slice(0, 10),
+      criado_em: new Date().toISOString(),
+    }
+    db.movimentacoes.push(nova)
+    save(db)
+    return nova
+  },
+}
+
+export const mockEntradas = {
+  async list() {
+    await delay(120)
+    const db = load()
+    return [...db.entradas].sort((a, b) => (b.data + String(b.id)).localeCompare(a.data + String(a.id)))
+  },
+  async create(data) {
+    await delay()
+    const db = load()
+    const itens = data.itens || []
+    if (itens.length === 0) throw new Error("Informe ao menos um item.")
+    const hoje = data.data || new Date().toISOString().slice(0, 10)
+    const entradaId = db.seqE++
+    let total = 0
+    const itensOut = []
+    for (const it of itens) {
+      ajustarSaldo(db, it.produto, "ENTRADA", it.quantidade)
+      const preco = it.preco_unitario != null && it.preco_unitario !== "" ? Number(it.preco_unitario) : null
+      if (preco != null) total += preco * Number(it.quantidade)
+      db.movimentacoes.push({
+        id: db.seqM++, produto: Number(it.produto), tipo: "ENTRADA",
+        quantidade: Number(it.quantidade), preco_unitario: preco, entrada: entradaId,
+        motivo: "entrada", data: hoje, criado_em: new Date().toISOString(),
+      })
+      itensOut.push({
+        produto: Number(it.produto),
+        produto_nome: db.produtos.find((p) => p.id === Number(it.produto))?.nome ?? "—",
+        quantidade: Number(it.quantidade), preco_unitario: preco,
+      })
+    }
+    const forn = data.fornecedor ? db.fornecedores.find((f) => f.id === Number(data.fornecedor)) : null
+    const entrada = {
+      id: entradaId, fornecedor: data.fornecedor ? Number(data.fornecedor) : null,
+      fornecedor_nome: forn ? forn.nome : null, numero_nota_fiscal: data.numero_nota_fiscal || "",
+      data: hoje, observacao: data.observacao || "", itens: itensOut,
+      total: total.toFixed(2), criado_em: new Date().toISOString(),
+    }
+    db.entradas.push(entrada)
+    save(db)
+    return entrada
   },
 }
 
