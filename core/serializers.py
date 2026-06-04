@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor
+from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
 
 
 class CategoriaSerializer(serializers.ModelSerializer):
@@ -56,3 +56,53 @@ class FornecedorSerializer(serializers.ModelSerializer):
             "criado_em", "atualizado_em",
         ]
         read_only_fields = ["criado_em", "atualizado_em"]
+
+
+class MovimentacaoSerializer(serializers.ModelSerializer):
+    produto_nome = serializers.CharField(source="produto.nome", read_only=True)
+
+    class Meta:
+        model = Movimentacao
+        fields = [
+            "id", "produto", "produto_nome", "tipo", "quantidade",
+            "preco_unitario", "entrada", "motivo", "data", "criado_em",
+        ]
+        read_only_fields = ["entrada", "criado_em"]
+
+
+class EntradaItemSerializer(serializers.ModelSerializer):
+    produto_nome = serializers.CharField(source="produto.nome", read_only=True)
+
+    class Meta:
+        model = Movimentacao
+        fields = ["produto", "produto_nome", "quantidade", "preco_unitario"]
+
+
+class EntradaSerializer(serializers.ModelSerializer):
+    fornecedor_nome = serializers.CharField(source="fornecedor.nome", read_only=True, allow_null=True, default=None)
+    itens = EntradaItemSerializer(many=True)
+    total = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Entrada
+        fields = [
+            "id", "fornecedor", "fornecedor_nome", "numero_nota_fiscal",
+            "data", "observacao", "itens", "total", "criado_em",
+        ]
+        read_only_fields = ["criado_em"]
+
+    def get_total(self, obj):
+        return str(obj.total)
+
+    def create(self, validated_data):
+        from .services import registrar_entrada
+        itens = validated_data.pop("itens")
+        request = self.context.get("request")
+        user = request.user if request and request.user.is_authenticated else None
+        return registrar_entrada(
+            fornecedor=validated_data.get("fornecedor"),
+            numero_nota_fiscal=validated_data.get("numero_nota_fiscal", ""),
+            data=validated_data.get("data"),
+            observacao=validated_data.get("observacao", ""),
+            itens=itens, user=user,
+        )
