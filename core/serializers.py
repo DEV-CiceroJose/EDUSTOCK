@@ -25,7 +25,7 @@ class ProdutoSerializer(serializers.ModelSerializer):
             "validade", "preco",
             "criado_por_nome", "criado_em", "atualizado_em",
         ]
-        read_only_fields = ["criado_por_nome", "criado_em", "atualizado_em"]
+        read_only_fields = ["quantidade", "criado_por_nome", "criado_em", "atualizado_em"]
 
 
 class GrupoSerializer(serializers.ModelSerializer):
@@ -92,7 +92,8 @@ class EntradaSerializer(serializers.ModelSerializer):
         read_only_fields = ["criado_em"]
 
     def get_total(self, obj):
-        return str(obj.total)
+        from decimal import Decimal, ROUND_HALF_UP
+        return str(obj.total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
     def create(self, validated_data):
         from .services import registrar_entrada
