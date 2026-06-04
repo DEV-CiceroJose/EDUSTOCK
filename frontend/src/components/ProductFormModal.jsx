@@ -79,7 +79,7 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
     const e = {}
     if (!form.nome.trim()) e.nome = "Informe o nome"
     if (!form.grupo) e.grupo = "Selecione um grupo"
-    if (form.quantidade === "" || Number(form.quantidade) < 0) e.quantidade = "Inválida"
+    if (!editando && (form.quantidade === "" || Number(form.quantidade) < 0)) e.quantidade = "Inválida"
     if (form.estoque_minimo !== "" && Number(form.estoque_minimo) < 0) e.estoque_minimo = "Inválido"
     setErros(e)
     return Object.keys(e).length === 0
@@ -90,7 +90,8 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
     if (!validar()) return
     setSalvando(true)
     try {
-      const payload = { ...form, fornecedor: form.fornecedor || null }
+      const { numero_nota_fiscal, ...campos } = form
+      const payload = { ...campos, fornecedor: form.fornecedor || null }
       if (editando) {
         await produtosApi.update(produto.id, payload)
         toast("Item atualizado")
