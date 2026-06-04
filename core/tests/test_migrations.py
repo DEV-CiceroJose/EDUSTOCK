@@ -42,3 +42,38 @@ class RepointDataMigrationTest(TransactionTestCase):
     def tearDown(self):
         # deixa o banco de teste na migração mais recente
         self._migrate(("core", "0005_repoint_produtos_para_grupo"))
+
+
+class SaldoInicialMigrationTest(TransactionTestCase):
+    migrate_from = ("core", "0008_movimentacoes")
+    migrate_to = ("core", "0009_saldo_inicial")
+
+    def _migrate(self, target):
+        from django.db.migrations.executor import MigrationExecutor
+        from django.db import connection
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate([target])
+        return executor.loader.project_state([target]).apps
+
+    def test_saldo_inicial_nao_altera_saldo(self):
+        from decimal import Decimal
+        apps = self._migrate(self.migrate_from)
+        Categoria = apps.get_model("core", "Categoria")
+        Grupo = apps.get_model("core", "Grupo")
+        Produto = apps.get_model("core", "Produto")
+        cat = Categoria.objects.create(name="Alimentos")
+        grupo = Grupo.objects.create(nome="Geral", categoria=cat)
+        Produto.objects.create(nome="Arroz", grupo=grupo, quantidade=Decimal("10"), unidade="KG")
+
+        apps = self._migrate(self.migrate_to)
+        Produto = apps.get_model("core", "Produto")
+        Movimentacao = apps.get_model("core", "Movimentacao")
+        prod = Produto.objects.get(nome="Arroz")
+        self.assertEqual(prod.quantidade, Decimal("10.000"))  # saldo não muda
+        mov = Movimentacao.objects.get(produto=prod, motivo="saldo inicial")
+        self.assertEqual(mov.tipo, "ENTRADA")
+        self.assertEqual(mov.quantidade, Decimal("10.000"))
+
+    def tearDown(self):
+        self._migrate(("core", "0009_saldo_inicial"))
