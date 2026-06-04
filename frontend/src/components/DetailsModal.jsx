@@ -16,11 +16,11 @@ function Linha({ label, children }) {
 export default function DetailsModal({ produto, onClose, onEdit, onDelete }) {
   if (!produto) return null
   const st = categoryStyle(produto.categoria_nome)
-  const stock = stockStatus(produto.quantidade)
+  const stock = stockStatus(produto.quantidade, produto.estoque_minimo)
   const val = validadeStatus(produto.validade)
 
   return (
-    <Modal open={!!produto} onClose={onClose} title="Detalhes do item" subtitle={produto.categoria_nome}>
+    <Modal open={!!produto} onClose={onClose} title="Detalhes do item" subtitle={`${produto.categoria_nome} › ${produto.grupo_nome ?? ""}`}>
       <div className="flex items-center gap-4">
         <div className="grid h-16 w-16 place-items-center rounded-2xl" style={{ background: st.tint, color: st.fg }}>
           {st.renderIcon(28)}
@@ -49,6 +49,8 @@ export default function DetailsModal({ produto, onClose, onEdit, onDelete }) {
           ) : "Sem validade"}
         </Linha>
         <Linha label="Nota Fiscal">{produto.numero_nota_fiscal || "—"}</Linha>
+        <Linha label="Estoque mínimo">{qtd(produto.estoque_minimo)} {unidadeLabel(produto.unidade).toLowerCase()}</Linha>
+        <Linha label="Periodicidade">{produto.periodicidade ?? "—"}</Linha>
       </div>
 
       <div className="mt-5 flex justify-end gap-2">
