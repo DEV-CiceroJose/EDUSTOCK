@@ -12,21 +12,21 @@ export const dataBR = (iso) => {
   return `${d}/${m}/${y}`
 }
 
-// Limiar (heurística de UI — o backend não tem campo estoque_minimo ainda)
-export const LIMITE_BAIXO = 15
-
-// Status de estoque a partir da quantidade: { code, label }
-export function stockStatus(quantidade) {
+// Status de estoque a partir da quantidade e do estoque mínimo do item
+export function stockStatus(quantidade, estoqueMinimo = 0) {
   const q = Number(quantidade)
+  const min = Number(estoqueMinimo) || 0
   if (q <= 0) return { code: "out", label: "Esgotado" }
-  if (q <= LIMITE_BAIXO) return { code: "low", label: "Estoque Baixo" }
+  if (q <= min) return { code: "low", label: "Estoque Baixo" }
   return { code: "ok", label: "Em Estoque" }
 }
 
-// Percentual visual da barrinha (0–100), saturando em 2x o limiar
-export function stockPercent(quantidade) {
+// Percentual visual da barrinha (0–100), saturando em 2x o mínimo
+export function stockPercent(quantidade, estoqueMinimo = 0) {
   const q = Math.max(0, Number(quantidade))
-  return Math.min(100, Math.round((q / (LIMITE_BAIXO * 2)) * 100))
+  const min = Number(estoqueMinimo) || 0
+  const teto = min > 0 ? min * 2 : Math.max(q, 1)
+  return Math.min(100, Math.round((q / teto) * 100))
 }
 
 // Status da validade: { code, label, dias }
