@@ -15,6 +15,9 @@ import DetailsModal from "../components/DetailsModal"
 import ProductFormModal from "../components/ProductFormModal"
 import FornecedoresView from "../components/FornecedoresView"
 import FornecedorFormModal from "../components/FornecedorFormModal"
+import MovimentacoesView from "../components/MovimentacoesView"
+import SaidaFormModal from "../components/SaidaFormModal"
+import EntradaFormModal from "../components/EntradaFormModal"
 import ConfirmDialog from "../components/ConfirmDialog"
 import { useToast } from "../components/Toast"
 
@@ -31,6 +34,9 @@ export default function DashboardPage() {
   const [categorias, setCategorias] = useState([])
   const [grupos, setGrupos] = useState([])
   const [fornecedores, setFornecedores] = useState([])
+  const [movimentacoes, setMovimentacoes] = useState([])
+  const [saidaOpen, setSaidaOpen] = useState(false)
+  const [entradaOpen, setEntradaOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const [tab, setTab] = useState("inv")
@@ -57,13 +63,15 @@ export default function DashboardPage() {
   async function carregar() {
     setLoading(true)
     try {
-      const [p, c, g, f] = await Promise.all([
-        produtosApi.list(termo), categoriasApi.list(), gruposApi.list(), fornecedoresApi.list(),
+      const [p, c, g, f, mv] = await Promise.all([
+        produtosApi.list(termo), categoriasApi.list(), gruposApi.list(),
+        fornecedoresApi.list(), movimentacoesApi.list(),
       ])
       setProdutos(p)
       setCategorias(c)
       setGrupos(g)
       setFornecedores(f)
+      setMovimentacoes(mv)
     } finally {
       setLoading(false)
     }
@@ -251,10 +259,10 @@ export default function DashboardPage() {
               {tab === "geral" && <VisaoGeral resumo={resumo} alerts={alerts} onPick={abrirAlerta} />}
 
               {tab === "mov" && (
-                <EmptyTab
-                  icon={Icon.refresh(40)}
-                  titulo="Movimentações"
-                  texto="O histórico de entradas e saídas aparecerá aqui. Cada Adicionar/Retirar já é registrado via API."
+                <MovimentacoesView
+                  movimentacoes={movimentacoes}
+                  onNovaEntrada={() => setEntradaOpen(true)}
+                  onNovaSaida={() => setSaidaOpen(true)}
                 />
               )}
               {tab === "sol" && (
@@ -284,6 +292,19 @@ export default function DashboardPage() {
         open={addFornOpen || !!editFornecedor}
         fornecedor={editFornecedor}
         onClose={() => { setAddFornOpen(false); setEditFornecedor(null) }}
+        onSaved={carregar}
+      />
+      <SaidaFormModal
+        open={saidaOpen}
+        produtos={produtos}
+        onClose={() => setSaidaOpen(false)}
+        onSaved={carregar}
+      />
+      <EntradaFormModal
+        open={entradaOpen}
+        produtos={produtos}
+        fornecedores={fornecedores.filter((f) => f.ativo)}
+        onClose={() => setEntradaOpen(false)}
         onSaved={carregar}
       />
       <DetailsModal
