@@ -9,13 +9,22 @@ class CategoriaViewSet(viewsets.ModelViewSet):
 
 
 class ProdutoViewSet(viewsets.ModelViewSet):
-    # select_related evita N+1 ao serializar categoria/criado_por
-    queryset = Produto.objects.select_related("categoria", "criado_por").order_by("nome")
     serializer_class = ProdutoSerializer
     filter_backends = [filters.SearchFilter]
-    search_fields = ["nome"]  # casa com ?search= usado pelo frontend
+    search_fields = ["nome"]
 
-    # Preenche a auditoria com o usuário logado (espelha o admin)
+    def get_queryset(self):
+        qs = Produto.objects.select_related(
+            "grupo__categoria", "criado_por", "atualizado_por"
+        ).all()
+        grupo = self.request.query_params.get("grupo")
+        categoria = self.request.query_params.get("categoria")
+        if grupo:
+            qs = qs.filter(grupo_id=grupo)
+        if categoria:
+            qs = qs.filter(grupo__categoria_id=categoria)
+        return qs
+
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         serializer.save(criado_por=user, atualizado_por=user)
