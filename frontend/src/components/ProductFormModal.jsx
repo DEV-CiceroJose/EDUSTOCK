@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { produtosApi } from "../api"
+import { produtosApi, movimentacoesApi } from "../api"
 import { UNIDADES, PERIODICIDADES } from "../api/units"
 import Modal from "./Modal"
 import { useToast } from "./Toast"
@@ -95,7 +95,13 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
         await produtosApi.update(produto.id, payload)
         toast("Item atualizado")
       } else {
-        await produtosApi.create(payload)
+        const novo = await produtosApi.create(payload)
+        if (Number(form.quantidade) > 0) {
+          await movimentacoesApi.create({
+            produto: novo.id, tipo: "ENTRADA",
+            quantidade: Number(form.quantidade), motivo: "saldo inicial",
+          })
+        }
         toast("Item cadastrado")
       }
       onSaved?.()
@@ -135,14 +141,18 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
           {erros.grupo && <p className="mt-1 text-xs text-out">{erros.grupo}</p>}
         </Campo>
 
-        <Campo label="Nota Fiscal" hint="opcional">
-          <input className="field" value={form.numero_nota_fiscal} onChange={set("numero_nota_fiscal")} placeholder="NF-00000" />
-        </Campo>
-
-        <Campo label="Quantidade">
-          <input type="number" step="any" min="0" className="field" value={form.quantidade} onChange={set("quantidade")} placeholder="0" />
-          {erros.quantidade && <p className="mt-1 text-xs text-out">{erros.quantidade}</p>}
-        </Campo>
+        {!editando && (
+          <Campo label="Quantidade inicial">
+            <input type="number" step="any" min="0" className="field" value={form.quantidade} onChange={set("quantidade")} placeholder="0" />
+            {erros.quantidade && <p className="mt-1 text-xs text-out">{erros.quantidade}</p>}
+          </Campo>
+        )}
+        {editando && (
+          <Campo label="Saldo atual">
+            <input className="field bg-surface-2" value={`${produto.quantidade} ${produto.unidade}`} readOnly />
+            <p className="mt-1 text-[0.66rem] text-ink-faint">Ajuste o estoque pela aba Movimentações.</p>
+          </Campo>
+        )}
 
         <Campo label="Estoque mínimo" hint="alerta de reposição">
           <input type="number" step="any" min="0" className="field" value={form.estoque_minimo} onChange={set("estoque_minimo")} placeholder="0" />

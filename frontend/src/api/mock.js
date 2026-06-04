@@ -93,7 +93,7 @@ export const mockProdutos = {
   async create(data) {
     await delay()
     const db = load()
-    const novo = { id: db.seqP++, ...normalize(data) }
+    const novo = { id: db.seqP++, ...normalize(data), quantidade: 0 }
     db.produtos.push(novo)
     save(db)
     return expand(novo, db)
@@ -103,7 +103,8 @@ export const mockProdutos = {
     const db = load()
     const i = db.produtos.findIndex((x) => x.id === Number(id))
     if (i === -1) throw new Error("Produto não encontrado")
-    db.produtos[i] = { ...db.produtos[i], ...normalize(data) }
+    const { quantidade, ...semSaldo } = normalize(data)
+    db.produtos[i] = { ...db.produtos[i], ...semSaldo }
     save(db)
     return expand(db.produtos[i], db)
   },
