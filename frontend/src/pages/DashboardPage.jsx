@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { produtosApi, categoriasApi, gruposApi } from "../api"
+import { produtosApi, categoriasApi, gruposApi, fornecedoresApi } from "../api"
 import { brl, stockStatus, validadeStatus } from "../lib/format"
 import { Icon } from "../lib/icons.jsx"
 
@@ -13,12 +13,15 @@ import KitchenPanel from "../components/KitchenPanel"
 import AlertTicker from "../components/AlertTicker"
 import DetailsModal from "../components/DetailsModal"
 import ProductFormModal from "../components/ProductFormModal"
+import FornecedoresView from "../components/FornecedoresView"
+import FornecedorFormModal from "../components/FornecedorFormModal"
 import ConfirmDialog from "../components/ConfirmDialog"
 import { useToast } from "../components/Toast"
 
 const TABS = [
   { key: "geral", label: "Visão Geral" },
   { key: "inv", label: "Inventário" },
+  { key: "forn", label: "Fornecedores" },
   { key: "mov", label: "Movimentações" },
   { key: "sol", label: "Solicitações" },
 ]
@@ -27,6 +30,7 @@ export default function DashboardPage() {
   const [produtos, setProdutos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [grupos, setGrupos] = useState([])
+  const [fornecedores, setFornecedores] = useState([])
   const [loading, setLoading] = useState(true)
 
   const [tab, setTab] = useState("inv")
@@ -37,6 +41,8 @@ export default function DashboardPage() {
   const [busyId, setBusyId] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
   const [editProduto, setEditProduto] = useState(null)
+  const [addFornOpen, setAddFornOpen] = useState(false)
+  const [editFornecedor, setEditFornecedor] = useState(null)
   const [detalhe, setDetalhe] = useState(null)
   const [aExcluir, setAExcluir] = useState(null)
 
@@ -51,12 +57,13 @@ export default function DashboardPage() {
   async function carregar() {
     setLoading(true)
     try {
-      const [p, c, g] = await Promise.all([
-        produtosApi.list(termo), categoriasApi.list(), gruposApi.list(),
+      const [p, c, g, f] = await Promise.all([
+        produtosApi.list(termo), categoriasApi.list(), gruposApi.list(), fornecedoresApi.list(),
       ])
       setProdutos(p)
       setCategorias(c)
       setGrupos(g)
+      setFornecedores(f)
     } finally {
       setLoading(false)
     }
@@ -230,6 +237,15 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {tab === "forn" && (
+                <FornecedoresView
+                  fornecedores={fornecedores}
+                  onNew={() => setAddFornOpen(true)}
+                  onEdit={(f) => setEditFornecedor(f)}
+                  onChanged={carregar}
+                />
+              )}
+
               {tab === "geral" && <VisaoGeral resumo={resumo} alerts={alerts} onPick={abrirAlerta} />}
 
               {tab === "mov" && (
@@ -258,7 +274,14 @@ export default function DashboardPage() {
         open={addOpen || !!editProduto}
         produto={editProduto}
         grupos={grupos}
+        fornecedores={fornecedores.filter((f) => f.ativo)}
         onClose={() => { setAddOpen(false); setEditProduto(null) }}
+        onSaved={carregar}
+      />
+      <FornecedorFormModal
+        open={addFornOpen || !!editFornecedor}
+        fornecedor={editFornecedor}
+        onClose={() => { setAddFornOpen(false); setEditFornecedor(null) }}
         onSaved={carregar}
       />
       <DetailsModal
