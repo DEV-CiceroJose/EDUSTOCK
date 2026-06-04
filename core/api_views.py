@@ -1,6 +1,6 @@
 from rest_framework import viewsets, filters
-from .models import Produto, Categoria
-from .serializers import ProdutoSerializer, CategoriaSerializer
+from .models import Produto, Categoria, Grupo
+from .serializers import ProdutoSerializer, CategoriaSerializer, GrupoSerializer
 
 
 class CategoriaViewSet(viewsets.ModelViewSet):
@@ -23,3 +23,8 @@ class ProdutoViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         serializer.save(atualizado_por=user)
+
+
+class GrupoViewSet(viewsets.ModelViewSet):
+    queryset = Grupo.objects.select_related("categoria").all()
+    serializer_class = GrupoSerializer
