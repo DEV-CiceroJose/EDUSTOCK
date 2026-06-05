@@ -1,8 +1,9 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .api_views import (
     ProdutoViewSet, CategoriaViewSet, GrupoViewSet,
     BemPermanenteViewSet, FornecedorViewSet,
-    MovimentacaoViewSet, EntradaViewSet,
+    MovimentacaoViewSet, EntradaViewSet, SugestaoComprasView,
 )
 
 router = DefaultRouter()
@@ -14,4 +15,6 @@ router.register(r"fornecedores", FornecedorViewSet, basename="fornecedor")
 router.register(r"movimentacoes", MovimentacaoViewSet, basename="movimentacao")
 router.register(r"entradas", EntradaViewSet, basename="entrada")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("sugestao-compras/", SugestaoComprasView.as_view(), name="sugestao-compras"),
+] + router.urls

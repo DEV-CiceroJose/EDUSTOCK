@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework.test import APITestCase
 from core.models import Categoria, Grupo, Produto, Fornecedor, Movimentacao
 from core.compras import sugerir_compras
 
@@ -48,3 +49,27 @@ class SugerirComprasTest(TestCase):
         r = sugerir_compras(horizonte=1, semanas=4)
         self.assertEqual(r["total_itens"], len(r["itens"]))
         self.assertEqual(r["custo_total_estimado"], "4.00")
+
+
+class SugestaoComprasEndpointTest(APITestCase):
+    def setUp(self):
+        cat = Categoria.objects.create(name="Alimentos")
+        self.grupo = Grupo.objects.create(nome="Geral", categoria=cat)
+        self.p = Produto.objects.create(
+            nome="Feijão", grupo=self.grupo, quantidade=2, unidade="KG", estoque_minimo=10
+        )
+
+    def test_get_retorna_sugestao(self):
+        resp = self.client.get("/api/sugestao-compras/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("itens", resp.data)
+        self.assertIn("total_itens", resp.data)
+        self.assertIn("custo_total_estimado", resp.data)
+        item = next(i for i in resp.data["itens"] if i["produto"] == self.p.id)
+        self.assertEqual(item["sugerido"], "8.000")
+
+    def test_params_invalidos_usam_default(self):
+        resp = self.client.get("/api/sugestao-compras/?horizonte=abc&semanas=-5")
+        self.assertEqual(resp.status_code, 200)
+        item = next(i for i in resp.data["itens"] if i["produto"] == self.p.id)
+        self.assertEqual(item["sugerido"], "8.000")

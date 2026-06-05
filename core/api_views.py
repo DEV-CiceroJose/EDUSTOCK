@@ -1,5 +1,7 @@
 from rest_framework import viewsets, filters, status
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from .compras import sugerir_compras
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
 from .serializers import (
@@ -134,3 +136,17 @@ class EntradaViewSet(viewsets.ModelViewSet):
             return Response({"detail": e.messages}, status=status.HTTP_400_BAD_REQUEST)
         out = self.get_serializer(entrada)
         return Response(out.data, status=status.HTTP_201_CREATED)
+
+
+class SugestaoComprasView(APIView):
+    def get(self, request):
+        def _intparam(nome, default):
+            try:
+                v = int(request.query_params.get(nome, default))
+            except (TypeError, ValueError):
+                return default
+            return v if v > 0 else default
+
+        horizonte = _intparam("horizonte", 1)
+        semanas = _intparam("semanas", 4)
+        return Response(sugerir_compras(horizonte=horizonte, semanas=semanas))
