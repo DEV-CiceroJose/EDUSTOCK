@@ -16,6 +16,7 @@ import ProductFormModal from "../components/ProductFormModal"
 import FornecedoresView from "../components/FornecedoresView"
 import FornecedorFormModal from "../components/FornecedorFormModal"
 import MovimentacoesView from "../components/MovimentacoesView"
+import ComprasView from "../components/ComprasView"
 import SaidaFormModal from "../components/SaidaFormModal"
 import EntradaFormModal from "../components/EntradaFormModal"
 import ConfirmDialog from "../components/ConfirmDialog"
@@ -26,6 +27,7 @@ const TABS = [
   { key: "inv", label: "Inventário" },
   { key: "forn", label: "Fornecedores" },
   { key: "mov", label: "Movimentações" },
+  { key: "compras", label: "Compras" },
   { key: "sol", label: "Solicitações" },
 ]
 
@@ -265,6 +267,7 @@ export default function DashboardPage() {
                   onNovaSaida={() => setSaidaOpen(true)}
                 />
               )}
+              {tab === "compras" && <ComprasView />}
               {tab === "sol" && (
                 <EmptyTab
                   icon={Icon.report(40)}
