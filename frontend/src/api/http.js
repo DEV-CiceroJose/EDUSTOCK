@@ -71,3 +71,8 @@ export const httpEntradas = {
   list: () => req(`/entradas/`),
   create: (data) => req(`/entradas/`, { method: "POST", body: data }),
 }
+
+export const httpCompras = {
+  sugerir: ({ horizonte = 1, semanas = 4 } = {}) =>
+    req(`/sugestao-compras/?horizonte=${horizonte}&semanas=${semanas}`),
+}

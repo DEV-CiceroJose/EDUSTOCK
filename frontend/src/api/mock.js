@@ -273,6 +273,50 @@ export const mockEntradas = {
   },
 }
 
+export const mockCompras = {
+  async sugerir({ horizonte = 1, semanas = 4 } = {}) {
+    await delay(150)
+    const db = load()
+    const h = Math.max(1, Number(horizonte) || 1)
+    const s = Math.max(1, Number(semanas) || 4)
+    const janela = new Date()
+    janela.setDate(janela.getDate() - s * 7)
+    const janelaStr = janela.toISOString().slice(0, 10)
+
+    const consumo = {}
+    for (const m of db.movimentacoes) {
+      if (m.tipo === "SAIDA" && m.motivo === "consumo" && m.data >= janelaStr) {
+        consumo[m.produto] = (consumo[m.produto] || 0) + Number(m.quantidade)
+      }
+    }
+
+    const itens = []
+    let custoTotal = 0
+    for (const p of db.produtos) {
+      const consumoSemanal = (consumo[p.id] || 0) / s
+      const sugerido = consumoSemanal * h + Number(p.estoque_minimo) - Number(p.quantidade)
+      if (sugerido <= 0) continue
+      const preco = p.preco != null && p.preco !== "" ? Number(p.preco) : null
+      const custo = preco != null ? sugerido * preco : null
+      if (custo != null) custoTotal += custo
+      const forn = p.fornecedor ? db.fornecedores.find((f) => f.id === Number(p.fornecedor)) : null
+      itens.push({
+        produto: p.id, produto_nome: p.nome, unidade: p.unidade,
+        saldo: String(p.quantidade), estoque_minimo: String(p.estoque_minimo),
+        consumo_semanal: consumoSemanal.toFixed(3), sugerido: sugerido.toFixed(3),
+        fornecedor: forn ? forn.id : null, fornecedor_nome: forn ? forn.nome : null,
+        preco: preco != null ? String(preco) : null,
+        custo_estimado: custo != null ? custo.toFixed(2) : null,
+      })
+    }
+    itens.sort((a, b) =>
+      ((a.fornecedor_nome || "￿") + a.produto_nome)
+        .localeCompare((b.fornecedor_nome || "￿") + b.produto_nome, "pt-BR")
+    )
+    return { itens, total_itens: itens.length, custo_total_estimado: custoTotal.toFixed(2) }
+  },
+}
+
 export const mockCategorias = {
   async list() {
     await delay(120)
