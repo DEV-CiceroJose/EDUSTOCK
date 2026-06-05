@@ -279,13 +279,14 @@ export const mockCompras = {
     const db = load()
     const h = Math.max(1, Number(horizonte) || 1)
     const s = Math.max(1, Number(semanas) || 4)
+    const hojeStr = new Date().toISOString().slice(0, 10)
     const janela = new Date()
     janela.setDate(janela.getDate() - s * 7)
     const janelaStr = janela.toISOString().slice(0, 10)
 
     const consumo = {}
     for (const m of db.movimentacoes) {
-      if (m.tipo === "SAIDA" && m.motivo === "consumo" && m.data >= janelaStr) {
+      if (m.tipo === "SAIDA" && m.motivo === "consumo" && m.data >= janelaStr && m.data <= hojeStr) {
         consumo[m.produto] = (consumo[m.produto] || 0) + Number(m.quantidade)
       }
     }

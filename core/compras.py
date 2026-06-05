@@ -17,12 +17,14 @@ def _q(valor, exp):
 def sugerir_compras(*, horizonte=1, semanas=4):
     horizonte = max(1, int(horizonte))
     semanas = max(1, int(semanas))
-    janela_inicio = timezone.localdate() - timedelta(days=semanas * 7)
+    hoje = timezone.localdate()
+    janela_inicio = hoje - timedelta(days=semanas * 7)
 
     consumo = {
         row["produto"]: row["total"]
         for row in Movimentacao.objects.filter(
-            tipo=Movimentacao.SAIDA, motivo="consumo", data__gte=janela_inicio
+            tipo=Movimentacao.SAIDA, motivo="consumo",
+            data__gte=janela_inicio, data__lte=hoje,
         ).values("produto").annotate(total=Sum("quantidade"))
     }
 

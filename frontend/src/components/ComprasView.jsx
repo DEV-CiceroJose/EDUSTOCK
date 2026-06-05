@@ -47,6 +47,16 @@ export default function ComprasView() {
 
   function exportar() {
     if (dados.itens.length === 0) return
+    // decimal pt-BR (vírgula) para o Excel não ler "7.000" como 7000
+    const ptbr = (v) => (v == null ? "" : String(v).replace(".", ","))
+    const linhas = dados.itens.map((it) => ({
+      ...it,
+      saldo: ptbr(it.saldo),
+      estoque_minimo: ptbr(it.estoque_minimo),
+      consumo_semanal: ptbr(it.consumo_semanal),
+      sugerido: ptbr(it.sugerido),
+      custo_estimado: ptbr(it.custo_estimado),
+    }))
     baixarCSV(
       "lista-de-compras.csv",
       [
@@ -59,7 +69,7 @@ export default function ComprasView() {
         { key: "unidade", label: "Unidade" },
         { key: "custo_estimado", label: "Custo estimado" },
       ],
-      dados.itens
+      linhas
     )
     toast("CSV exportado")
   }
