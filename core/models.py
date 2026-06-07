@@ -210,3 +210,52 @@ class Movimentacao(models.Model):
 
     def __str__(self):
         return f"{self.tipo} {self.quantidade:.3f} {self.produto.nome}"
+
+
+class FrequenciaDiaria(models.Model):
+    MANHA = "MANHA"
+    TARDE = "TARDE"
+    INTEGRAL = "INTEGRAL"
+    TURNO_CHOICES = [
+        (MANHA, "Manhã"),
+        (TARDE, "Tarde"),
+        (INTEGRAL, "Integral"),
+    ]
+
+    data = models.DateField(default=timezone.localdate)
+    turno = models.CharField(max_length=8, choices=TURNO_CHOICES)
+    turma = models.CharField(max_length=20)
+    quantidade_alunos = models.PositiveIntegerField()
+    registrado_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="frequencias_registradas"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data", "turno", "turma"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data", "turno", "turma"],
+                name="unique_frequencia_por_turma_turno_dia",
+            )
+        ]
+        verbose_name = "Frequência diária"
+        verbose_name_plural = "Frequências diárias"
+
+    def __str__(self):
+        return f"{self.data} {self.turno} {self.turma}: {self.quantidade_alunos}"
+
+
+class FatorConsumo(models.Model):
+    produto = models.OneToOneField(
+        Produto, on_delete=models.CASCADE, related_name="fator_consumo"
+    )
+    gramas_por_aluno = models.DecimalField(max_digits=6, decimal_places=2)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Fator de consumo"
+        verbose_name_plural = "Fatores de consumo"
+
+    def __str__(self):
+        return f"{self.produto.nome}: {self.gramas_por_aluno}/aluno"

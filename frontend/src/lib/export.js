@@ -1,0 +1,81 @@
+import { dataBR } from "./format"
+
+const MESES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+]
+
+export function isoHoje() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export function periodoMesAtual() {
+  const hoje = new Date()
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+  return { inicio: inicio.toISOString().slice(0, 10), fim: isoHoje() }
+}
+
+export function periodoTrimestre() {
+  const hoje = new Date()
+  const trimInicio = Math.floor(hoje.getMonth() / 3) * 3
+  const inicio = new Date(hoje.getFullYear(), trimInicio, 1)
+  return { inicio: inicio.toISOString().slice(0, 10), fim: isoHoje() }
+}
+
+export function formatPeriodoLabel(inicio, fim) {
+  if (inicio.slice(0, 7) === fim.slice(0, 7)) {
+    const d = new Date(inicio + "T00:00:00")
+    return `${MESES[d.getMonth()]}/${d.getFullYear()}`
+  }
+  return `${dataBR(inicio)} a ${dataBR(fim)}`
+}
+
+export function downloadBlob(content, filename, mime) {
+  const blob = new Blob([content], { type: mime })
+  const a = document.createElement("a")
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+export function toCsv(rows, sep = ";") {
+  const escape = (v) => {
+    const s = String(v ?? "")
+    if (s.includes(sep) || s.includes('"') || s.includes("\n")) {
+      return `"${s.replace(/"/g, '""')}"`
+    }
+    return s
+  }
+  return rows.map((row) => row.map(escape).join(sep)).join("\n")
+}
+
+export function prestacaoContasToCsv(dados) {
+  const header = [
+    "Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd",
+    "Preço Unit.", "Subtotal", "Categoria", "Legado",
+  ]
+  const rows = [header]
+  for (const f of dados.fornecedores ?? []) {
+    for (const doc of f.documentos ?? []) {
+      for (const it of doc.itens ?? []) {
+        rows.push([
+          f.fornecedor_nome,
+          f.documento || "",
+          doc.numero_nota_fiscal || it.numero_nota_fiscal_legado || "",
+          dataBR(doc.data),
+          it.produto_nome,
+          it.quantidade,
+          it.preco_unitario ?? "",
+          it.subtotal,
+          "",
+          doc.legado ? "Sim" : "Não",
+        ])
+      }
+    }
+  }
+  for (const c of dados.resumo_financeiro?.por_categoria ?? []) {
+    rows.push(["", "", "", "", "", "", "", c.total, c.categoria_nome, "Resumo"])
+  }
+  return "\uFEFF" + toCsv(rows)
+}

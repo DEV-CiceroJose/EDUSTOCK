@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { produtosApi, categoriasApi, gruposApi, fornecedoresApi, movimentacoesApi, entradasApi } from "../api"
-import { brl, stockStatus, validadeStatus } from "../lib/format"
+import { produtosApi, categoriasApi, gruposApi, fornecedoresApi, movimentacoesApi, alertasApi } from "../api"
+import { brl } from "../lib/format"
 import { Icon } from "../lib/icons.jsx"
 
 import Header from "../components/Header"
@@ -10,7 +10,12 @@ import Tabs from "../components/Tabs"
 import CategoryRail from "../components/CategoryRail"
 import ProductCard from "../components/ProductCard"
 import KitchenPanel from "../components/KitchenPanel"
+import ContagemWidget from "../components/ContagemWidget"
+import ContagemView from "../components/ContagemView"
+import KitchenProductionView from "../components/KitchenProductionView"
 import AlertTicker from "../components/AlertTicker"
+import AlertasView from "../components/AlertasView"
+import RelatoriosView from "../components/RelatoriosView"
 import DetailsModal from "../components/DetailsModal"
 import ProductFormModal from "../components/ProductFormModal"
 import FornecedoresView from "../components/FornecedoresView"
@@ -24,10 +29,33 @@ import { useToast } from "../components/Toast"
 const TABS = [
   { key: "geral", label: "Visão Geral" },
   { key: "inv", label: "Inventário" },
+  { key: "alert", label: "Alertas" },
   { key: "forn", label: "Fornecedores" },
   { key: "mov", label: "Movimentações" },
+  { key: "rel", label: "Relatórios" },
+  { key: "merenda", label: "Merenda" },
   { key: "sol", label: "Solicitações" },
 ]
+
+const ALERTAS_VAZIO = { resumo: {}, validade: [], estoque_critico: [] }
+
+function flattenAlertas(al) {
+  const mapUrgencia = (u) => (u === "critico" ? "out" : "low")
+  return [
+    ...(al.validade ?? []).map((a) => ({
+      id: `v${a.produto_id}`,
+      code: mapUrgencia(a.urgencia),
+      label: `${a.motivo} — ${a.nome}`,
+      produtoId: a.produto_id,
+    })),
+    ...(al.estoque_critico ?? []).map((a) => ({
+      id: `e${a.produto_id}`,
+      code: mapUrgencia(a.urgencia),
+      label: `${a.motivo} — ${a.nome}`,
+      produtoId: a.produto_id,
+    })),
+  ]
+}
 
 export default function DashboardPage() {
   const [produtos, setProdutos] = useState([])
@@ -35,6 +63,7 @@ export default function DashboardPage() {
   const [grupos, setGrupos] = useState([])
   const [fornecedores, setFornecedores] = useState([])
   const [movimentacoes, setMovimentacoes] = useState([])
+  const [alertas, setAlertas] = useState(ALERTAS_VAZIO)
   const [saidaOpen, setSaidaOpen] = useState(false)
   const [entradaOpen, setEntradaOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -51,8 +80,11 @@ export default function DashboardPage() {
   const [editFornecedor, setEditFornecedor] = useState(null)
   const [detalhe, setDetalhe] = useState(null)
   const [aExcluir, setAExcluir] = useState(null)
+  const [merendaView, setMerendaView] = useState("producao")
+  const [contagemKey, setContagemKey] = useState(0)
 
   const toast = useToast()
+  const toastShown = useRef(false)
 
   // debounce da busca
   useEffect(() => {
@@ -63,20 +95,30 @@ export default function DashboardPage() {
   async function carregar() {
     setLoading(true)
     try {
-      const [p, c, g, f, mv] = await Promise.all([
+      const [p, c, g, f, mv, al] = await Promise.all([
         produtosApi.list(termo), categoriasApi.list(), gruposApi.list(),
-        fornecedoresApi.list(), movimentacoesApi.list(),
+        fornecedoresApi.list(), movimentacoesApi.list(), alertasApi.list(),
       ])
       setProdutos(p)
       setCategorias(c)
       setGrupos(g)
       setFornecedores(f)
       setMovimentacoes(mv)
+      setAlertas(al)
     } finally {
       setLoading(false)
     }
   }
   useEffect(() => { carregar() }, [termo]) // eslint-disable-line
+
+  useEffect(() => {
+    if (loading || toastShown.current) return
+    const criticos = (alertas.resumo?.vencidos ?? 0) + (alertas.resumo?.esgotados ?? 0)
+    if (criticos > 0) {
+      toast(`${criticos} alerta(s) crítico(s) — confira a aba Alertas`, "danger")
+      toastShown.current = true
+    }
+  }, [loading, alertas, toast])
 
   const counts = useMemo(() => {
     const cat = {}, grupo = {}
@@ -93,28 +135,20 @@ export default function DashboardPage() {
     return produtos
   }, [produtos, cat])
 
-  const alerts = useMemo(() => {
-    const a = []
-    for (const p of produtos) {
-      const s = stockStatus(p.quantidade, p.estoque_minimo)
-      const v = validadeStatus(p.validade)
-      if (s.code === "out") a.push({ id: `o${p.id}`, code: "out", label: `Esgotado — ${p.nome}`, produtoId: p.id })
-      else if (s.code === "low") a.push({ id: `l${p.id}`, code: "low", label: `Estoque baixo — ${p.nome} (${p.categoria_nome})`, produtoId: p.id })
-      if (v.code === "expired") a.push({ id: `v${p.id}`, code: "out", label: `Vencido — ${p.nome}`, produtoId: p.id })
-      else if (v.code === "soon") a.push({ id: `s${p.id}`, code: "low", label: `Vence em ${v.dias}d — ${p.nome}`, produtoId: p.id })
-    }
-    return a
-  }, [produtos])
+  const alerts = useMemo(() => flattenAlertas(alertas), [alertas])
 
   const resumo = useMemo(() => {
-    let valor = 0, baixo = 0, vencidos = 0
+    let valor = 0
     for (const p of produtos) {
       if (p.preco) valor += Number(p.preco) * Number(p.quantidade)
-      if (stockStatus(p.quantidade, p.estoque_minimo).code !== "ok") baixo++
-      if (validadeStatus(p.validade).code === "expired") vencidos++
     }
-    return { valor, baixo, vencidos, total: produtos.length }
-  }, [produtos])
+    return {
+      valor,
+      baixo: alertas.resumo?.total_estoque_critico ?? 0,
+      vencidos: alertas.resumo?.vencidos ?? 0,
+      total: produtos.length,
+    }
+  }, [produtos, alertas])
 
   async function ajustar(produto, delta) {
     setBusyId(produto.id)
@@ -151,12 +185,17 @@ export default function DashboardPage() {
   }
 
   function relatorio() {
-    const n = resumo.baixo + resumo.vencidos
-    toast(n ? `Relatório: ${n} itens precisam de atenção` : "Tudo em ordem — nada a reportar", n ? "low" : "ok")
+    setTab("rel")
+  }
+
+  function refreshContagem() {
+    setContagemKey((k) => k + 1)
+    carregar()
   }
 
   function abrirAlerta(a) {
-    const p = produtos.find((x) => x.id === a.produtoId)
+    const id = typeof a === "object" ? a.produtoId : a
+    const p = produtos.find((x) => x.id === id)
     if (p) setDetalhe(p)
   }
 
@@ -256,7 +295,19 @@ export default function DashboardPage() {
                 />
               )}
 
-              {tab === "geral" && <VisaoGeral resumo={resumo} alerts={alerts} onPick={abrirAlerta} />}
+              {tab === "geral" && (
+                <VisaoGeral
+                  resumo={resumo}
+                  alerts={alerts}
+                  onPick={abrirAlerta}
+                  contagemKey={contagemKey}
+                  onOpenContagem={() => { setMerendaView("contagem"); setTab("merenda") }}
+                />
+              )}
+
+              {tab === "alert" && (
+                <AlertasView alertas={alertas} onPick={abrirAlerta} />
+              )}
 
               {tab === "mov" && (
                 <MovimentacoesView
@@ -265,6 +316,38 @@ export default function DashboardPage() {
                   onNovaSaida={() => setSaidaOpen(true)}
                 />
               )}
+
+              {tab === "rel" && <RelatoriosView />}
+
+              {tab === "merenda" && (
+                <div>
+                  <div className="mb-5 flex flex-wrap gap-2">
+                    {[
+                      { key: "contagem", label: "Contagem" },
+                      { key: "producao", label: "Produção" },
+                    ].map((v) => (
+                      <button
+                        key={v.key}
+                        type="button"
+                        onClick={() => setMerendaView(v.key)}
+                        className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                          merendaView === v.key
+                            ? "border-brand bg-brand text-[#f4f1e7]"
+                            : "border-line bg-surface text-ink-soft"
+                        }`}
+                      >
+                        {v.label}
+                      </button>
+                    ))}
+                  </div>
+                  {merendaView === "contagem" ? (
+                    <ContagemView onRegistrado={refreshContagem} />
+                  ) : (
+                    <KitchenProductionView onBaixaConcluida={carregar} />
+                  )}
+                </div>
+              )}
+
               {tab === "sol" && (
                 <EmptyTab
                   icon={Icon.report(40)}
@@ -325,11 +408,11 @@ export default function DashboardPage() {
 }
 
 /* ---------- Aba Visão Geral ---------- */
-function VisaoGeral({ resumo, alerts, onPick }) {
+function VisaoGeral({ resumo, alerts, onPick, contagemKey, onOpenContagem }) {
   const cards = [
     { label: "Itens cadastrados", value: resumo.total, icon: Icon.box, tint: "var(--color-brand-tint)", fg: "var(--color-brand)" },
-    { label: "Precisam de atenção", value: resumo.baixo, icon: Icon.alert, tint: "var(--color-low-tint)", fg: "var(--color-low)" },
-    { label: "Itens vencidos", value: resumo.vencidos, icon: Icon.bell, tint: "var(--color-out-tint)", fg: "var(--color-out)" },
+    { label: "Estoque crítico", value: resumo.baixo, icon: Icon.alert, tint: "var(--color-low-tint)", fg: "var(--color-low)" },
+    { label: "Validade crítica", value: resumo.vencidos, icon: Icon.bell, tint: "var(--color-out-tint)", fg: "var(--color-out)" },
     { label: "Valor em estoque", value: brl(resumo.valor), icon: Icon.report, tint: "var(--color-accent-tint)", fg: "var(--color-accent)", small: true },
   ]
   return (
@@ -348,7 +431,7 @@ function VisaoGeral({ resumo, alerts, onPick }) {
         </div>
         <div className="card mt-5 p-5">
           <h3 className="font-display text-lg font-bold">Central de alertas</h3>
-          <p className="text-sm text-ink-faint">Itens com estoque baixo, esgotados ou vencidos.</p>
+          <p className="text-sm text-ink-faint">Itens com validade crítica ou estoque abaixo do limiar.</p>
           <div className="mt-3 divide-y divide-line">
             {alerts.length === 0 && <p className="py-6 text-center text-sm text-ink-faint">Nenhum alerta. 🎉</p>}
             {alerts.map((a) => (
@@ -361,7 +444,9 @@ function VisaoGeral({ resumo, alerts, onPick }) {
           </div>
         </div>
       </div>
-      <aside><KitchenPanel /></aside>
+      <aside>
+        <ContagemWidget refreshKey={contagemKey} onOpenContagem={onOpenContagem} />
+      </aside>
     </div>
   )
 }

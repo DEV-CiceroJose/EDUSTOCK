@@ -1,10 +1,12 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 
-from .models import Produto, Entrada, Movimentacao
+from .models import Produto, Entrada, Movimentacao, FrequenciaDiaria
 
 
 @transaction.atomic
@@ -48,3 +50,56 @@ def registrar_entrada(*, fornecedor=None, numero_nota_fiscal="", data=None, obse
             entrada=entrada, motivo="entrada", data=entrada.data, user=user,
         )
     return entrada
+
+
+def _media_diaria_frequencia(*, data, turno=None, dias=30):
+    """Média dos totais diários de alunos nos últimos `dias` antes de `data`."""
+    inicio = data - timedelta(days=dias)
+    qs = FrequenciaDiaria.objects.filter(data__gte=inicio, data__lt=data)
+    if turno:
+        qs = qs.filter(turno=turno)
+    totais_por_dia = qs.values("data").annotate(total=Sum("quantidade_alunos"))
+    valores = [row["total"] for row in totais_por_dia]
+    if not valores:
+        return Decimal("0")
+    return Decimal(sum(valores)) / Decimal(len(valores))
+
+
+def total_frequencia(*, data, turno=None):
+    qs = FrequenciaDiaria.objects.filter(data=data)
+    if turno:
+        qs = qs.filter(turno=turno)
+    return qs.aggregate(total=Sum("quantidade_alunos"))["total"] or 0
+
+
+def calcular_previsao_producao(data, turno):
+    total_alunos = total_frequencia(data=data, turno=turno)
+    media_historica = _media_diaria_frequencia(data=data, turno=turno)
+    alerta_reducao = False
+    if media_historica > 0:
+        alerta_reducao = Decimal(total_alunos) < media_historica * Decimal("0.5")
+    return {
+        "total_alunos": total_alunos,
+        "media_historica": float(media_historica.quantize(Decimal("0.01"))),
+        "alerta_reducao": alerta_reducao,
+    }
+
+
+def calcular_resumo_dia(data):
+    """Resumo agregado do dia (todos os turnos) para o widget do dashboard."""
+    total_alunos = total_frequencia(data=data)
+    media_historica = _media_diaria_frequencia(data=data, turno=None)
+    variacao_pct = None
+    alerta_reducao = False
+    if media_historica > 0:
+        variacao_pct = float(
+            ((Decimal(total_alunos) - media_historica) / media_historica * 100).quantize(Decimal("0.1"))
+        )
+        alerta_reducao = Decimal(total_alunos) < media_historica * Decimal("0.5")
+    return {
+        "data": data.isoformat(),
+        "total_alunos": total_alunos,
+        "media_historica": float(media_historica.quantize(Decimal("0.01"))),
+        "variacao_pct": variacao_pct,
+        "alerta_reducao": alerta_reducao,
+    }

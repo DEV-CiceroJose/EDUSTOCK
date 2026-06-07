@@ -1,5 +1,8 @@
+from datetime import datetime
+
 from rest_framework import viewsets, filters, status
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
 from .serializers import (
@@ -8,6 +11,44 @@ from .serializers import (
     MovimentacaoSerializer, EntradaSerializer,
 )
 from .services import registrar_movimentacao
+from .alerts import coletar_alertas
+from .relatorios import gerar_prestacao_contas
+
+
+def _parse_date_param(value, label):
+    if not value:
+        return None, Response({"detail": f"Parâmetro '{label}' é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date(), None
+    except ValueError:
+        return None, Response({"detail": f"Parâmetro '{label}' inválido. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AlertasView(APIView):
+    def get(self, request):
+        tipo = request.query_params.get("tipo")
+        urgencia = request.query_params.get("urgencia")
+        if tipo and tipo not in ("validade", "estoque"):
+            return Response({"detail": "tipo inválido"}, status=status.HTTP_400_BAD_REQUEST)
+        if urgencia and urgencia not in ("critico", "alerta"):
+            return Response({"detail": "urgencia inválida"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(coletar_alertas(tipo=tipo, urgencia=urgencia))
+
+
+class PrestacaoContasView(APIView):
+    def get(self, request):
+        inicio, err = _parse_date_param(request.query_params.get("inicio"), "inicio")
+        if err:
+            return err
+        fim, err = _parse_date_param(request.query_params.get("fim"), "fim")
+        if err:
+            return err
+        if inicio > fim:
+            return Response(
+                {"detail": "inicio não pode ser posterior a fim."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(gerar_prestacao_contas(inicio=inicio, fim=fim))
 
 
 class CategoriaViewSet(viewsets.ModelViewSet):

@@ -71,3 +71,31 @@ export const httpEntradas = {
   list: () => req(`/entradas/`),
   create: (data) => req(`/entradas/`, { method: "POST", body: data }),
 }
+
+export const httpAlertas = {
+  list: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v != null && v !== "")
+    ).toString()
+    return req(`/alertas/${qs ? `?${qs}` : ""}`)
+  },
+}
+
+export const httpRelatorios = {
+  prestacaoContas: ({ inicio, fim }) =>
+    req(`/relatorios/prestacao-contas/?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`),
+}
+
+export const httpOperacao = {
+  registrarContagem: (data) =>
+    req(`/operacao/contagem/`, { method: "POST", body: data }),
+  resumo: (data) =>
+    req(`/operacao/resumo/${data ? `?data=${encodeURIComponent(data)}` : ""}`),
+  planoDoDia: ({ data, turno }) => {
+    const qs = new URLSearchParams({ turno })
+    if (data) qs.set("data", data)
+    return req(`/operacao/plano-do-dia/?${qs}`)
+  },
+  baixaProducao: (data) =>
+    req(`/operacao/baixa-de-producao/`, { method: "POST", body: data }),
+}

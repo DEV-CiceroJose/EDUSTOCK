@@ -34,10 +34,30 @@ function seed() {
     { id: 3, nome: "Detergente Neutro", numero_nota_fiscal: "NF-00198", grupo: 3, fornecedor: 2, quantidade: 64, unidade: "UN", estoque_minimo: 20, perecivel: false, periodicidade: "EVENTUAL", validade: emDias(310), preco: "2.15" },
     { id: 4, nome: "Resma Papel A4", numero_nota_fiscal: "NF-00210", grupo: 4, fornecedor: null, quantidade: 25, unidade: "PC", estoque_minimo: 10, perecivel: false, periodicidade: "EVENTUAL", validade: null, preco: "23.00" },
   ]
+  const dataHoje = hoje.toISOString().slice(0, 10)
+  const entradas = [
+    {
+      id: 1, fornecedor: 1, fornecedor_nome: "Atacadão Escolar",
+      numero_nota_fiscal: "NF-9001", data: dataHoje, observacao: "",
+      itens: [
+        { produto: 1, produto_nome: "Arroz Branco Tipo 1", quantidade: 10, preco_unitario: 5.4 },
+        { produto: 2, produto_nome: "Feijão Carioca", quantidade: 5, preco_unitario: 8.2 },
+      ],
+      total: "95.00", criado_em: hoje.toISOString(),
+    },
+  ]
+  const movimentacoes = [
+    { id: 1, produto: 1, tipo: "ENTRADA", quantidade: 10, preco_unitario: 5.4, entrada: 1, motivo: "entrada", data: dataHoje, criado_em: hoje.toISOString() },
+    { id: 2, produto: 2, tipo: "ENTRADA", quantidade: 5, preco_unitario: 8.2, entrada: 1, motivo: "entrada", data: dataHoje, criado_em: hoje.toISOString() },
+  ]
+  const fatores = [
+    { produto: 1, gramas_por_aluno: 80, ativo: true },
+    { produto: 2, gramas_por_aluno: 60, ativo: true },
+  ]
   return {
     categorias, grupos, fornecedores, produtos,
-    movimentacoes: [], entradas: [],
-    seqC: 4, seqG: 5, seqF: 3, seqP: 5, seqM: 1, seqE: 1,
+    movimentacoes, entradas, frequencias: [], fatores,
+    seqC: 4, seqG: 5, seqF: 3, seqP: 5, seqM: 3, seqE: 2, seqFreq: 1,
   }
 }
 
@@ -292,6 +312,392 @@ export const mockCategorias = {
     const db = load()
     db.categorias = db.categorias.filter((c) => c.id !== Number(id))
     save(db)
+  },
+}
+
+const CRITICO_DIAS = 7
+const ALERTA_DIAS = 30
+
+function diasAteValidade(iso, hoje = new Date()) {
+  const h = new Date(hoje)
+  h.setHours(0, 0, 0, 0)
+  const alvo = new Date(iso + "T00:00:00")
+  return Math.round((alvo - h) / 86400000)
+}
+
+function urgenciaValidade(dias) {
+  return dias < CRITICO_DIAS ? "critico" : "alerta"
+}
+
+function isEstoqueCritico(quantidade, estoqueMinimo) {
+  const q = Number(quantidade)
+  const m = Number(estoqueMinimo) || 0
+  if (q <= 0) return { critico: true, urgencia: "critico" }
+  if (m > 0 && q < m * 0.2) return { critico: true, urgencia: "alerta" }
+  return { critico: false, urgencia: null }
+}
+
+function motivoValidade(dias) {
+  if (dias < 0) return "Vencido"
+  if (dias === 0) return "Vence hoje"
+  return `Vence em ${dias} dias`
+}
+
+const UNIDADE_LABEL = { UN: "unidade", KG: "quilograma", L: "litro", CX: "caixa", PC: "pacote" }
+
+function motivoEstoque(quantidade, unidade) {
+  const q = Number(quantidade)
+  if (q <= 0) return "Esgotado"
+  const label = UNIDADE_LABEL[unidade] || unidade
+  const qtdFmt = Number.isInteger(q) ? String(q) : String(q)
+  return `Saldo: ${qtdFmt} ${label}`
+}
+
+function coletarAlertasMock(produtos, { tipo, urgencia } = {}) {
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+
+  const validade = []
+  const estoque_critico = []
+
+  if (!tipo || tipo === "validade") {
+    for (const p of produtos) {
+      if (!p.validade) continue
+      const dias = diasAteValidade(p.validade, hoje)
+      if (dias > ALERTA_DIAS) continue
+      const item = {
+        produto_id: p.id,
+        nome: p.nome,
+        grupo_nome: p.grupo_nome,
+        fornecedor_nome: p.fornecedor_nome ?? null,
+        motivo: motivoValidade(dias),
+        urgencia: urgenciaValidade(dias),
+        dias_validade: dias,
+      }
+      if (!urgencia || item.urgencia === urgencia) validade.push(item)
+    }
+  }
+
+  if (!tipo || tipo === "estoque") {
+    for (const p of produtos) {
+      const { critico, urgencia: urg } = isEstoqueCritico(p.quantidade, p.estoque_minimo)
+      if (!critico) continue
+      const item = {
+        produto_id: p.id,
+        nome: p.nome,
+        grupo_nome: p.grupo_nome,
+        fornecedor_nome: p.fornecedor_nome ?? null,
+        motivo: motivoEstoque(p.quantidade, p.unidade),
+        urgencia: urg,
+        quantidade: String(p.quantidade),
+        estoque_minimo: String(p.estoque_minimo ?? 0),
+      }
+      if (!urgencia || item.urgencia === urgencia) estoque_critico.push(item)
+    }
+  }
+
+  const vencidos = validade.filter((a) => a.urgencia === "critico").length
+  const esgotados = estoque_critico.filter((a) => a.urgencia === "critico").length
+
+  return {
+    resumo: {
+      vencidos,
+      esgotados,
+      total_validade: validade.length,
+      total_estoque_critico: estoque_critico.length,
+    },
+    validade,
+    estoque_critico,
+  }
+}
+
+export const mockAlertas = {
+  async list(params = {}) {
+    await delay()
+    const db = load()
+    const produtos = db.produtos.map((p) => expand(p, db))
+    return coletarAlertasMock(produtos, params)
+  },
+}
+
+function money(val) {
+  return Number(val).toFixed(2)
+}
+
+function produtoTemEntrada(db, produtoId) {
+  return db.movimentacoes.some((m) => m.produto === produtoId && m.entrada != null)
+}
+
+function gerarPrestacaoContasMock(db, inicio, fim) {
+  const entradas = db.entradas.filter((e) => e.data >= inicio && e.data <= fim)
+  const porFornecedor = new Map()
+
+  for (const e of entradas) {
+    const fid = e.fornecedor ?? null
+    if (!porFornecedor.has(fid)) {
+      porFornecedor.set(fid, {
+        fornecedor_id: fid,
+        fornecedor_nome: e.fornecedor_nome || "Sem fornecedor",
+        documento: fid ? (db.fornecedores.find((f) => f.id === fid)?.documento || "") : "",
+        documentos: [],
+        total_fornecedor: 0,
+      })
+    }
+    const bloco = porFornecedor.get(fid)
+    const itens = (e.itens || []).map((it) => {
+      const prod = db.produtos.find((p) => p.id === Number(it.produto))
+      const sub = it.preco_unitario != null ? Number(it.quantidade) * Number(it.preco_unitario) : 0
+      const legadoNf = !e.numero_nota_fiscal && prod?.numero_nota_fiscal ? prod.numero_nota_fiscal : null
+      return {
+        produto_nome: it.produto_nome,
+        quantidade: String(it.quantidade),
+        preco_unitario: it.preco_unitario != null ? String(it.preco_unitario) : null,
+        subtotal: money(sub),
+        numero_nota_fiscal_legado: legadoNf,
+      }
+    })
+    const doc = {
+      entrada_id: e.id,
+      numero_nota_fiscal: e.numero_nota_fiscal || "",
+      data: e.data,
+      total: e.total || money(itens.reduce((s, i) => s + Number(i.subtotal), 0)),
+      legado: false,
+      itens,
+    }
+    bloco.documentos.push(doc)
+    bloco.total_fornecedor += Number(doc.total)
+  }
+
+  const catTotals = new Map()
+  const catNames = new Map()
+  for (const e of entradas) {
+    for (const it of e.itens || []) {
+      const prod = db.produtos.find((p) => p.id === Number(it.produto))
+      const grupo = prod ? db.grupos.find((g) => g.id === prod.grupo) : null
+      const cat = grupo ? db.categorias.find((c) => c.id === grupo.categoria) : null
+      if (!cat || it.preco_unitario == null) continue
+      const sub = Number(it.quantidade) * Number(it.preco_unitario)
+      catTotals.set(cat.id, (catTotals.get(cat.id) || 0) + sub)
+      catNames.set(cat.id, cat.name)
+    }
+  }
+
+  for (const p of db.produtos) {
+    if (!p.numero_nota_fiscal) continue
+    if (produtoTemEntrada(db, p.id)) continue
+    const criado = (p.criado_em || new Date().toISOString()).slice(0, 10)
+    if (criado < inicio || criado > fim) continue
+    const exp = expand(p, db)
+    const fid = p.fornecedor ?? null
+    if (!porFornecedor.has(fid)) {
+      const forn = fid ? db.fornecedores.find((f) => f.id === fid) : null
+      porFornecedor.set(fid, {
+        fornecedor_id: fid,
+        fornecedor_nome: forn?.nome || "Sem fornecedor",
+        documento: forn?.documento || "",
+        documentos: [],
+        total_fornecedor: 0,
+      })
+    }
+    const preco = p.preco != null ? Number(p.preco) : null
+    const sub = preco != null ? Number(p.quantidade) * preco : 0
+    const doc = {
+      entrada_id: null,
+      numero_nota_fiscal: p.numero_nota_fiscal,
+      data: criado,
+      total: money(sub),
+      legado: true,
+      itens: [{
+        produto_nome: p.nome,
+        quantidade: String(p.quantidade),
+        preco_unitario: preco != null ? String(preco) : null,
+        subtotal: money(sub),
+        numero_nota_fiscal_legado: p.numero_nota_fiscal,
+      }],
+    }
+    const bloco = porFornecedor.get(fid)
+    const existente = bloco.documentos.find((d) => d.legado && d.numero_nota_fiscal === p.numero_nota_fiscal)
+    if (existente) {
+      existente.itens.push(doc.itens[0])
+      existente.total = money(Number(existente.total) + sub)
+    } else {
+      bloco.documentos.push(doc)
+    }
+    bloco.total_fornecedor += sub
+    const grupo = db.grupos.find((g) => g.id === p.grupo)
+    const cat = grupo ? db.categorias.find((c) => c.id === grupo.categoria) : null
+    if (cat) {
+      catTotals.set(cat.id, (catTotals.get(cat.id) || 0) + sub)
+      catNames.set(cat.id, cat.name)
+    }
+  }
+
+  let totalGeral = 0
+  const porCategoria = [...catTotals.entries()]
+    .sort((a, b) => (catNames.get(a[0]) || "").localeCompare(catNames.get(b[0]) || ""))
+    .map(([cid, total]) => {
+      totalGeral += total
+      return { categoria_id: cid, categoria_nome: catNames.get(cid), total: money(total) }
+    })
+
+  const fornecedores = [...porFornecedor.values()]
+    .map((f) => ({
+      ...f,
+      total_fornecedor: money(f.total_fornecedor),
+      documentos: f.documentos.sort((a, b) => a.data.localeCompare(b.data)),
+    }))
+    .sort((a, b) => (a.fornecedor_nome || "").localeCompare(b.fornecedor_nome || ""))
+
+  return {
+    periodo: { inicio, fim },
+    resumo_financeiro: { total_geral: money(totalGeral), por_categoria: porCategoria },
+    fornecedores,
+  }
+}
+
+export const mockRelatorios = {
+  async prestacaoContas({ inicio, fim }) {
+    await delay(280)
+    const db = load()
+    return gerarPrestacaoContasMock(db, inicio, fim)
+  },
+}
+
+function totalFreq(db, data, turno) {
+  return db.frequencias
+    .filter((f) => f.data === data && (!turno || f.turno === turno))
+    .reduce((s, f) => s + f.quantidade_alunos, 0)
+}
+
+function mediaHistoricaMock(db, data, turno) {
+  const inicio = new Date(data + "T00:00:00")
+  inicio.setDate(inicio.getDate() - 30)
+  const limite = inicio.toISOString().slice(0, 10)
+  const porDia = {}
+  for (const f of db.frequencias) {
+    if (f.data >= limite && f.data < data && (!turno || f.turno === turno)) {
+      porDia[f.data] = (porDia[f.data] || 0) + f.quantidade_alunos
+    }
+  }
+  const vals = Object.values(porDia)
+  if (!vals.length) return 0
+  return vals.reduce((a, b) => a + b, 0) / vals.length
+}
+
+function previsaoMock(db, data, turno) {
+  const total = totalFreq(db, data, turno)
+  const media = mediaHistoricaMock(db, data, turno)
+  return {
+    total_alunos: total,
+    media_historica: Math.round(media * 100) / 100,
+    alerta_reducao: media > 0 && total < media * 0.5,
+  }
+}
+
+function planoMock(db, data, turno) {
+  const total = totalFreq(db, data, turno)
+  const previsao = previsaoMock(db, data, turno)
+  const itens = []
+  for (const f of db.fatores || []) {
+    if (!f.ativo) continue
+    const p = db.produtos.find((x) => x.id === f.produto)
+    if (!p) continue
+    const exp = expand(p, db)
+    const base = f.gramas_por_aluno * total
+    const qtd = (p.unidade === "KG" || p.unidade === "L") ? base / 1000 : base
+    if (qtd <= 0) continue
+    const qtdStr = qtd.toFixed(3)
+    itens.push({
+      produto_id: p.id,
+      produto_nome: p.nome,
+      categoria_nome: exp.categoria_nome,
+      unidade: p.unidade,
+      quantidade: qtdStr,
+      quantidade_legivel: p.unidade === "KG" ? `${qtd.toFixed(1).replace(".", ",")} kg` : `${Math.round(qtd)} unidades`,
+      saldo_atual: String(p.quantidade),
+      estoque_insuficiente: Number(p.quantidade) < qtd,
+      gramas_por_aluno: String(f.gramas_por_aluno),
+    })
+  }
+  return { data, turno, total_alunos: total, previsao, itens }
+}
+
+export const mockOperacao = {
+  async registrarContagem(payload) {
+    await delay(150)
+    const db = load()
+    const data = payload.data || new Date().toISOString().slice(0, 10)
+    const dup = db.frequencias.some(
+      (f) => f.data === data && f.turno === payload.turno && f.turma === payload.turma
+    )
+    if (dup) {
+      throw new Error(
+        `Já existe contagem para a turma '${payload.turma}' no turno ${payload.turno} em ${data}.`
+      )
+    }
+    const freq = {
+      id: db.seqFreq++,
+      data,
+      turno: payload.turno,
+      turma: payload.turma,
+      quantidade_alunos: Number(payload.quantidade_alunos),
+    }
+    db.frequencias.push(freq)
+    save(db)
+    return {
+      ...freq,
+      previsao: previsaoMock(db, data, payload.turno),
+    }
+  },
+  async resumo(data) {
+    await delay(100)
+    const db = load()
+    const d = data || new Date().toISOString().slice(0, 10)
+    const total = totalFreq(db, d)
+    const media = mediaHistoricaMock(db, d)
+    return {
+      data: d,
+      total_alunos: total,
+      media_historica: Math.round(media * 100) / 100,
+      variacao_pct: media > 0 ? Math.round(((total - media) / media) * 1000) / 10 : null,
+      alerta_reducao: media > 0 && total < media * 0.5,
+    }
+  },
+  async planoDoDia({ data, turno }) {
+    await delay(180)
+    const db = load()
+    const d = data || new Date().toISOString().slice(0, 10)
+    return planoMock(db, d, turno)
+  },
+  async baixaProducao({ data, turno, itens }) {
+    await delay(200)
+    const db = load()
+    const d = data || new Date().toISOString().slice(0, 10)
+    const plano = planoMock(db, d, turno)
+    const overrides = {}
+    for (const it of itens || []) overrides[it.produto_id] = it
+    const resultados = []
+    for (const item of plano.itens) {
+      const qtd = Number(overrides[item.produto_id]?.quantidade_override ?? item.quantidade)
+      const p = db.produtos.find((x) => x.id === item.produto_id)
+      if (!p || p.quantidade < qtd) {
+        resultados.push({ ok: false, produto_id: item.produto_id, produto_nome: item.produto_nome, quantidade: String(qtd), erro: "Saldo insuficiente" })
+        continue
+      }
+      p.quantidade = Number(p.quantidade) - qtd
+      db.movimentacoes.push({
+        id: db.seqM++, produto: p.id, tipo: "SAIDA", quantidade: qtd,
+        preco_unitario: null, entrada: null, motivo: "consumo", data: d,
+        criado_em: new Date().toISOString(),
+      })
+      resultados.push({ ok: true, produto_id: item.produto_id, produto_nome: item.produto_nome, quantidade: String(qtd), movimentacao_id: db.seqM - 1 })
+    }
+    save(db)
+    return {
+      data: d, turno, resultados,
+      sucesso: resultados.filter((r) => r.ok).length,
+      falhas: resultados.filter((r) => !r.ok).length,
+    }
   },
 }
 
