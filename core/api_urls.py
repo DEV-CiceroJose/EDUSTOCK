@@ -7,6 +7,7 @@ from .api_views import (
 )
 from .operacao_views import (
     ContagemView, ResumoFrequenciaView, PlanoDoDiaView, BaixaProducaoView,
+    OperacaoLoginView, OperacaoLogoutView,
 )
 
 router = DefaultRouter()
@@ -21,8 +22,19 @@ router.register(r"entradas", EntradaViewSet, basename="entrada")
 urlpatterns = [
     path("alertas/", AlertasView.as_view(), name="alertas"),
     path("relatorios/prestacao-contas/", PrestacaoContasView.as_view(), name="prestacao-contas"),
+
+    # --- Módulo de Operação da Merenda (Sub-projeto E) ---
+    # Autenticação por PIN (não usa Django auth)
+    path("operacao/auth/", OperacaoLoginView.as_view(), name="operacao-auth-login"),
+    path("operacao/auth/logout/", OperacaoLogoutView.as_view(), name="operacao-auth-logout"),
+
+    # app-alunos — contagem de frequência (POST: ALUNO_REP / GET: ALUNO_REP + COZINHA)
     path("operacao/contagem/", ContagemView.as_view(), name="operacao-contagem"),
+
+    # Dashboard admin — resumo sem autenticação de perfil
     path("operacao/resumo/", ResumoFrequenciaView.as_view(), name="operacao-resumo"),
+
+    # app-cozinha — plano e baixa de produção (apenas COZINHA)
     path("operacao/plano-do-dia/", PlanoDoDiaView.as_view(), name="operacao-plano"),
     path("operacao/baixa-de-producao/", BaixaProducaoView.as_view(), name="operacao-baixa"),
 ] + router.urls

@@ -1,0 +1,335 @@
+import { useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getSessao, registrarContagem, logout } from './api.js'
+
+const TURNO_LABEL = { MANHA: 'Manhã', TARDE: 'Tarde', INTEGRAL: 'Integral' }
+
+/**
+ * Formata a variação percentual em relação à média histórica.
+ * Retorna null se não houver histórico.
+ */
+function formatarVariacao(previsao) {
+  if (!previsao) return null
+  const { total_alunos, media_historica } = previsao
+  if (!media_historica || media_historica === 0) return null
+  const pct = ((total_alunos - media_historica) / media_historica) * 100
+  const sinal = pct > 0 ? '+' : ''
+  return `${sinal}${pct.toFixed(0)}% em relação à média`
+}
+
+export default function ContagemView() {
+  const navigate = useNavigate()
+  const sessao = getSessao()
+
+  const [numero, setNumero] = useState('')    // string de dígitos do teclado
+  const [estado, setEstado] = useState('idle') // 'idle' | 'loading' | 'sucesso' | 'erro'
+  const [resultado, setResultado] = useState(null)
+  const [mensagemErro, setMensagemErro] = useState('')
+
+  // Redireciona se sessão expirou
+  if (!sessao) {
+    navigate('/login', { replace: true })
+    return null
+  }
+
+  const pressKey = useCallback((val) => {
+    if (estado !== 'idle') return
+    if (val === 'back') {
+      setNumero((n) => n.slice(0, -1))
+    } else if (numero.length < 4) {
+      // Limita a 4 dígitos para evitar números absurdos (max 9999 alunos)
+      setNumero((n) => n + val)
+    }
+  }, [estado, numero])
+
+  async function confirmar() {
+    const qtd = parseInt(numero, 10)
+    if (!qtd || qtd <= 0) return
+
+    setEstado('loading')
+    try {
+      const data = await registrarContagem(qtd)
+      setResultado(data)
+      setEstado('sucesso')
+    } catch (e) {
+      if (e.status === 409) {
+        // Duplicata — mostra mensagem sem travar
+        setMensagemErro('Frequência já registrada hoje para esta turma.')
+      } else {
+        setMensagemErro(e.message ?? 'Erro ao registrar. Tente novamente.')
+      }
+      setEstado('erro')
+    }
+  }
+
+  function reiniciar() {
+    setNumero('')
+    setEstado('idle')
+    setResultado(null)
+    setMensagemErro('')
+  }
+
+  function sair() {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
+  /* ---- Tela de Sucesso ---- */
+  if (estado === 'sucesso' && resultado) {
+    const variacao = formatarVariacao(resultado.previsao)
+    const alerta = resultado.previsao?.alerta_reducao
+
+    return (
+      <div
+        className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
+        style={{ maxWidth: 420, margin: '0 auto' }}
+      >
+        <div className="result-card w-full">
+          {/* Ícone grande de sucesso */}
+          <div
+            className="mx-auto mb-5 grid place-items-center rounded-full"
+            style={{
+              width: 80, height: 80,
+              background: 'var(--color-ok-tint)',
+              fontSize: '2.5rem',
+            }}
+          >
+            ✓
+          </div>
+
+          <p style={{ fontSize: '1rem', color: 'var(--color-ink-soft)', margin: 0 }}>
+            Turma {resultado.turma} — {TURNO_LABEL[resultado.turno] ?? resultado.turno}
+          </p>
+
+          {/* Número em destaque */}
+          <div
+            style={{
+              fontSize: '4rem',
+              fontWeight: 800,
+              color: 'var(--color-brand)',
+              lineHeight: 1.1,
+              marginTop: '0.5rem',
+            }}
+          >
+            {resultado.quantidade_alunos}
+          </div>
+          <p style={{ fontSize: '1.1rem', color: 'var(--color-ink-soft)', margin: '4px 0 0' }}>
+            alunos registrados
+          </p>
+
+          {/* Variação em relação à média */}
+          {variacao && (
+            <p
+              style={{
+                marginTop: '1rem',
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                color: alerta ? 'var(--color-warn)' : 'var(--color-ink-soft)',
+              }}
+            >
+              {alerta ? '⚠️ ' : ''}
+              {variacao}
+            </p>
+          )}
+
+          {/* Alerta de redução brusca */}
+          {alerta && (
+            <div
+              className="mt-4 rounded-xl px-4 py-3"
+              style={{
+                background: 'var(--color-warn-tint)',
+                color: 'var(--color-warn)',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+              }}
+            >
+              Frequência abaixo de 50% da média histórica
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={sair}
+          className="mt-8 w-full rounded-2xl py-4"
+          style={{
+            background: 'var(--color-canvas)',
+            border: '1.5px solid var(--color-line)',
+            fontSize: '1.05rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Concluído
+        </button>
+      </div>
+    )
+  }
+
+  /* ---- Tela de Erro ---- */
+  if (estado === 'erro') {
+    return (
+      <div
+        className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
+        style={{ maxWidth: 420, margin: '0 auto' }}
+      >
+        <div className="result-card w-full">
+          <div
+            className="mx-auto mb-5 grid place-items-center rounded-full"
+            style={{ width: 80, height: 80, background: 'var(--color-err-tint)', fontSize: '2.5rem' }}
+          >
+            ⚠
+          </div>
+          <p
+            style={{
+              fontSize: '1.05rem',
+              fontWeight: 600,
+              color: 'var(--color-err)',
+              margin: 0,
+            }}
+          >
+            {mensagemErro}
+          </p>
+        </div>
+
+        <button
+          onClick={reiniciar}
+          className="mt-6 w-full rounded-2xl py-4"
+          style={{
+            background: 'var(--color-brand)',
+            color: '#fff',
+            border: 'none',
+            fontSize: '1.05rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Tentar novamente
+        </button>
+
+        <button
+          onClick={sair}
+          className="mt-3 w-full rounded-2xl py-4"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '0.95rem',
+            color: 'var(--color-ink-soft)',
+            cursor: 'pointer',
+          }}
+        >
+          Sair
+        </button>
+      </div>
+    )
+  }
+
+  /* ---- Tela Principal de Registro ---- */
+  const podeConfirmar = numero.length > 0 && parseInt(numero, 10) > 0 && estado === 'idle'
+  const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back']
+
+  return (
+    <div
+      className="flex min-h-screen flex-col bg-white px-6 pb-8 pt-6"
+      style={{ maxWidth: 420, margin: '0 auto' }}
+    >
+      {/* Cabeçalho — turma e turno (somente leitura) */}
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>
+            Turma {sessao.turma}
+          </div>
+          <div style={{ color: 'var(--color-ink-soft)', fontSize: '0.95rem', marginTop: 2 }}>
+            {TURNO_LABEL[sessao.turno] ?? sessao.turno}
+          </div>
+        </div>
+        <button
+          onClick={sair}
+          style={{
+            background: 'var(--color-canvas)',
+            border: '1.5px solid var(--color-line)',
+            borderRadius: 12,
+            padding: '0.4rem 0.9rem',
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+            color: 'var(--color-ink-soft)',
+            fontWeight: 600,
+          }}
+        >
+          Sair
+        </button>
+      </div>
+
+      {/* Prompt */}
+      <p
+        className="mb-2 text-center"
+        style={{ color: 'var(--color-ink-soft)', fontSize: '1rem' }}
+      >
+        Quantos alunos estão presentes?
+      </p>
+
+      {/* Display do número digitado */}
+      <div
+        className="pin-display mb-6 flex items-center justify-center"
+        style={{ minHeight: '5rem' }}
+      >
+        {numero ? (
+          <span style={{ color: 'var(--color-brand)' }}>{numero}</span>
+        ) : (
+          <span style={{ color: 'var(--color-ink-faint)', fontSize: '2rem' }}>—</span>
+        )}
+      </div>
+
+      {/* Teclado numérico */}
+      <div
+        className="grid flex-1 gap-3"
+        style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
+      >
+        {teclas.map((t, i) => {
+          if (t === '') {
+            return <div key={i} />
+          }
+          if (t === 'back') {
+            return (
+              <button
+                key="back"
+                onClick={() => pressKey('back')}
+                className="numkey numkey-back"
+                aria-label="Apagar"
+              >
+                ⌫
+              </button>
+            )
+          }
+          return (
+            <button
+              key={t}
+              onClick={() => pressKey(t)}
+              className="numkey"
+            >
+              {t}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Botão confirmar */}
+      <button
+        onClick={confirmar}
+        disabled={!podeConfirmar}
+        className="numkey-confirm mt-4 w-full rounded-2xl py-5"
+        style={{
+          fontSize: '1.15rem',
+          fontWeight: 700,
+          background: podeConfirmar ? 'var(--color-brand)' : '#ccc',
+          color: '#fff',
+          border: 'none',
+          cursor: podeConfirmar ? 'pointer' : 'not-allowed',
+          transition: 'background 150ms',
+          minHeight: 64,
+        }}
+      >
+        {estado === 'loading' ? 'Enviando…' : 'Confirmar'}
+      </button>
+    </div>
+  )
+}

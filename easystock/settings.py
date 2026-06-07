@@ -136,7 +136,32 @@ REST_FRAMEWORK = {
 
 # Origem do dev server do Vite (React)
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
+    "http://localhost:5173",  # frontend admin
     "http://127.0.0.1:5173",
+    "http://localhost:5174",  # app-alunos
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",  # app-cozinha
+    "http://127.0.0.1:5175",
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# ------------------------------------------------------------------
+# Módulo de Operação da Merenda — PINs de acesso
+# ------------------------------------------------------------------
+# PIN de cada turma: { pin (str), turma, turno }
+# Em produção, carregue de variável de ambiente ou arquivo seguro.
+OPERACAO_PINS_ALUNOS = [
+    {"pin": "1001", "turma": "6A", "turno": "MANHA"},
+    {"pin": "1002", "turma": "6B", "turno": "MANHA"},
+    {"pin": "1003", "turma": "7A", "turno": "MANHA"},
+    {"pin": "1004", "turma": "7B", "turno": "TARDE"},
+    {"pin": "1005", "turma": "8A", "turno": "TARDE"},
+    {"pin": "1006", "turma": "8B", "turno": "TARDE"},
+    {"pin": "1007", "turma": "9A", "turno": "INTEGRAL"},
+]
+
+# PIN único da cozinha
+OPERACAO_PIN_COZINHA = "9999"
+
+# Tempo de vida dos tokens de sessão em horas (padrão 12h)
+OPERACAO_TOKEN_TTL_HORAS = 12

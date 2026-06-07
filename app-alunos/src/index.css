@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* app-alunos — otimizado para toque em celular */
+
+@theme {
+  --color-brand:      #214d3f;
+  --color-brand-dark: #1a3e33;
+  --color-brand-tint: #e7efe8;
+  --color-surface:    #ffffff;
+  --color-canvas:     #f5f5f5;
+  --color-line:       #e4e4e4;
+  --color-ink:        #1a1a1a;
+  --color-ink-soft:   #555555;
+  --color-ink-faint:  #999999;
+  --color-ok:         #2f8f5b;
+  --color-ok-tint:    #e1f1e6;
+  --color-err:        #c14444;
+  --color-err-tint:   #fbe2e0;
+  --color-warn:       #c98a16;
+  --color-warn-tint:  #fbeecd;
+
+  --font-body: "Hanken Grotesk", system-ui, sans-serif;
+}
+
+* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  /* impede scroll acidental no teclado numérico */
+  overscroll-behavior: none;
+}
+
+/* Botão numérico grande para toque */
+.numkey {
+  display: grid;
+  place-items: center;
+  height: 72px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  border-radius: 18px;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-line);
+  cursor: pointer;
+  transition: background 100ms, transform 80ms;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.numkey:active { transform: scale(0.94); background: var(--color-brand-tint); }
+
+.numkey-confirm {
+  background: var(--color-brand);
+  color: #fff;
+  border-color: var(--color-brand);
+  box-shadow: 0 8px 20px -10px rgba(33, 77, 63, 0.6);
+}
+.numkey-confirm:active { background: var(--color-brand-dark); }
+.numkey-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.numkey-back {
+  font-size: 1.2rem;
+  color: var(--color-ink-soft);
+}
+
+/* Display do número digitado */
+.pin-display {
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  min-height: 4rem;
+  text-align: center;
+}
+
+/* Dot de PIN */
+.pin-dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--color-brand);
+  margin: 0 6px;
+  transition: background 150ms;
+}
+.pin-dot.filled { background: var(--color-brand); }
+
+/* Card de resultado */
+.result-card {
+  background: var(--color-surface);
+  border-radius: 24px;
+  border: 1.5px solid var(--color-line);
+  padding: 2rem 1.5rem;
+  text-align: center;
+}

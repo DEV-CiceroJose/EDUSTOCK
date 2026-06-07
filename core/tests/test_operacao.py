@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
-from rest_framework.test import APITestCase
+from rest_framework.test import APITestCase, APIClient
 
 from core.models import Categoria, FrequenciaDiaria, FatorConsumo, Grupo, Produto
 from core.operacao import baixa_de_producao, gerar_plano_do_dia
@@ -98,27 +98,45 @@ class BaixaProducaoTest(TestCase):
 
 
 class ContagemApiTest(APITestCase):
+    def setUp(self):
+        # Cria tokens de operação para os testes de API
+        from core.operacao_auth import criar_token, PERFIL_ALUNO, PERFIL_COZINHA
+        self.client_aluno = APIClient()
+        self.client_aluno.credentials(
+            HTTP_X_OPERACAO_TOKEN=criar_token(PERFIL_ALUNO, turma="6A", turno="MANHA")
+        )
+        self.client_cozinha = APIClient()
+        self.client_cozinha.credentials(
+            HTTP_X_OPERACAO_TOKEN=criar_token(PERFIL_COZINHA)
+        )
+
     def test_cria_contagem_valida(self):
-        resp = self.client.post("/api/operacao/contagem/", {
-            "turma": "6A", "turno": "MANHA", "quantidade_alunos": 32,
+        resp = self.client_aluno.post("/api/operacao/contagem/", {
+            "quantidade_alunos": 32,
         }, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
         self.assertEqual(resp.data["previsao"]["total_alunos"], 32)
 
     def test_duplicata_retorna_409(self):
-        payload = {"turma": "6A", "turno": "MANHA", "quantidade_alunos": 32}
-        self.client.post("/api/operacao/contagem/", payload, format="json")
-        resp = self.client.post("/api/operacao/contagem/", payload, format="json")
+        payload = {"quantidade_alunos": 32}
+        self.client_aluno.post("/api/operacao/contagem/", payload, format="json")
+        resp = self.client_aluno.post("/api/operacao/contagem/", payload, format="json")
         self.assertEqual(resp.status_code, 409)
-        self.assertIn("Já existe contagem", resp.data["detail"])
+        self.assertIn("Frequência já registrada", resp.data["detail"])
 
     def test_resumo_dia(self):
-        self.client.post("/api/operacao/contagem/", {
-            "turma": "6A", "turno": "MANHA", "quantidade_alunos": 30,
+        from core.operacao_auth import criar_token, PERFIL_ALUNO
+        client_7b = APIClient()
+        client_7b.credentials(
+            HTTP_X_OPERACAO_TOKEN=criar_token(PERFIL_ALUNO, turma="7B", turno="TARDE")
+        )
+        self.client_aluno.post("/api/operacao/contagem/", {
+            "quantidade_alunos": 30,
         }, format="json")
-        self.client.post("/api/operacao/contagem/", {
-            "turma": "7B", "turno": "TARDE", "quantidade_alunos": 20,
+        client_7b.post("/api/operacao/contagem/", {
+            "quantidade_alunos": 20,
         }, format="json")
+        # /resumo/ não tem proteção de perfil (é usado pelo dashboard admin)
         resp = self.client.get("/api/operacao/resumo/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["total_alunos"], 50)
@@ -129,10 +147,10 @@ class ContagemApiTest(APITestCase):
         p = Produto.objects.create(nome="Arroz", grupo=grupo, unidade="KG", quantidade=10)
         FatorConsumo.objects.create(produto=p, gramas_por_aluno=Decimal("100"))
         hoje = timezone.localdate().isoformat()
-        self.client.post("/api/operacao/contagem/", {
-            "turma": "Total", "turno": "MANHA", "quantidade_alunos": 50,
+        self.client_aluno.post("/api/operacao/contagem/", {
+            "quantidade_alunos": 50,
         }, format="json")
-        resp = self.client.get(f"/api/operacao/plano-do-dia/?data={hoje}&turno=MANHA")
+        resp = self.client_cozinha.get(f"/api/operacao/plano-do-dia/?data={hoje}&turno=MANHA")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data["itens"]), 1)
 
@@ -142,10 +160,10 @@ class ContagemApiTest(APITestCase):
         p = Produto.objects.create(nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("20"))
         FatorConsumo.objects.create(produto=p, gramas_por_aluno=Decimal("100"))
         hoje = timezone.localdate().isoformat()
-        self.client.post("/api/operacao/contagem/", {
-            "turma": "Total", "turno": "MANHA", "quantidade_alunos": 100,
+        self.client_aluno.post("/api/operacao/contagem/", {
+            "quantidade_alunos": 100,
         }, format="json")
-        resp = self.client.post("/api/operacao/baixa-de-producao/", {
+        resp = self.client_cozinha.post("/api/operacao/baixa-de-producao/", {
             "data": hoje, "turno": "MANHA",
         }, format="json")
         self.assertEqual(resp.status_code, 200)
