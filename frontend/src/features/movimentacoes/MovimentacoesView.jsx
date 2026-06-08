@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { motion } from "motion/react"
-import { Icon } from "../lib/icons.jsx"
-import { dataBR } from "../lib/format"
+import { Icon } from "../../lib/icons.jsx"
+import { dataBR } from "../../lib/format"
 
 export default function MovimentacoesView({ movimentacoes, onNovaEntrada, onNovaSaida }) {
   const [tipo, setTipo] = useState("todos")

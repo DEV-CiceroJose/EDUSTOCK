@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react"
 import { motion } from "motion/react"
-import { operacaoApi } from "../api"
-import { categoryStyle } from "../lib/catalog"
-import { Icon } from "../lib/icons.jsx"
-import ConfirmDialog from "./ConfirmDialog"
-import { useToast } from "./Toast"
+import { operacaoApi } from "../../api"
+import { categoryStyle } from "../../lib/catalog"
+import { Icon } from "../../lib/icons.jsx"
+import ConfirmDialog from "../../components/ui/ConfirmDialog"
+import { useToast } from "../../components/ui/Toast"
 
 const TURNOS = [
   { key: "MANHA", label: "Manhã" },

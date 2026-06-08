@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { motion } from "motion/react"
-import { Icon } from "../lib/icons.jsx"
-import { useToast } from "./Toast"
+import { Icon } from "../../lib/icons.jsx"
+import { useToast } from "../../components/ui/Toast"
 
 function Stepper({ value, onChange }) {
   return (

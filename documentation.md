@@ -1,277 +1,353 @@
-# EduStock — Documentação Técnica Completa
+# EduStock — Documentação Técnica
 
-> Sistema de gestão de estoque escolar desenvolvido com Django (backend) e React (frontend).
+> Sistema de gestão de estoque escolar com backend Django REST + frontend React (SPA) + dois apps independentes de merenda escolar.
 
 ---
 
 ## Sumário
 
-1. [Visão Geral do Projeto](#1-visão-geral-do-projeto)
+1. [Visão Geral](#1-visão-geral)
 2. [Arquitetura do Sistema](#2-arquitetura-do-sistema)
 3. [Estrutura de Pastas](#3-estrutura-de-pastas)
-4. [Configuração e Instalação](#4-configuração-e-instalação)
+4. [Como Rodar o Projeto](#4-como-rodar-o-projeto)
 5. [Backend — Django](#5-backend--django)
    - 5.1 [Modelos de Dados](#51-modelos-de-dados)
-   - 5.2 [API REST — Endpoints](#52-api-rest--endpoints)
-   - 5.3 [Serializers](#53-serializers)
-   - 5.4 [Serviços (Services)](#54-serviços-services)
-   - 5.5 [Sistema de Alertas](#55-sistema-de-alertas)
-   - 5.6 [Relatórios — Prestação de Contas](#56-relatórios--prestação-de-contas)
-   - 5.7 [Admin Django](#57-admin-django)
-   - 5.8 [Migrações](#58-migrações)
-6. [Frontend — React](#6-frontend--react)
-   - 6.1 [Tecnologias e Dependências](#61-tecnologias-e-dependências)
-   - 6.2 [Camada de API (src/api)](#62-camada-de-api-srcapi)
-   - 6.3 [Páginas e Componentes](#63-páginas-e-componentes)
-   - 6.4 [Abas do Dashboard](#64-abas-do-dashboard)
-   - 6.5 [Modais](#65-modais)
-   - 6.6 [Utilitários (src/lib)](#66-utilitários-srclib)
-7. [Testes](#7-testes)
-8. [Fluxos Funcionais](#8-fluxos-funcionais)
-9. [Dados de Demonstração (Seed)](#9-dados-de-demonstração-seed)
-10. [Evolução do Projeto — Histórico de Design](#10-evolução-do-projeto--histórico-de-design)
-11. [Roadmap e Próximos Passos](#11-roadmap-e-próximos-passos)
+   - 5.2 [API REST — Endpoints Administrativos](#52-api-rest--endpoints-administrativos)
+   - 5.3 [API REST — Endpoints de Operação (Merenda)](#53-api-rest--endpoints-de-operação-merenda)
+   - 5.4 [Autenticação por PIN (operacao_auth.py)](#54-autenticação-por-pin-operacao_authpy)
+   - 5.5 [Serializers](#55-serializers)
+   - 5.6 [Serviços (services.py)](#56-serviços-servicespy)
+   - 5.7 [Sistema de Alertas](#57-sistema-de-alertas)
+   - 5.8 [Relatórios — Prestação de Contas](#58-relatórios--prestação-de-contas)
+   - 5.9 [Migrações](#59-migrações)
+6. [Frontend Administrativo (frontend/)](#6-frontend-administrativo-frontend)
+7. [App Alunos (app-alunos/)](#7-app-alunos-app-alunos)
+8. [App Cozinha (app-cozinha/)](#8-app-cozinha-app-cozinha)
+9. [Testes](#9-testes)
+10. [Fluxos Funcionais](#10-fluxos-funcionais)
+11. [Dados de Demonstração](#11-dados-de-demonstração)
+12. [Histórico de Desenvolvimento](#12-histórico-de-desenvolvimento)
+13. [Roadmap](#13-roadmap)
+14. [Referências Rápidas](#14-referências-rápidas)
 
 ---
 
-## 1. Visão Geral do Projeto
+## 1. Visão Geral
 
-O **EduStock** é um sistema digital de gestão de estoque desenvolvido para substituir o controle manual (Excel/papel) utilizado em escolas públicas. O projeto foi construído a partir de entrevistas com o responsável pela gestão (Alberes, assistente de gestão), e tem como foco:
+O **EduStock** é um sistema digital de gestão de estoque para escolas públicas, substituindo controles em Excel e papel. Foi construído a partir de entrevistas com o responsável pela gestão (Alberes, assistente de gestão).
 
-- Controle de **itens de consumo** (alimentos, material de limpeza, higiene, papelaria).
-- Cadastro de **bens permanentes** (patrimônio escolar).
-- Registro de **entradas e saídas** de estoque com rastreabilidade.
-- **Alertas automáticos** de itens com validade próxima ou estoque crítico.
-- Geração de **relatórios de prestação de contas** para a GRE (Gerência Regional de Educação).
-- Cadastro de **fornecedores** com informações fiscais.
+**Módulos implementados:**
 
-O sistema é composto por:
+| Módulo | Status | Descrição |
+|---|---|---|
+| A — Estoque (Hierarquia) | ✅ | Categorias → Grupos → Produtos com campos completos |
+| B — Fornecedores | ✅ | CRUD com filtros e vínculo a produtos |
+| C — Movimentações | ✅ | Entradas/saídas com transação atômica, saldo protegido |
+| D — Alertas e Relatórios | ✅ | Alertas de validade/estoque, relatório GRE em CSV/PDF |
+| E — Merenda Escolar | ✅ | Frequência de alunos + painel de produção diária |
 
-- **Backend**: API REST em Django + Django REST Framework, banco SQLite (desenvolvimento).
-- **Frontend**: SPA (Single Page Application) em React com Tailwind CSS e Vite.
+**Três interfaces independentes:**
+- **`/frontend`** — painel administrativo (gestor/almoxarife)
+- **`/app-alunos`** — registro de frequência por turma (representantes)
+- **`/app-cozinha`** — painel de produção diária (merendeiras)
 
 ---
 
 ## 2. Arquitetura do Sistema
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Navegador (SPA)                   │
-│   React 19 + React Router + Tailwind CSS + Motion   │
-│   ┌─────────────────────────────────────────────┐   │
-│   │             DashboardPage.jsx               │   │
-│   │  Inventário | Alertas | Fornecedores        │   │
-│   │  Movimentações | Relatórios | Solicitações  │   │
-│   └─────────────────────────────────────────────┘   │
-│                         │                           │
-│            src/api/http.js  (fetch)                 │
-│            src/api/mock.js  (modo offline)          │
-└─────────────────────────┬───────────────────────────┘
-                          │ HTTP / JSON
-                          ▼
-┌─────────────────────────────────────────────────────┐
-│             Django 5 + Django REST Framework        │
-│                                                     │
-│  /api/produtos/        /api/categorias/             │
-│  /api/grupos/          /api/fornecedores/           │
-│  /api/movimentacoes/   /api/entradas/               │
-│  /api/bens-permanentes/                             │
-│  /api/alertas/                                      │
-│  /api/relatorios/prestacao-contas/                  │
-│                                                     │
-│  ┌──────────────┐  ┌──────────────┐                 │
-│  │   Services   │  │   Alerts     │                 │
-│  │ (services.py)│  │ (alerts.py)  │                 │
-│  └──────────────┘  └──────────────┘                 │
-│          │                                          │
-│  ┌───────▼──────────────────────────────────────┐   │
-│  │                  Models                      │   │
-│  │ Categoria | Grupo | Produto | Fornecedor     │   │
-│  │ BemPermanente | Entrada | Movimentacao       │   │
-│  │ Perfil                                       │   │
-│  └──────────────────────────────────────────────┘   │
-│                      │                              │
-│              SQLite (db.sqlite3)                    │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  frontend/        app-alunos/           app-cozinha/                │
+│  :5173            :5174                 :5175                        │
+│  Painel Admin     Frequência de alunos  Painel de produção          │
+│                                                                      │
+│  Token: Django    Token: X-Operacao-    Token: X-Operacao-          │
+│  session/admin    Token (ALUNO_REP)     Token (COZINHA)             │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │ HTTP / JSON
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                  Django 6 + Django REST Framework                   │
+│                                                                      │
+│  /api/produtos/      /api/categorias/    /api/grupos/               │
+│  /api/fornecedores/  /api/movimentacoes/ /api/entradas/             │
+│  /api/bens-permanentes/                                             │
+│  /api/alertas/       /api/relatorios/prestacao-contas/              │
+│                                                                      │
+│  /api/operacao/auth/           ← login por PIN                      │
+│  /api/operacao/contagem/       ← frequência (ALUNO_REP)             │
+│  /api/operacao/resumo/         ← resumo do dia (dashboard admin)    │
+│  /api/operacao/plano-do-dia/   ← ordem de produção (COZINHA)        │
+│  /api/operacao/baixa-de-producao/ ← saídas de estoque (COZINHA)    │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐    │
+│  │  services.py │  │   alerts.py  │  │  operacao_auth.py      │    │
+│  │  movim. ATM  │  │  validade +  │  │  tokens PIN em memória │    │
+│  │  select_for  │  │  estoque     │  │  TTL 12h               │    │
+│  │  _update()   │  │              │  │                        │    │
+│  └──────────────┘  └──────────────┘  └────────────────────────┘    │
+│                          │                                          │
+│  ┌───────────────────────▼──────────────────────────────────────┐  │
+│  │                       Models                                 │  │
+│  │  Categoria | Grupo | Produto | Fornecedor | BemPermanente    │  │
+│  │  Entrada | Movimentacao | Perfil                             │  │
+│  │  FrequenciaDiaria | FatorConsumo                             │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+│                              │                                      │
+│                       SQLite (db.sqlite3)                           │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Modo Mock (desenvolvimento offline)
+### Isolamento de segurança
 
-O frontend possui um sistema de mock controlado pela variável de ambiente `VITE_USE_MOCK`. Quando `true` (padrão), todas as chamadas de API são interceptadas por `src/api/mock.js`, permitindo desenvolvimento sem o backend rodando.
+- Os endpoints `/api/operacao/*` (exceto `/resumo/`) rejeitam tokens de admin Django com **HTTP 403**.
+- O app-alunos e o app-cozinha não têm acesso a preços, fornecedores ou relatórios financeiros.
+- Os três apps não compartilham código, estado ou autenticação entre si.
 
 ---
 
 ## 3. Estrutura de Pastas
 
 ```
-EduStock/
+easystock/
 ├── core/                        # App principal Django
-│   ├── migrations/              # Migrações do banco de dados (0001–0009)
-│   ├── templates/               # Templates HTML (admin Django legado)
-│   │   ├── base.html
-│   │   ├── categorias/
-│   │   └── produtos/
-│   ├── tests/                   # Suite de testes
+│   ├── migrations/              # 0001–0011
+│   ├── tests/
 │   │   ├── test_alerts.py
 │   │   ├── test_api.py
 │   │   ├── test_migrations.py
 │   │   ├── test_models.py
+│   │   ├── test_operacao.py     # testes de integração do módulo E
+│   │   ├── test_operacao_spec.py # 5 testes obrigatórios da spec + extras
 │   │   ├── test_relatorios.py
 │   │   └── test_services.py
-│   ├── admin.py                 # Configuração do admin Django
-│   ├── alerts.py                # Lógica de alertas (validade e estoque)
-│   ├── api_urls.py              # Roteamento da API REST
-│   ├── api_views.py             # ViewSets e Views da API
-│   ├── apps.py
-│   ├── forms.py                 # Formulários Django (legado)
-│   ├── models.py                # Modelos de dados
-│   ├── relatorios.py            # Geração de relatório de prestação de contas
-│   ├── serializers.py           # Serializers DRF
-│   ├── services.py              # Serviços de domínio (movimentações, entradas)
-│   └── views.py                 # Views HTML legadas
+│   ├── admin.py
+│   ├── alerts.py                # alertas de validade e estoque
+│   ├── api_urls.py              # roteamento da API (admin + operacao)
+│   ├── api_views.py             # ViewSets administrativos
+│   ├── models.py                # todos os modelos de dados
+│   ├── operacao.py              # lógica de plano e baixa de produção
+│   ├── operacao_auth.py         # autenticação por PIN (tokens em memória)
+│   ├── operacao_views.py        # views dos endpoints /api/operacao/*
+│   ├── relatorios.py
+│   ├── serializers.py
+│   ├── services.py
+│   └── views.py                 # views HTML legadas
 │
-├── EduStock/                   # Configuração do projeto Django
+├── easystock/                   # Configuração do projeto Django
 │   ├── settings.py
 │   ├── urls.py
 │   ├── asgi.py
 │   └── wsgi.py
 │
-├── frontend/                    # SPA React
-│   ├── public/                  # Assets estáticos (favicon, ícones)
-│   ├── dist/                    # Build de produção (gerado pelo Vite)
+├── frontend/                    # Painel administrativo (porta 5173)
 │   └── src/
-│       ├── api/
-│       │   ├── http.js          # Chamadas reais ao backend
-│       │   ├── index.js         # Seletor mock/real
-│       │   ├── mock.js          # Dados fictícios para dev
-│       │   └── units.js         # Utilitários de unidade
-│       ├── assets/
-│       ├── components/          # Componentes React
-│       │   ├── AlertasView.jsx
-│       │   ├── AlertTicker.jsx
-│       │   ├── CategoryRail.jsx
-│       │   ├── ConfirmDialog.jsx
-│       │   ├── DetailsModal.jsx
-│       │   ├── EntradaFormModal.jsx
-│       │   ├── FornecedoresView.jsx
-│       │   ├── FornecedorFormModal.jsx
-│       │   ├── Header.jsx
-│       │   ├── KitchenPanel.jsx
-│       │   ├── Modal.jsx
-│       │   ├── MovimentacoesView.jsx
-│       │   ├── ProductCard.jsx
-│       │   ├── ProductFormModal.jsx
-│       │   ├── RelatoriosView.jsx
-│       │   ├── SaidaFormModal.jsx
-│       │   ├── Sidebar.jsx
-│       │   ├── Tabs.jsx
-│       │   └── Toast.jsx
-│       ├── lib/
-│       │   ├── catalog.js
-│       │   ├── export.js        # Exportação CSV e PDF
-│       │   ├── format.js        # Formatação de datas e moeda
-│       │   ├── format.test.js   # Testes unitários de format
-│       │   ├── icons.jsx        # Ícones SVG inline
-│       │   └── prestacaoPdf.js  # Geração de PDF (jsPDF)
-│       ├── pages/
-│       │   └── DashboardPage.jsx
-│       ├── index.css            # Estilos globais e tokens de design
-│       └── main.jsx             # Entrada da aplicação
+│       ├── api/                 # http.js, mock.js, index.js
+│       ├── components/          # Header, Sidebar, ProductCard, modais…
+│       ├── lib/                 # format.js, export.js, icons.jsx…
+│       ├── pages/DashboardPage.jsx
+│       └── index.css            # tokens de design + utilitários
 │
-├── docs/
-│   └── superpowers/
-│       ├── plans/               # Planos de implementação
-│       └── specs/               # Especificações de design
+├── app-alunos/                  # App de frequência (porta 5174)
+│   ├── .env.example
+│   ├── vite.config.js
+│   └── src/
+│       ├── api.js               # login, registrarContagem
+│       ├── App.jsx              # rotas /login → /registrar
+│       ├── PinLogin.jsx         # teclado PIN 4 dígitos
+│       └── ContagemView.jsx     # teclado numérico + tela de resultado
 │
-├── db.sqlite3                   # Banco de dados (dev)
+├── app-cozinha/                 # Painel de produção (porta 5175)
+│   ├── .env.example
+│   ├── vite.config.js
+│   └── src/
+│       ├── api.js               # login, getPlano, baixaProducao
+│       ├── App.jsx              # rotas /login → /producao
+│       ├── PinLogin.jsx         # teclado PIN único da cozinha
+│       └── ProducaoView.jsx     # cards de receita, modal de baixa
+│
+├── db.sqlite3
 ├── manage.py
 ├── requirements.txt
-└── seed_demo.py                 # Dados de exemplo
+└── seed_demo.py
 ```
 
 ---
 
-## 4. Configuração e Instalação
+## 4. Como Rodar o Projeto
 
 ### Pré-requisitos
 
 - Python 3.10+
 - Node.js 18+ e npm
 
-### Backend
+---
+
+### 4.1 Backend
 
 ```bash
 # 1. Clonar o repositório
 git clone https://github.com/DEV-CiceroJose/EDUSTOCK.git
-cd EduStock
+cd easystock
 
-# 2. Criar e ativar o ambiente virtual
+# 2. Criar e ativar ambiente virtual
 python -m venv .venv
-source .venv/bin/activate          # Linux/Mac
-.venv\Scripts\activate             # Windows
+.venv\Scripts\activate          # Windows
+source .venv/bin/activate       # Linux/Mac
 
 # 3. Instalar dependências Python
 pip install -r requirements.txt
 
-# 4. Executar as migrações
+# 4. Aplicar migrações
 python manage.py migrate
 
-# 5. Criar superusuário (opcional, para o admin)
+# 5. (Opcional) Criar superusuário para o admin Django
 python manage.py createsuperuser
 
-# 6. Popular com dados de demonstração (opcional)
+# 6. (Opcional) Popular com dados de demonstração
 python manage.py shell < seed_demo.py
 
-# 7. Iniciar o servidor de desenvolvimento
+# 7. Iniciar o servidor
 python manage.py runserver
 ```
 
-O backend estará disponível em `http://localhost:8000`.
+Backend disponível em **`http://localhost:8000`**.
 
-### Frontend
+---
+
+### 4.2 Frontend Administrativo
 
 ```bash
-# 1. Entrar na pasta do frontend
 cd frontend
-
-# 2. Instalar dependências Node
 npm install
 
-# 3. Configurar variáveis de ambiente (opcional)
-# Criar arquivo .env na pasta frontend:
-# VITE_USE_MOCK=false     # usa o backend real
-# VITE_USE_MOCK=true      # usa dados mock (padrão)
+# Modo mock (sem backend):
+# crie frontend/.env com VITE_USE_MOCK=true  (já é o padrão)
 
-# 4. Iniciar em modo de desenvolvimento
+# Modo real (com backend rodando):
+# crie frontend/.env com VITE_USE_MOCK=false
+
 npm run dev
-
-# 5. Build de produção
-npm run build
 ```
 
-O frontend de desenvolvimento estará disponível em `http://localhost:5173`.
+Disponível em **`http://localhost:5173`**.
 
-### Dependências Python (`requirements.txt`)
+---
 
+### 4.3 App Alunos (Frequência)
+
+```bash
+cd app-alunos
+npm install
+
+# Copiar e configurar variáveis de ambiente
+copy .env.example .env        # Windows
+cp .env.example .env          # Linux/Mac
 ```
-Django>=5.0
-djangorestframework>=3.15
-django-cors-headers>=4.4
+
+Editar `app-alunos/.env`:
+
+```env
+# PINs das turmas no formato TURMA:PIN,TURMA:PIN,...
+VITE_PINS=6A:1001,6B:1002,7A:1003,7B:1004,8A:1005,8B:1006,9A:1007
+
+# Turno de cada turma (padrão MANHA se omitido)
+VITE_TURNOS=6A:MANHA,6B:MANHA,7A:MANHA,7B:TARDE,8A:TARDE,8B:TARDE,9A:INTEGRAL
 ```
 
-### Dependências Node principais (`package.json`)
+> Os PINs no `.env` são usados para validação local (resposta imediata na UI).
+> A validação final é **sempre feita pelo backend** via `POST /api/operacao/auth/`.
+> Os PINs configurados em `settings.py` (`OPERACAO_PINS_ALUNOS`) precisam coincidir.
 
-| Pacote | Versão | Função |
-|---|---|---|
-| react | ^19.2.6 | Biblioteca de UI |
-| react-dom | ^19.2.6 | Renderização DOM |
-| react-router-dom | ^7.16.0 | Roteamento SPA |
-| tailwindcss | ^4.3.0 | Framework CSS utilitário |
-| motion | ^12.40.0 | Animações |
-| jspdf | ^4.2.1 | Geração de PDF |
-| jspdf-autotable | ^5.0.8 | Tabelas em PDF |
-| vite | ^8.0.12 | Bundler e servidor dev |
-| vitest | ^4.1.8 | Testes unitários |
+```bash
+npm run dev
+```
+
+Disponível em **`http://localhost:5174`**.
+
+---
+
+### 4.4 App Cozinha (Produção)
+
+```bash
+cd app-cozinha
+npm install
+
+copy .env.example .env        # Windows
+cp .env.example .env          # Linux/Mac
+```
+
+Editar `app-cozinha/.env`:
+
+```env
+# PIN único da cozinha
+VITE_PIN_COZINHA=9999
+```
+
+> Precisa coincidir com `OPERACAO_PIN_COZINHA` em `settings.py`.
+
+```bash
+npm run dev
+```
+
+Disponível em **`http://localhost:5175`**.
+
+---
+
+### 4.5 Configurar os PINs no backend
+
+Em `easystock/settings.py`, ajuste as listas para corresponder ao `.env` de cada app:
+
+```python
+# PINs das turmas (validados pelo backend no login)
+OPERACAO_PINS_ALUNOS = [
+    {"pin": "1001", "turma": "6A", "turno": "MANHA"},
+    {"pin": "1002", "turma": "6B", "turno": "MANHA"},
+    {"pin": "1003", "turma": "7A", "turno": "MANHA"},
+    {"pin": "1004", "turma": "7B", "turno": "TARDE"},
+    {"pin": "1005", "turma": "8A", "turno": "TARDE"},
+    {"pin": "1006", "turma": "8B", "turno": "TARDE"},
+    {"pin": "1007", "turma": "9A", "turno": "INTEGRAL"},
+]
+
+# PIN único da cozinha
+OPERACAO_PIN_COZINHA = "9999"
+
+# TTL dos tokens de sessão em horas (padrão 12h)
+OPERACAO_TOKEN_TTL_HORAS = 12
+```
+
+---
+
+### 4.6 Rodar os Testes
+
+```bash
+# Todos os testes do backend (104 testes)
+python manage.py test
+
+# Apenas o módulo de operação/merenda
+python manage.py test core.tests.test_operacao core.tests.test_operacao_spec
+
+# Testes do frontend administrativo
+cd frontend && npm test
+```
+
+---
+
+### 4.7 Build de Produção
+
+```bash
+# Frontend admin
+cd frontend && npm run build
+
+# App alunos
+cd app-alunos && npm run build
+
+# App cozinha
+cd app-cozinha && npm run build
+```
+
+Os arquivos de produção ficam nas respectivas pastas `dist/`.
 
 ---
 
@@ -279,932 +355,622 @@ django-cors-headers>=4.4
 
 ### 5.1 Modelos de Dados
 
-O banco de dados é composto pelos seguintes modelos, todos definidos em `core/models.py`:
+Todos em `core/models.py`.
 
-#### `Perfil`
+#### Modelos Administrativos (Módulos A–D)
 
-Extensão do usuário Django para armazenar a matrícula funcional.
+**`Categoria`** — Nível superior da hierarquia. Ex.: Alimentos, Limpeza.
 
-| Campo | Tipo | Descrição |
+**`Grupo`** — Segundo nível. Ex.: Carboidratos (dentro de Alimentos).
+- Constraint: (`categoria`, `nome`) únicos.
+
+**`Produto`** — Item de estoque de consumo.
+
+| Campo | Tipo | Notas |
 |---|---|---|
-| `user` | OneToOneField (User) | Usuário Django associado |
-| `matricula` | CharField(50) | Matrícula funcional (única) |
+| `nome` | CharField(200) | |
+| `grupo` | FK → Grupo | PROTECT |
+| `fornecedor` | FK → Fornecedor | opcional |
+| `quantidade` | Decimal(10,3) | saldo atual, atualizado por service |
+| `unidade` | choices | UN, KG, L, CX, PC |
+| `estoque_minimo` | Decimal(10,3) | limiar de alerta |
+| `perecivel` | Boolean | |
+| `validade` | Date | opcional |
+| `preco` | Decimal(10,2) | opcional, não exposto nos endpoints de operação |
+
+**`Fornecedor`** — CNPJ/CPF, telefone, e-mail, `emite_nota_fiscal`, `aceita_fiado`.
+
+**`BemPermanente`** — Patrimônio escolar (sem fluxo de estoque de consumo).
+
+**`Entrada`** — Agrupa movimentações de uma nota fiscal.
+
+**`Movimentacao`** — Registro atômico append-only de entrada ou saída.
 
 ---
 
-#### `Categoria`
+#### Modelos do Módulo E (Merenda)
 
-Nível superior da hierarquia de produtos. Ex.: Alimentos, Limpeza, Papelaria.
+**`FrequenciaDiaria`** — Contagem de alunos por turma/turno/dia.
 
-| Campo | Tipo | Descrição |
+| Campo | Tipo | Notas |
 |---|---|---|
-| `name` | CharField(100) | Nome da categoria (único) |
+| `data` | Date | padrão: hoje |
+| `turno` | choices | MANHA, TARDE, INTEGRAL |
+| `turma` | CharField(20) | ex.: "6A" |
+| `quantidade_alunos` | PositiveIntegerField | > 0 |
+| `registrado_por_turma` | CharField(20) | PIN/identificador da turma (app-alunos) |
+| `registrado_por` | FK → User | nulo quando registrado via app-alunos |
+| `criado_em` | DateTimeField | automático |
+
+Constraint única: (`data`, `turno`, `turma`) — bloqueia duplicatas com HTTP 409.
+
+**`FatorConsumo`** — Define quanto de um produto usar por aluno.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `produto` | OneToOneField → Produto | PROTECT |
+| `gramas_por_aluno` | Decimal(6,2) | quantidade em gramas por aluno |
+| `ativo` | Boolean | padrão True |
 
 ---
 
-#### `Grupo`
+### 5.2 API REST — Endpoints Administrativos
 
-Segundo nível da hierarquia. Ex.: Carboidratos, Leguminosas (dentro de Alimentos).
-
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `nome` | CharField(100) | Nome do grupo |
-| `categoria` | ForeignKey → Categoria | Categoria pai (PROTECT) |
-
-Constraint: combinação (`categoria`, `nome`) deve ser única.
-
----
-
-#### `Produto`
-
-Item de consumo do estoque escolar.
-
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `nome` | CharField(200) | Nome do produto |
-| `numero_nota_fiscal` | CharField(12) | NF de origem (legado, pode ser nulo) |
-| `grupo` | ForeignKey → Grupo | Grupo ao qual pertence (PROTECT) |
-| `fornecedor` | ForeignKey → Fornecedor | Fornecedor padrão (opcional) |
-| `quantidade` | Decimal(10,3) | Saldo atual em estoque |
-| `unidade` | choices | UN, KG, L, CX ou PC |
-| `estoque_minimo` | Decimal(10,3) | Limiar de alerta de estoque baixo |
-| `perecivel` | Boolean | Indica se o produto tem prazo de validade |
-| `periodicidade` | choices | SEMANAL, MENSAL ou EVENTUAL |
-| `validade` | Date | Data de vencimento (opcional) |
-| `preco` | Decimal(10,2) | Preço unitário (opcional) |
-| `criado_por` | ForeignKey → User | Usuário que criou |
-| `atualizado_por` | ForeignKey → User | Último usuário que atualizou |
-| `criado_em` | DateTimeField | Data/hora de criação (automático) |
-| `atualizado_em` | DateTimeField | Data/hora de atualização (automático) |
-
----
-
-#### `Fornecedor`
-
-Cadastro de fornecedores de produtos.
-
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `nome` | CharField(200) | Nome do fornecedor |
-| `documento` | CharField(20) | CNPJ ou CPF |
-| `endereco` | CharField(200) | Endereço (opcional) |
-| `telefone` | CharField(20) | Telefone (opcional) |
-| `email` | EmailField | E-mail (opcional) |
-| `emite_nota_fiscal` | Boolean | Indica se emite NF (padrão: True) |
-| `aceita_fiado` | Boolean | Indica se aceita crédito |
-| `ativo` | Boolean | Indica se o fornecedor está ativo |
-| `observacao` | TextField | Notas livres |
-| `criado_por` | ForeignKey → User | Auditoria |
-| `atualizado_por` | ForeignKey → User | Auditoria |
-| `criado_em` / `atualizado_em` | DateTimeField | Timestamps automáticos |
-
----
-
-#### `BemPermanente`
-
-Cadastro de bens patrimoniais da escola (não entram no fluxo de estoque de consumo).
-
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `nome` | CharField(200) | Nome do bem |
-| `numero_patrimonio` | CharField(50) | Número de patrimônio (único, opcional) |
-| `localizacao` | CharField(150) | Local onde o bem se encontra |
-| `responsavel` | CharField(150) | Responsável pelo bem |
-| `estado_conservacao` | choices | NOVO, BOM, REGULAR, RUIM ou INSERVIVEL |
-| `data_aquisicao` | Date | Data de aquisição (opcional) |
-| `observacao` | TextField | Notas livres |
-| `criado_por` / `atualizado_por` | ForeignKey → User | Auditoria |
-| `criado_em` / `atualizado_em` | DateTimeField | Timestamps automáticos |
-
----
-
-#### `Entrada`
-
-Registro de uma nota fiscal / lote de compra. Agrupa múltiplos `Movimentacao` do tipo ENTRADA.
-
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `fornecedor` | ForeignKey → Fornecedor | Fornecedor da compra (opcional) |
-| `numero_nota_fiscal` | CharField(20) | Número da NF |
-| `data` | Date | Data da entrada (padrão: hoje) |
-| `observacao` | TextField | Observações livres |
-| `criado_por` | ForeignKey → User | Usuário que registrou |
-| `criado_em` | DateTimeField | Timestamp automático |
-
-**Propriedade calculada `total`**: soma de `quantidade × preco_unitario` de todos os itens (movimentações) vinculados.
-
----
-
-#### `Movimentacao`
-
-Registro atômico de entrada ou saída de um produto. É o coração do rastreamento de saldo.
-
-| Campo | Tipo | Descrição |
-|---|---|---|
-| `produto` | ForeignKey → Produto | Produto movimentado (PROTECT) |
-| `tipo` | choices | ENTRADA ou SAIDA |
-| `quantidade` | Decimal(10,3) | Quantidade movimentada |
-| `preco_unitario` | Decimal(10,2) | Preço unitário (opcional) |
-| `entrada` | ForeignKey → Entrada | Entrada associada (para entradas em lote) |
-| `motivo` | CharField(120) | Descrição do motivo |
-| `data` | Date | Data da movimentação (padrão: hoje) |
-| `criado_por` | ForeignKey → User | Usuário que registrou |
-| `criado_em` | DateTimeField | Timestamp automático |
-
-> **Importante:** `Movimentacao` é **append-only** (somente criação e leitura, sem edição ou exclusão via API). O saldo do produto (`Produto.quantidade`) é atualizado atomicamente no momento do registro.
-
----
-
-### 5.2 API REST — Endpoints
-
-A API está disponível em `/api/` e segue os padrões do Django REST Framework com `DefaultRouter`.
-
-#### Produtos
+Prefixo: `/api/`
 
 | Método | Endpoint | Descrição |
 |---|---|---|
-| GET | `/api/produtos/` | Listar todos os produtos |
-| POST | `/api/produtos/` | Criar novo produto |
-| GET | `/api/produtos/{id}/` | Detalhe de um produto |
-| PUT/PATCH | `/api/produtos/{id}/` | Atualizar produto |
-| DELETE | `/api/produtos/{id}/` | Remover produto |
+| GET/POST | `/api/produtos/` | Lista e cria produtos |
+| GET/PUT/PATCH/DELETE | `/api/produtos/{id}/` | CRUD de produto |
+| GET/POST | `/api/categorias/` | Lista e cria categorias |
+| GET/POST | `/api/grupos/` | Lista e cria grupos |
+| GET/POST | `/api/fornecedores/` | Lista e cria fornecedores |
+| GET/POST | `/api/movimentacoes/` | Lista e cria movimentações (append-only) |
+| GET/POST | `/api/entradas/` | Lista e cria entradas em lote (append-only) |
+| GET/POST | `/api/bens-permanentes/` | Lista e cria bens patrimoniais |
+| GET | `/api/alertas/` | Alertas de validade e estoque crítico |
+| GET | `/api/relatorios/prestacao-contas/` | Relatório por período |
 
-**Filtros disponíveis (query params):**
-- `?search=<termo>` — busca por nome
-- `?grupo=<id>` — filtra por grupo
-- `?categoria=<id>` — filtra por categoria
-- `?fornecedor=<id>` — filtra por fornecedor
+**Filtros comuns:**
+- Produtos: `?search=`, `?grupo=`, `?categoria=`, `?fornecedor=`
+- Fornecedores: `?search=`, `?emite_nota_fiscal=`, `?aceita_fiado=`, `?ativo=`
+- Movimentações: `?produto=`, `?tipo=`, `?data_de=`, `?data_ate=`
+- Alertas: `?tipo=validade|estoque`, `?urgencia=critico|alerta`
+- Relatório: `?inicio=YYYY-MM-DD&fim=YYYY-MM-DD`
 
-#### Categorias
+---
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/categorias/` | Listar categorias |
-| POST | `/api/categorias/` | Criar categoria |
-| GET/PUT/PATCH/DELETE | `/api/categorias/{id}/` | CRUD completo |
+### 5.3 API REST — Endpoints de Operação (Merenda)
 
-#### Grupos
+Prefixo: `/api/operacao/`
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/grupos/` | Listar grupos (com nome da categoria) |
-| POST | `/api/grupos/` | Criar grupo |
-| GET/PUT/PATCH/DELETE | `/api/grupos/{id}/` | CRUD completo |
+Todos exigem o header `X-Operacao-Token` (exceto `/auth/` e `/resumo/`).
+Tokens de admin Django são rejeitados com **HTTP 403**.
 
-#### Fornecedores
+| Método | Endpoint | Perfil | Descrição |
+|---|---|---|---|
+| POST | `/api/operacao/auth/` | — | Login por PIN, retorna token de sessão |
+| DELETE | `/api/operacao/auth/logout/` | qualquer | Invalida token |
+| POST | `/api/operacao/contagem/` | ALUNO_REP | Registra frequência da turma |
+| GET | `/api/operacao/contagem/` | ALUNO_REP, COZINHA | Consulta total do dia/turno |
+| GET | `/api/operacao/resumo/` | — (público) | Resumo do dia para o dashboard admin |
+| GET | `/api/operacao/plano-do-dia/` | COZINHA | Ordem de produção calculada |
+| POST | `/api/operacao/baixa-de-producao/` | COZINHA | Registra saídas de estoque |
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/fornecedores/` | Listar fornecedores |
-| POST | `/api/fornecedores/` | Criar fornecedor |
-| GET/PUT/PATCH/DELETE | `/api/fornecedores/{id}/` | CRUD completo |
+#### Login por PIN
 
-**Filtros disponíveis (query params):**
-- `?search=<termo>` — busca por nome ou CNPJ/CPF
-- `?emite_nota_fiscal=true|false`
-- `?aceita_fiado=true|false`
-- `?ativo=true|false`
+```
+POST /api/operacao/auth/
+Body:  { "pin": "1001", "perfil": "ALUNO_REP" }
+       { "pin": "9999", "perfil": "COZINHA"   }
 
-#### Bens Permanentes
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/bens-permanentes/` | Listar bens |
-| POST | `/api/bens-permanentes/` | Criar bem |
-| GET/PUT/PATCH/DELETE | `/api/bens-permanentes/{id}/` | CRUD completo |
-
-#### Movimentações (append-only)
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/movimentacoes/` | Listar movimentações |
-| POST | `/api/movimentacoes/` | Registrar movimentação (entrada ou saída) |
-
-**Filtros disponíveis (query params):**
-- `?produto=<id>`
-- `?tipo=ENTRADA|SAIDA`
-- `?data_de=YYYY-MM-DD`
-- `?data_ate=YYYY-MM-DD`
-
-**Payload de criação:**
-```json
-{
-  "produto": 1,
-  "tipo": "ENTRADA",
-  "quantidade": "5.000",
-  "motivo": "reposição semanal",
-  "preco_unitario": "8.50"
-}
+200:   { "token": "uuid...", "perfil": "ALUNO_REP", "turma": "6A", "turno": "MANHA" }
+401:   { "detail": "PIN inválido." }
 ```
 
-#### Entradas (lote, append-only)
+#### Registrar Frequência
 
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/entradas/` | Listar entradas |
-| POST | `/api/entradas/` | Criar entrada com múltiplos itens |
+```
+POST /api/operacao/contagem/
+Header: X-Operacao-Token: <token-aluno>
+Body:   { "quantidade_alunos": 32, "data": "2026-06-07" }
 
-**Payload de criação:**
-```json
-{
-  "fornecedor": 2,
-  "numero_nota_fiscal": "NF-00321",
-  "data": "2026-06-03",
-  "observacao": "",
+201:  { "id": 1, "data": "...", "turma": "6A", "turno": "MANHA",
+        "quantidade_alunos": 32,
+        "previsao": { "total_alunos": 32, "media_historica": 30.5,
+                      "alerta_reducao": false } }
+409:  { "detail": "Frequência já registrada hoje para esta turma..." }
+```
+
+#### Plano do Dia
+
+```
+GET /api/operacao/plano-do-dia/?data=2026-06-07&turno=MANHA
+Header: X-Operacao-Token: <token-cozinha>
+
+200: {
+  "data": "2026-06-07", "turno": "MANHA", "total_alunos": 210,
+  "previsao": { "alerta_reducao": false, ... },
   "itens": [
-    { "produto": 1, "quantidade": "10.000", "preco_unitario": "5.40" },
-    { "produto": 3, "quantidade": "5.000", "preco_unitario": "8.20" }
-  ]
-}
-```
-
-#### Alertas
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/alertas/` | Retornar alertas de validade e estoque |
-
-**Filtros disponíveis:**
-- `?tipo=validade|estoque`
-- `?urgencia=critico|alerta`
-
-**Resposta:**
-```json
-{
-  "resumo": {
-    "vencidos": 2,
-    "esgotados": 1,
-    "total_validade": 4,
-    "total_estoque_critico": 3
-  },
-  "validade": [...],
-  "estoque_critico": [...]
-}
-```
-
-#### Relatório de Prestação de Contas
-
-| Método | Endpoint | Descrição |
-|---|---|---|
-| GET | `/api/relatorios/prestacao-contas/` | Gerar relatório por período |
-
-**Parâmetros obrigatórios:**
-- `?inicio=YYYY-MM-DD`
-- `?fim=YYYY-MM-DD`
-
----
-
-### 5.3 Serializers
-
-Definidos em `core/serializers.py`. Todos os serializers seguem o padrão `ModelSerializer` do DRF.
-
-**`ProdutoSerializer`** — expõe campos derivados somente-leitura:
-- `grupo_nome` — nome do grupo
-- `categoria` — ID da categoria (via grupo)
-- `categoria_nome` — nome da categoria
-- `criado_por_nome` — username do criador
-- `fornecedor_nome` — nome do fornecedor
-
-**`GrupoSerializer`** — inclui `categoria_nome` somente-leitura.
-
-**`FornecedorSerializer`** — todos os campos do modelo, com `criado_em` e `atualizado_em` somente-leitura.
-
-**`MovimentacaoSerializer`** — inclui `produto_nome` somente-leitura. O campo `entrada` é somente-leitura (preenchido pelo service).
-
-**`EntradaSerializer`** — inclui:
-- `fornecedor_nome` somente-leitura
-- `itens` (nested `EntradaItemSerializer`, com escrita)
-- `total` calculado via `SerializerMethodField`
-
-O método `create` de `EntradaSerializer` delega para o service `registrar_entrada`, garantindo que toda a lógica de negócio (criação dos itens, atualização de saldo) seja executada de forma atômica.
-
----
-
-### 5.4 Serviços (Services)
-
-Definidos em `core/services.py`. Toda a lógica de negócio que altera o banco de dados fica aqui, isolada dos serializers e views.
-
-#### `registrar_movimentacao`
-
-```python
-def registrar_movimentacao(*, produto, tipo, quantidade, motivo="",
-                            preco_unitario=None, entrada=None, data=None, user=None)
-```
-
-Registra uma movimentação (entrada ou saída) de forma atômica (`@transaction.atomic`):
-
-1. Valida que `quantidade > 0`.
-2. Bloqueia o produto com `select_for_update()` para evitar condições de corrida.
-3. Para `SAIDA`: verifica se o saldo é suficiente; rejeita com `ValidationError` caso contrário.
-4. Atualiza `Produto.quantidade`.
-5. Cria e retorna o objeto `Movimentacao`.
-
-#### `registrar_entrada`
-
-```python
-def registrar_entrada(*, fornecedor=None, numero_nota_fiscal="", data=None,
-                       observacao="", itens, user=None)
-```
-
-Registra uma entrada em lote (múltiplos produtos em uma NF):
-
-1. Valida que `itens` não está vazio.
-2. Cria o objeto `Entrada`.
-3. Para cada item, chama `registrar_movimentacao` com `tipo=ENTRADA`.
-4. Tudo em uma única transação atômica.
-
----
-
-### 5.5 Sistema de Alertas
-
-Definido em `core/alerts.py`. Gera alertas em duas categorias:
-
-#### Alertas de Validade
-
-Configuração:
-- `CRITICO_DIAS = 7` — Produtos com validade em até 7 dias (urgência **crítico**).
-- `ALERTA_DIAS = 30` — Produtos com validade em até 30 dias (urgência **alerta**).
-
-Função principal: `coletar_alertas(tipo=None, urgencia=None, hoje=None)`
-
-Retorno de um item de validade:
-```json
-{
-  "produto_id": 3,
-  "nome": "Óleo de Soja 900ml",
-  "grupo_nome": "Óleos e Gorduras",
-  "fornecedor_nome": "Atacadão",
-  "motivo": "Vence em 5 dias",
-  "urgencia": "critico",
-  "dias_validade": 5
-}
-```
-
-#### Alertas de Estoque Crítico
-
-Um produto entra em estado crítico quando:
-- `quantidade <= 0` → urgência **crítico** (esgotado)
-- `quantidade < estoque_minimo × 0.2` (menos de 20% do mínimo) → urgência **alerta**
-
-Retorno de um item de estoque:
-```json
-{
-  "produto_id": 7,
-  "nome": "Feijão Carioca",
-  "grupo_nome": "Leguminosas",
-  "fornecedor_nome": null,
-  "motivo": "Saldo: 1.5 kg",
-  "urgencia": "alerta",
-  "quantidade": "1.500",
-  "estoque_minimo": "10.000"
-}
-```
-
----
-
-### 5.6 Relatórios — Prestação de Contas
-
-Definido em `core/relatorios.py`. Gera um relatório financeiro de um período, agrupando compras por fornecedor com detalhamento por nota fiscal.
-
-**Função principal:** `gerar_prestacao_contas(inicio, fim)`
-
-**Estrutura do retorno:**
-```json
-{
-  "periodo": { "inicio": "2026-06-01", "fim": "2026-06-30" },
-  "resumo_financeiro": {
-    "total_geral": "1250.00",
-    "por_categoria": [
-      { "categoria_id": 1, "categoria_nome": "Alimentos", "total": "980.00" },
-      { "categoria_id": 2, "categoria_nome": "Limpeza", "total": "270.00" }
-    ]
-  },
-  "fornecedores": [
     {
-      "fornecedor_id": 1,
-      "fornecedor_nome": "Atacadão",
-      "documento": "12.345.678/0001-99",
-      "total_fornecedor": "980.00",
-      "documentos": [
-        {
-          "entrada_id": 5,
-          "numero_nota_fiscal": "NF-00321",
-          "data": "2026-06-03",
-          "total": "980.00",
-          "legado": false,
-          "itens": [...]
-        }
-      ]
+      "produto_id": 1, "produto_nome": "Arroz Branco",
+      "categoria_nome": "Alimentos", "unidade": "KG",
+      "quantidade": "16.800", "quantidade_legivel": "16,8 kg",
+      "saldo_atual": "48.000", "estoque_insuficiente": false
     }
   ]
 }
 ```
 
-O relatório suporta dois modos de dados:
+#### Baixa de Produção
 
-- **Entradas regulares**: produtos com `Entrada` associada (fluxo normal pós-implementação do módulo de movimentações).
-- **Dados legados**: produtos cadastrados diretamente com `numero_nota_fiscal` no campo do produto (migração de dados do Excel), tratados como documentos separados no relatório.
+```
+POST /api/operacao/baixa-de-producao/
+Header: X-Operacao-Token: <token-cozinha>
+Body:   { "data": "2026-06-07", "turno": "MANHA" }
 
----
-
-### 5.7 Admin Django
-
-Configurado em `core/admin.py`. Registra as seguintes entidades com configurações personalizadas:
-
-**`CategoriaAdmin`**
-- Exibe: ID e nome
-- Busca por nome
-- Ordenação por nome
-
-**`ProdutoAdmin`**
-- Exibe: nome, NF, grupo, quantidade, unidade, validade, preço, usuários de auditoria e data de atualização
-- Filtros laterais: grupo, NF, unidade, validade, data de criação
-- Busca por nome
-- Campos somente-leitura: `criado_por`, `atualizado_por`, `criado_em`, `atualizado_em`
-- Preenchimento automático de `criado_por` e `atualizado_por` no `save_model`
+200: {
+  "sucesso": 3, "falhas": 1,
+  "resultados": [
+    { "ok": true,  "produto_nome": "Arroz Branco", "quantidade": "16.800", ... },
+    { "ok": false, "produto_nome": "Feijão",       "erro": "Saída excede saldo..." }
+  ]
+}
+```
 
 ---
 
-### 5.8 Migrações
+### 5.4 Autenticação por PIN (`operacao_auth.py`)
 
-O histórico de migrações documenta a evolução do modelo de dados:
+Sistema de tokens de sessão em memória (dict Python), sem dependência de banco de dados ou sessões Django.
+
+**Fluxo:**
+1. `POST /api/operacao/auth/` com PIN + perfil.
+2. Backend valida o PIN contra `settings.OPERACAO_PINS_ALUNOS` ou `settings.OPERACAO_PIN_COZINHA`.
+3. Gera um token UUID e armazena em `_SESSOES` com TTL.
+4. Retorna o token para o app, que o salva em `sessionStorage`.
+5. Cada request subsequente inclui `X-Operacao-Token: <token>`.
+6. O decorador `@requer_perfil_operacao(PERFIL_ALUNO)` / `@requer_perfil_operacao(PERFIL_COZINHA)` valida e injeta `request.sessao_operacao`.
+
+**Regras de segurança:**
+- Se o request tem um usuário Django autenticado → **HTTP 403** (bloqueia admin).
+- Token ausente → **HTTP 401**.
+- Token expirado → **HTTP 401**.
+- Perfil errado para o endpoint → **HTTP 403**.
+
+```python
+# Uso nas views
+@requer_perfil_operacao(PERFIL_ALUNO)
+def post(self, request):
+    sessao = request.sessao_operacao  # { perfil, turma, turno }
+    ...
+```
+
+> **Nota de produção:** Os tokens ficam em memória do processo Django. Reiniciar o servidor invalida todas as sessões ativas. Para alta disponibilidade, substitua `_SESSOES` por um cache Redis.
+
+---
+
+### 5.5 Serializers
+
+`core/serializers.py` — padrão `ModelSerializer` do DRF.
+
+- **`ProdutoSerializer`** — expõe `grupo_nome`, `categoria`, `categoria_nome`, `fornecedor_nome` como campos somente-leitura. Campo `quantidade` é somente-leitura (controlado por service).
+- **`EntradaSerializer`** — nested write para `itens`; `create()` delega para `registrar_entrada()`.
+- **`MovimentacaoSerializer`** — `entrada` somente-leitura.
+
+Os endpoints de operação **não usam serializers DRF** — retornam dicts Python diretamente para evitar expor campos financeiros por acidente.
+
+---
+
+### 5.6 Serviços (`services.py`)
+
+#### `registrar_movimentacao`
+
+```python
+@transaction.atomic
+def registrar_movimentacao(*, produto, tipo, quantidade, motivo="",
+                            preco_unitario=None, entrada=None, data=None, user=None)
+```
+
+1. Valida `quantidade > 0`.
+2. `select_for_update()` no produto — evita race conditions.
+3. Para SAIDA: verifica saldo; lança `ValidationError` se insuficiente.
+4. Atualiza `produto.quantidade`.
+5. Cria e retorna `Movimentacao`.
+
+#### `registrar_entrada`
+
+Cria `Entrada` + chama `registrar_movimentacao(ENTRADA)` para cada item. Tudo em uma transação.
+
+#### `calcular_previsao_producao(data, turno)`
+
+Retorna `{ total_alunos, media_historica, alerta_reducao }`.
+- `media_historica` = média dos totais diários dos últimos 30 dias no mesmo turno.
+- `alerta_reducao = total < media * 0.5` (frequência abaixo de 50% da média).
+
+#### `calcular_resumo_dia(data)`
+
+Versão sem turno para o widget do dashboard admin.
+
+---
+
+### 5.7 Sistema de Alertas
+
+`core/alerts.py` — função `coletar_alertas(tipo, urgencia)`.
+
+**Validade:**
+- `critico`: vence em ≤ 7 dias
+- `alerta`: vence em ≤ 30 dias
+
+**Estoque:**
+- `critico`: `quantidade <= 0`
+- `alerta`: `quantidade < estoque_minimo × 0.2`
+
+---
+
+### 5.8 Relatórios — Prestação de Contas
+
+`core/relatorios.py` — `gerar_prestacao_contas(inicio, fim)`.
+
+Retorna JSON agrupado por fornecedor e NF. Suporta dados legados (produtos com NF no campo `numero_nota_fiscal` do modelo). O frontend exporta em CSV e PDF (jsPDF).
+
+---
+
+### 5.9 Migrações
 
 | Migração | Descrição |
 |---|---|
-| `0001_initial` | Criação inicial de `Categoria` e `Produto` |
-| `0002_produto_numero_nota_fiscal` | Adição do campo `numero_nota_fiscal` ao Produto |
-| `0003_perfil` | Criação do modelo `Perfil` (matrícula do usuário) |
-| `0004_fundacao_grupo_bempermanente` | Criação de `Grupo` e `BemPermanente`; adição de campos `estoque_minimo`, `perecivel`, `periodicidade` ao Produto |
-| `0005_repoint_produtos_para_grupo` | Migração de dados: associa produtos existentes ao novo modelo de Grupo |
-| `0006_finaliza_grupo_obrigatorio` | Torna o campo `grupo` obrigatório no Produto |
-| `0007_fornecedor` | Criação do modelo `Fornecedor`; vínculo com Produto |
-| `0008_movimentacoes` | Criação dos modelos `Entrada` e `Movimentacao` |
-| `0009_saldo_inicial` | Migração de saldo inicial: cria movimentações de entrada com o saldo pré-existente dos produtos |
+| `0001_initial` | Categoria + Produto |
+| `0002` | Campo `numero_nota_fiscal` no Produto |
+| `0003` | Modelo `Perfil` |
+| `0004` | `Grupo`, `BemPermanente`, campos `estoque_minimo`/`perecivel`/`periodicidade` |
+| `0005` | Migração de dados: produtos → grupos |
+| `0006` | `grupo` obrigatório no Produto |
+| `0007` | Modelo `Fornecedor` |
+| `0008` | Modelos `Entrada` e `Movimentacao` |
+| `0009` | Saldo inicial: movimentações de entrada para o saldo existente |
+| `0010` | Modelos `FrequenciaDiaria` e `FatorConsumo` (Módulo E) |
+| `0011` | Campo `registrado_por_turma` em `FrequenciaDiaria` |
 
 ---
 
-## 6. Frontend — React
+## 6. Frontend Administrativo (`frontend/`)
 
-### 6.1 Tecnologias e Dependências
+SPA em React 19 + Tailwind CSS v4, rodando na porta **5173**.
 
-- **React 19** com hooks funcionais
-- **React Router DOM v7** para roteamento (SPA)
-- **Tailwind CSS v4** via plugin Vite
-- **Motion (Framer Motion)** para animações de transição
-- **jsPDF + jspdf-autotable** para exportação de relatórios em PDF
-- **Vite v8** como bundler e servidor de desenvolvimento
-- **Vitest** para testes unitários
+### Tecnologias
 
-### 6.2 Camada de API (`src/api`)
+| Pacote | Versão | Função |
+|---|---|---|
+| react | ^19.2.6 | UI |
+| react-router-dom | ^7.16.0 | Roteamento |
+| tailwindcss | ^4.3.0 | Estilos |
+| motion | ^12.40.0 | Animações |
+| jspdf | ^4.2.1 | PDF |
+| vite | ^8.0.12 | Bundler |
+| vitest | ^4.1.8 | Testes |
 
-O módulo `src/api/index.js` exporta as APIs de cada entidade, selecionando automaticamente entre implementação HTTP real e mock:
+### Modo mock
 
-```javascript
-const USE_MOCK = String(import.meta.env.VITE_USE_MOCK ?? "true") !== "false"
-
-export const produtosApi    = USE_MOCK ? mockProdutos    : httpProdutos
-export const categoriasApi  = USE_MOCK ? mockCategorias  : httpCategorias
-export const gruposApi      = USE_MOCK ? mockGrupos      : httpGrupos
-export const fornecedoresApi= USE_MOCK ? mockFornecedores: httpFornecedores
-export const movimentacoesApi=USE_MOCK ? mockMovimentacoes:httpMovimentacoes
-export const entradasApi    = USE_MOCK ? mockEntradas    : httpEntradas
-export const alertasApi     = USE_MOCK ? mockAlertas     : httpAlertas
-export const relatoriosApi  = USE_MOCK ? mockRelatorios  : httpRelatorios
+```env
+# frontend/.env
+VITE_USE_MOCK=true   # dados fictícios (padrão)
+VITE_USE_MOCK=false  # backend real
 ```
 
-Cada módulo de API (`http.js` e `mock.js`) implementa a mesma interface: `list()`, `create(data)`, `update(id, data)`, `remove(id)`.
-
-### 6.3 Páginas e Componentes
-
-#### `DashboardPage.jsx` (página principal)
-
-É a única página real da aplicação. Gerencia todo o estado global e orquestra os componentes:
-
-**Estado gerenciado:**
-- `produtos`, `categorias`, `grupos`, `fornecedores`, `movimentacoes`, `alertas` — dados carregados da API
-- `tab` — aba ativa do painel
-- `cat` — filtro de categoria/grupo ativo
-- `search` / `termo` — busca com debounce de 300ms
-- `addOpen`, `editProduto`, `addFornOpen`, `editFornecedor`, `detalhe`, `aExcluir` — estado dos modais
-
-**Função `carregar()`:** carrega todos os dados em paralelo com `Promise.all`.
-
-**Lógica de alerta ao carregar:** exibe um toast de aviso se há itens críticos (vencidos ou esgotados).
-
-**Funções de ação:**
-- `ajustar(produto, delta)` — lança movimentação de +1 ou -1 unidade diretamente dos cards
-- `excluir()` — remove o produto selecionado
-- `novaCategoria()` — cria nova categoria via `window.prompt`
-
-#### `Header.jsx`
-
-Barra superior com campo de busca e botão de adicionar item. Props: `search`, `setSearch`, `onAddItem`, `onReport`.
-
-#### `Sidebar.jsx`
-
-Barra lateral de navegação com ícones para: Início, Inventário, Usuários e Configurações. Visível apenas em telas grandes (`lg:flex`).
-
-#### `CategoryRail.jsx`
-
-Painel lateral esquerdo no inventário com lista de categorias e grupos. Exibe contagem de itens por categoria/grupo. Permite filtrar o inventário e adicionar nova categoria.
-
-#### `ProductCard.jsx`
-
-Card de produto na grade do inventário. Exibe nome, quantidade, unidade, validade e estado do estoque. Botões de incremento/decremento rápido. Ao clicar, abre o `DetailsModal`.
-
-#### `KitchenPanel.jsx`
-
-Painel lateral direito com informações auxiliares para a gestão da cozinha escolar (visão do dia, itens de atenção).
-
-#### `AlertTicker.jsx`
-
-Faixa de alertas deslizante na parte inferior da tela. Exibe alertas críticos em rolagem contínua.
-
-#### `AlertasView.jsx`
-
-Aba de alertas com listagem detalhada de produtos com validade crítica e estoque baixo, organizados por urgência.
-
-#### `FornecedoresView.jsx`
-
-Aba de fornecedores com tabela de listagem. Ações: novo, editar, filtrar por status (ativo/inativo, emite NF, aceita fiado).
-
-#### `MovimentacoesView.jsx`
-
-Aba de movimentações. Exibe histórico de entradas e saídas com filtros por tipo, produto e período. Botões para abrir os modais de nova entrada (lote) e nova saída.
-
-#### `RelatoriosView.jsx`
-
-Aba de relatórios de prestação de contas. Permite selecionar período (mês atual, trimestre ou personalizado), gerar o relatório via API e exportar em **CSV** ou **PDF** (via jsPDF).
-
-### 6.4 Abas do Dashboard
+### Abas do Dashboard
 
 | Chave | Label | Descrição |
 |---|---|---|
-| `geral` | Visão Geral | Cards de resumo (total de itens, estoque crítico, validade crítica, valor em estoque) e central de alertas |
+| `geral` | Visão Geral | Cards de resumo + central de alertas + widget de frequência |
 | `inv` | Inventário | Grade de produtos com filtro por categoria/grupo e busca |
-| `alert` | Alertas | Listagem detalhada de alertas de validade e estoque |
+| `alert` | Alertas | Alertas de validade e estoque |
 | `forn` | Fornecedores | CRUD de fornecedores |
 | `mov` | Movimentações | Histórico de entradas e saídas |
-| `rel` | Relatórios | Prestação de contas por período |
-| `sol` | Solicitações | Em desenvolvimento — pedidos de reposição |
+| `rel` | Relatórios | Prestação de contas CSV/PDF |
+| `merenda` | Merenda | Sub-views: Contagem (frequência) e Produção |
+| `sol` | Solicitações | Em desenvolvimento |
 
-### 6.5 Modais
+### Fix CSS — barra de busca
 
-#### `ProductFormModal.jsx`
-Criação e edição de produto. Campos: nome, grupo (com seletor de categoria + grupo), fornecedor, unidade, estoque mínimo, periodicidade, perecível, validade, preço.
-
-#### `FornecedorFormModal.jsx`
-Criação e edição de fornecedor. Campos: nome, CNPJ/CPF, endereço, telefone, e-mail, emite NF, aceita fiado, ativo, observação.
-
-#### `SaidaFormModal.jsx`
-Registro de saída de produto. Campos: produto (busca), quantidade e motivo.
-
-#### `EntradaFormModal.jsx`
-Registro de entrada em lote. Campos: fornecedor, número da NF, data, observação e lista dinâmica de itens (produto, quantidade, preço unitário).
-
-#### `DetailsModal.jsx`
-Exibição detalhada de um produto, com histórico de movimentações. Ações: editar, excluir.
-
-#### `ConfirmDialog.jsx`
-Caixa de diálogo de confirmação genérica, usada antes de exclusões.
-
-#### `Modal.jsx`
-Componente base de modal (overlay + container) utilizado pelos demais modais.
-
-### 6.6 Utilitários (`src/lib`)
-
-#### `format.js`
-
-- `brl(valor)` — formata número em reais (ex.: `R$ 1.250,00`)
-- `dataBR(isoString)` — formata data ISO para o padrão brasileiro (ex.: `03/06/2026`)
-
-#### `export.js`
-
-- `isoHoje()` — retorna a data atual no formato ISO (`YYYY-MM-DD`)
-- `periodoMesAtual()` — retorna `{ inicio, fim }` do mês corrente
-- `periodoTrimestre()` — retorna `{ inicio, fim }` do trimestre corrente
-- `formatPeriodoLabel(inicio, fim)` — texto legível do período (ex.: `Junho 2026`)
-- `prestacaoContasToCsv(dados)` — converte o retorno do relatório em CSV
-- `downloadBlob(blob, filename)` — dispara download de arquivo no navegador
-
-#### `prestacaoPdf.js`
-
-Gera o PDF de prestação de contas usando jsPDF e jspdf-autotable. O PDF inclui:
-- Cabeçalho com período
-- Resumo financeiro por categoria
-- Detalhamento por fornecedor com tabela de NFs e itens
-
-#### `icons.jsx`
-
-Biblioteca de ícones SVG inline. Principais ícones disponíveis: `box`, `alert`, `bell`, `report`, `home`, `grid`, `users`, `gear`, `chevronR`.
-
-#### `catalog.js`
-
-Definição de dados estáticos de catálogo (unidades, periodicidades, estados de conservação) compartilhados entre frontend e lógica de exibição.
+O shorthand `padding` em `.field` sobrescrevia a classe utilitária `pl-10` do Tailwind v4 (mesmo nível de especificidade, ordem de cascade). Corrigido usando `padding-block`/`padding-inline` separados, que não conflitam com `padding-left`.
 
 ---
 
-## 7. Testes
+## 7. App Alunos (`app-alunos/`)
 
-Os testes estão em `core/tests/` (backend) e `src/lib/format.test.js` (frontend).
+Aplicação React independente para representantes de turma. **Sem acesso a dados financeiros ou de estoque.**
 
-### Testes de Backend
+### Fluxo de uso
 
-Executar com:
+```
+Abrir app → /login (PinLogin)
+  └─ Digitar 4 dígitos
+  └─ Auto-confirma ao completar
+  └─ Validação local (VITE_PINS) + POST /api/operacao/auth/
+  └─ Sessão salva em sessionStorage
+
+→ /registrar (ContagemView)
+  └─ Exibe turma e turno (somente leitura)
+  └─ Teclado numérico grande (botões ≥ 64px, fonte ≥ 24px)
+  └─ POST /api/operacao/contagem/
+  └─ Tela de sucesso: número + variação em relação à média
+       Ex.: "32 alunos — +5% em relação à média"
+  └─ HTTP 409 → "Frequência já registrada hoje" (sem travar)
+  └─ Botão "Concluído" → sair
+```
+
+### Arquivos
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `src/api.js` | `login()`, `logout()`, `getSessao()`, `registrarContagem()` |
+| `src/App.jsx` | Roteamento + guarda de rota (redireciona sem sessão) |
+| `src/PinLogin.jsx` | Teclado 4 dígitos, auto-confirma, lê `VITE_PINS` |
+| `src/ContagemView.jsx` | Display numérico, teclado, estados: idle/loading/sucesso/erro |
+
+### Variáveis de ambiente
+
+```env
+VITE_PINS=6A:1001,6B:1002,...         # obrigatório
+VITE_TURNOS=6A:MANHA,7B:TARDE,...     # opcional (padrão MANHA)
+VITE_API_BASE=                        # vazio = usa proxy do Vite
+```
+
+---
+
+## 8. App Cozinha (`app-cozinha/`)
+
+Aplicação React independente para merendeiras. **Sem acesso ao painel administrativo, preços ou fornecedores.**
+
+### Fluxo de uso
+
+```
+Abrir app → /login (PinLogin)
+  └─ PIN único da cozinha (4 dígitos)
+  └─ POST /api/operacao/auth/ { perfil: "COZINHA" }
+
+→ /producao (ProducaoView)
+  └─ Cabeçalho: data atual + chips de turno (Manhã/Tarde/Integral)
+  └─ Total de alunos do dia em destaque
+  └─ Banner amarelo se alerta_reducao=true
+  └─ Cards de receita por produto:
+       - Ícone SVG da categoria (alimentos=prato, limpeza=balde)
+       - Nome do produto (≥ 22px)
+       - Quantidade calculada em destaque ("16,8 kg")
+       - Borda vermelha + ícone ⚠ se estoque insuficiente
+  └─ Botão "Dar Baixa de Produção" fixo no rodapé
+       - Desabilitado se nenhum item disponível
+       - Clique → modal de confirmação listando itens + quantidades
+       - Confirmar → POST /api/operacao/baixa-de-producao/
+       - Modal de resultado: sucessos e falhas individualizados
+```
+
+### Arquivos
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `src/api.js` | `login()`, `logout()`, `isLoggedIn()`, `getPlano()`, `baixaProducao()` |
+| `src/App.jsx` | Roteamento + guarda de rota |
+| `src/PinLogin.jsx` | Teclado 4 dígitos, PIN único via `VITE_PIN_COZINHA` |
+| `src/ProducaoView.jsx` | Cabeçalho, cards, modal de confirmação, modal de resultado |
+
+### Variáveis de ambiente
+
+```env
+VITE_PIN_COZINHA=9999      # obrigatório
+VITE_API_BASE=             # vazio = usa proxy do Vite
+```
+
+---
+
+## 9. Testes
+
+### Backend (104 testes, todos passando)
+
 ```bash
 python manage.py test
 ```
 
-#### `test_models.py`
-Testa as constraints e comportamentos dos modelos:
-- Unicidade de grupos por categoria
-- Criação de produto com grupo obrigatório
-- Comportamento do campo `quantidade` decimal
+#### Testes obrigatórios do Módulo E (`test_operacao_spec.py`)
 
-#### `test_services.py`
-Testa a lógica de movimentações:
-- Entrada soma ao saldo do produto
-- Saída subtrai do saldo
-- Saída maior que saldo lança `ValidationError` sem alterar o banco
-- Quantidade zero ou negativa lança `ValidationError`
-- `registrar_entrada` cria múltiplos itens e calcula total corretamente
-- Entrada sem itens lança `ValidationError`
+| Teste | Classe | O que verifica |
+|---|---|---|
+| `test_frequencia_duplicata_bloqueada` | `TestFrequenciaDuplicataBloqueada` | Segundo POST igual retorna 409 com mensagem clara |
+| `test_previsao_alerta_reducao` | `TestPrevisaoAlertaReducao` | `alerta_reducao=true` quando total < 50% da média |
+| `test_plano_do_dia_calcula_quantidades` | `TestPlanoDoDiaCalculaQuantidades` | `qtd = gramas × alunos / 1000`; sinaliza estoque insuficiente |
+| `test_baixa_producao_atomica_por_item` | `TestBaixaProducaoAtomicaPorItem` | Falha em um item não cancela os demais |
+| `test_endpoint_operacao_rejeita_token_admin` | `TestEndpointOperacaoRejeitaTokenAdmin` | Admin Django recebe HTTP 403 nos endpoints de operação |
 
-#### `test_api.py`
-Testa os endpoints da API com `APITestCase`:
-- CRUD de Grupos, Produtos, Bens Permanentes, Fornecedores
-- Filtros de produtos por categoria, grupo e fornecedor
-- Criação de movimentações (entrada e saída)
-- Criação de entrada em lote (`/api/entradas/`)
-- Alertas: validade e estoque crítico
-- Filtros de fornecedores
+#### Outros testes do Módulo E (`test_operacao.py`)
 
-#### `test_alerts.py`
-Testa o módulo de alertas:
-- Produtos com validade vencida aparecem como críticos
-- Produtos com validade em até 30 dias aparecem como alerta
-- Produtos esgotados (`quantidade=0`) aparecem como críticos
-- Filtragem por `tipo` e `urgencia`
-- Formatação das mensagens de motivo
+- `FrequenciaServiceTest` — somas, alerta, duplicata a nível de model
+- `PlanoProducaoTest` — cálculo de KG, estoque insuficiente
+- `BaixaProducaoTest` — baixa parcial não aborta
+- `ContagemApiTest` — endpoints via APIClient com token de operação
 
-#### `test_relatorios.py`
-Testa a geração de prestação de contas:
-- Agrupamento correto por fornecedor e NF
-- Cálculo de totais por categoria
-- Tratamento de dados legados
-- Período sem movimentações retorna totais zerados
+#### Testes Administrativos
 
-#### `test_migrations.py`
-Verifica a integridade das migrações Django.
+- `test_services.py` — movimentações, entradas, saldo
+- `test_api.py` — CRUD de todas as entidades, filtros
+- `test_alerts.py` — alertas de validade e estoque
+- `test_relatorios.py` — prestação de contas, dados legados
 
-### Testes de Frontend
+### Frontend
 
-Executar com:
 ```bash
 cd frontend && npm test
 ```
 
-#### `format.test.js`
-Testa as funções utilitárias de formatação:
-- `brl()` para diferentes valores
-- `dataBR()` para diferentes formatos de data ISO
+- `format.test.js` — `brl()` e `dataBR()`
 
 ---
 
-## 8. Fluxos Funcionais
+## 10. Fluxos Funcionais
 
-### 8.1 Registro de Entrada de Produto (Lote)
+### 10.1 Registro de Frequência (app-alunos)
 
 ```
-Usuário abre EntradaFormModal
+Representante abre app → digita PIN (4 dígitos)
     │
-    ├─ Seleciona fornecedor
-    ├─ Informa número da NF e data
-    └─ Adiciona itens (produto, quantidade, preço)
-           │
-           ▼
-    POST /api/entradas/
-           │
-           ▼
-    EntradaSerializer.create()
-           │
-           ▼
-    registrar_entrada() [transaction.atomic]
+    ▼ POST /api/operacao/auth/ { pin, perfil: "ALUNO_REP" }
+    │
+    ▼ Token retornado → salvo em sessionStorage
+    │
+    ▼ Teclado numérico → digita quantidade de alunos
+    │
+    ▼ POST /api/operacao/contagem/ { quantidade_alunos }
+    ├─ 201: tela de sucesso com quantidade + variação histórica
+    └─ 409: "Frequência já registrada hoje" → não trava o app
+```
+
+### 10.2 Produção da Cozinha (app-cozinha)
+
+```
+Merendeira abre app → digita PIN da cozinha
+    │
+    ▼ POST /api/operacao/auth/ { pin, perfil: "COZINHA" }
+    │
+    ▼ GET /api/operacao/plano-do-dia/?data=...&turno=MANHA
+       Para cada FatorConsumo ativo:
+         quantidade = gramas_por_aluno × total_alunos / 1000
+         estoque_insuficiente = saldo_atual < quantidade
+    │
+    ▼ Cards de receita exibidos
+    │
+    ▼ "Dar Baixa de Produção" → modal de confirmação
+    │
+    ▼ POST /api/operacao/baixa-de-producao/
+       Para cada item:
+         registrar_movimentacao(tipo=SAIDA, motivo="consumo")
+         [transação atômica POR ITEM — falha não cancela demais]
+    │
+    ▼ Modal de resultado: sucessos e falhas individualizados
+```
+
+### 10.3 Registro de Entrada em Lote (admin)
+
+```
+POST /api/entradas/
+    │
+    ▼ EntradaSerializer.create()
+    │
+    ▼ registrar_entrada() [transaction.atomic]
         ├─ Cria objeto Entrada
-        └─ Para cada item:
-               registrar_movimentacao(tipo=ENTRADA)
-                   ├─ select_for_update() no Produto
-                   ├─ produto.quantidade += item.quantidade
-                   ├─ produto.save()
-                   └─ Movimentacao.objects.create()
-           │
-           ▼
-    Resposta 201 com Entrada + itens + total
-           │
-           ▼
-    carregar() no DashboardPage atualiza estado
-```
-
-### 8.2 Registro de Saída de Produto
-
-```
-Usuário abre SaidaFormModal
-    │
-    ├─ Seleciona produto
-    ├─ Informa quantidade e motivo
-           │
-           ▼
-    POST /api/movimentacoes/
-    { tipo: "SAIDA", ... }
-           │
-           ▼
-    MovimentacaoViewSet.create()
-           │
-           ▼
-    registrar_movimentacao(tipo=SAIDA)
-        ├─ Valida quantidade > 0
-        ├─ select_for_update() no Produto
-        ├─ Verifica saldo suficiente
-        │    └─ ValidationError se insuficiente
-        ├─ produto.quantidade -= quantidade
-        ├─ produto.save()
-        └─ Movimentacao.objects.create()
-           │
-           ▼
-    Resposta 201 ou 400 (saldo insuficiente)
-```
-
-### 8.3 Geração de Relatório de Prestação de Contas
-
-```
-Usuário seleciona período em RelatoriosView
-    │
-    ▼
-GET /api/relatorios/prestacao-contas/?inicio=...&fim=...
-    │
-    ▼
-gerar_prestacao_contas(inicio, fim)
-    ├─ Busca Entradas no período
-    ├─ Agrupa por fornecedor e NF
-    ├─ Busca dados legados (produtos com NF direta)
-    ├─ Calcula totais por categoria
-    └─ Retorna JSON estruturado
-           │
-           ▼
-    RelatoriosView exibe tabelas
-           │
-           ├─ Botão CSV → prestacaoContasToCsv() → downloadBlob()
-           └─ Botão PDF → gerarPdfPrestacaoContas() → downloadBlob()
-```
-
-### 8.4 Sistema de Alertas
-
-```
-DashboardPage.carregar()
-    │
-    ▼
-GET /api/alertas/
-    │
-    ▼
-coletar_alertas()
-    ├─ queryset_validade(): produtos com validade <= hoje + 30 dias
-    │    └─ _serializar_validade(): calcula dias, define urgência
-    └─ queryset_estoque_critico(): produtos esgotados ou < 20% do mínimo
-         └─ _serializar_estoque(): monta mensagem e urgência
-    │
-    ▼
-AlertTicker (faixa deslizante de alertas críticos)
-AlertasView (listagem completa)
-VisaoGeral (cards de resumo + central de alertas)
-Toast (notificação se há críticos ao carregar)
+        └─ Para cada item: registrar_movimentacao(ENTRADA)
+               ├─ select_for_update() no Produto
+               ├─ produto.quantidade += quantidade
+               └─ Movimentacao.objects.create()
 ```
 
 ---
 
-## 9. Dados de Demonstração (Seed)
-
-O arquivo `seed_demo.py` popula o banco com dados representativos para demonstração:
+## 11. Dados de Demonstração
 
 ```bash
 python manage.py shell < seed_demo.py
 ```
 
-Cria 4 categorias e 8 produtos com diferentes estados:
-- Produtos com validade futura (arroz, feijão, detergente)
-- Produto com validade em poucos dias (água sanitária — alerta)
-- Produto com validade vencida (óleo de soja — crítico)
-- Produtos sem validade (material de escritório)
-- Produtos com diferentes unidades (KG, UN, CX, L, PC)
+Cria 4 categorias, 8 produtos em diferentes estados (crítico, alerta, normal), fornecedores e algumas movimentações. O script é **idempotente** (`get_or_create`).
 
-O script é **idempotente** — pode ser executado múltiplas vezes sem duplicar dados (usa `get_or_create`).
+Para o Módulo E funcionar com dados reais, configure `FatorConsumo` para os produtos de merenda via admin Django (`/admin/`) ou diretamente no banco.
 
 ---
 
-## 10. Evolução do Projeto — Histórico de Design
+## 12. Histórico de Desenvolvimento
 
-O projeto foi construído em blocos incrementais, documentados nas specs em `docs/superpowers/specs/`:
-
-### Bloco A — Fundação do Modelo de Estoque (2026-06-03)
-
-**Contexto:** O sistema tinha apenas `Categoria` e `Produto` simples. As entrevistas com o usuário revelaram a necessidade de uma hierarquia de dois níveis e campos adicionais.
-
-**Entregues:**
-- Hierarquia `Categoria → Grupo → Produto`
-- Novos campos no Produto: `estoque_minimo`, `perecivel`, `periodicidade`
-- Conversão de `quantidade` de Float para Decimal
-- Criação de `BemPermanente` (sem UI nesta fase)
-- Migrações de dados preservando os registros existentes
-
-### Bloco B — Fornecedores (2026-06-04)
-
-**Entregues:**
-- Modelo `Fornecedor` com CNPJ/CPF, telefone, e-mail, `emite_nota_fiscal`, `aceita_fiado`
-- API REST completa com filtros
-- UI de cadastro e listagem de fornecedores
-- Vínculo do fornecedor ao produto
-
-### Bloco C — Movimentações, Entradas e Alertas (2026-06-04)
-
-**Entregues:**
-- Modelos `Entrada` e `Movimentacao` (append-only)
-- Service `registrar_movimentacao` com transação atômica e proteção de saldo
-- Service `registrar_entrada` para entrada em lote
-- Alertas refinados: validade (crítico/alerta) e estoque crítico
-- Migração de saldo inicial (0009)
-- UI de movimentações, modais de entrada e saída
-
-### Bloco D — Relatórios GRE (planejado)
-
-Geração de relatórios de prestação de contas estruturados para submissão à GRE (Gerência Regional de Educação), com agrupamento por fornecedor, nota fiscal e categoria. O endpoint já existe; a exportação em PDF e CSV está implementada no frontend.
+| Bloco | Data | Entregues |
+|---|---|---|
+| A — Fundação | 2026-06-03 | Hierarquia Categoria→Grupo→Produto, BemPermanente, Decimal |
+| B — Fornecedores | 2026-06-04 | Modelo Fornecedor, API, UI |
+| C — Movimentações | 2026-06-04 | Entrada, Movimentacao (append-only), services atômicos, alertas |
+| D — Relatórios | 2026-06-07 | Prestação de contas, exportação CSV/PDF |
+| E — Merenda | 2026-06-07 | FrequenciaDiaria, FatorConsumo, endpoints /operacao/*, autenticação PIN, app-alunos, app-cozinha, 104 testes |
+| Fix CSS | 2026-06-07 | `padding` shorthand sobrescrevia `pl-10` na barra de busca |
 
 ---
 
-## 11. Roadmap e Próximos Passos
+## 13. Roadmap
 
-Com base nas specs e no código atual, os próximos ciclos de desenvolvimento previstos são:
+### Próximos passos
 
-### Em Desenvolvimento / Planejado
+- **Solicitações de reposição** — aba "sol" já existe no frontend (placeholder); lógica de pedidos baseada em consumo médio.
+- **UI de Bens Permanentes** — backend e API prontos, falta tela de listagem/edição.
+- **Autenticação do painel admin** — modelo `Perfil` existe; falta tela de login/logout e controle de permissões por perfil.
+- **Tokens de operação em cache distribuído** — substituir o dict em memória por Redis para suporte a múltiplos workers.
 
-**Solicitações de Reposição** — A aba "Solicitações" já existe no frontend (placeholder) e prevê:
-- Pedidos de reposição baseados no consumo médio histórico
-- Lista de compras automática por produto com estoque abaixo do mínimo
+### Fora de escopo (confirmado)
 
-**Tela de Bens Permanentes** — O backend e a API existem; falta a UI para:
-- Listagem de bens com filtro por estado de conservação e localização
-- Formulário de cadastro e edição
-
-**Autenticação e Controle de Acesso** — O modelo `Perfil` existe, mas o sistema ainda não implementa login/logout na UI. Próximos passos:
-- Tela de login
-- Controle de permissões por perfil (gestor vs. operador)
-
-### Fora de Escopo (documentado nas specs)
-
-Itens explicitamente marcados como "não importante" pelo usuário responsável:
-- App de contagem de alunos
-- Interface dedicada para merendeiras
+Itens explicitamente marcados como não prioritários pelo usuário responsável:
 - Integração com sistemas estaduais de educação
+- App mobile nativo
 
 ---
 
-## Referências Rápidas
+## 14. Referências Rápidas
 
-### Comandos Úteis
+### Comandos do dia a dia
 
 ```bash
-# Rodar testes do backend
-python manage.py test
+# Backend
+python manage.py runserver          # servidor de dev
+python manage.py migrate            # aplicar migrações
+python manage.py makemigrations     # gerar migrações após mudança em models.py
+python manage.py test               # todos os testes
+python manage.py shell              # shell interativo
 
-# Criar migrações após mudança no models.py
-python manage.py makemigrations
+# Frontend admin
+cd frontend && npm run dev          # servidor dev :5173
+cd frontend && npm run build        # build produção
+cd frontend && npm test             # testes unitários
 
-# Aplicar migrações
-python manage.py migrate
+# App alunos
+cd app-alunos && npm run dev        # servidor dev :5174
+cd app-alunos && npm run build
 
-# Acessar o shell Django
-python manage.py shell
-
-# Rodar testes do frontend
-cd frontend && npm test
-
-# Build de produção do frontend
-cd frontend && npm run build
-
-# Linting do frontend
-cd frontend && npm run lint
+# App cozinha
+cd app-cozinha && npm run dev       # servidor dev :5175
+cd app-cozinha && npm run build
 ```
 
-### Variáveis de Ambiente
+### Variáveis de ambiente
 
-| Variável | Padrão | Descrição |
+| App | Variável | Padrão | Descrição |
+|---|---|---|---|
+| frontend | `VITE_USE_MOCK` | `true` | `false` para usar backend real |
+| app-alunos | `VITE_PINS` | — | `TURMA:PIN,...` obrigatório |
+| app-alunos | `VITE_TURNOS` | — | `TURMA:TURNO,...` opcional |
+| app-alunos | `VITE_API_BASE` | `""` | URL base da API (vazio = proxy Vite) |
+| app-cozinha | `VITE_PIN_COZINHA` | — | PIN único da cozinha, obrigatório |
+| app-cozinha | `VITE_API_BASE` | `""` | URL base da API |
+
+### Configurações Django relevantes
+
+```python
+# settings.py — CORS
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # admin
+    "http://localhost:5174",  # app-alunos
+    "http://localhost:5175",  # app-cozinha
+]
+
+# settings.py — PINs de operação
+OPERACAO_PINS_ALUNOS = [...]   # lista de { pin, turma, turno }
+OPERACAO_PIN_COZINHA = "9999"
+OPERACAO_TOKEN_TTL_HORAS = 12
+```
+
+### Portas em desenvolvimento
+
+| Serviço | Porta | URL |
 |---|---|---|
-| `VITE_USE_MOCK` | `true` | `false` para usar o backend real |
-| `DJANGO_SECRET_KEY` | (hardcoded em dev) | Chave secreta Django (trocar em produção) |
-| `DEBUG` | `True` | Desabilitar em produção |
-
-### Configurações CORS (settings.py)
-
-O middleware `django-cors-headers` está configurado para permitir o frontend de desenvolvimento (`localhost:5173`) acessar a API sem bloqueios de CORS.
+| Django (backend) | 8000 | http://localhost:8000 |
+| Frontend admin | 5173 | http://localhost:5173 |
+| App alunos | 5174 | http://localhost:5174 |
+| App cozinha | 5175 | http://localhost:5175 |
+| Admin Django | 8000 | http://localhost:8000/admin/ |
+| API browsable | 8000 | http://localhost:8000/api/ |
 
 ---
 
-*Documentação gerada em 07 de junho de 2026 com base no código-fonte do projeto EduStock.*
+*Documentação atualizada em 07 de junho de 2026 — branches: `tudo-finalizado-mas-feio` (baseline) e `apps-merenda-e-alunosv1` (Módulo E).*

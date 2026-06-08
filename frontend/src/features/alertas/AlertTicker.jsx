@@ -1,4 +1,4 @@
-import { Icon } from "../lib/icons.jsx"
+import { Icon } from "../../lib/icons.jsx"
 
 export default function AlertTicker({ alerts, onPick }) {
   const has = alerts.length > 0

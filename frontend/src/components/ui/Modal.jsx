@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react"
-import { Icon } from "../lib/icons.jsx"
+import { Icon } from "../../lib/icons.jsx"
 
 export default function Modal({ open, onClose, title, subtitle, children, maxW = "max-w-lg" }) {
   return (

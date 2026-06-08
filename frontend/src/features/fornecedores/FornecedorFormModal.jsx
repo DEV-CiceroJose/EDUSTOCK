@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
-import { fornecedoresApi } from "../api"
-import Modal from "./Modal"
-import { useToast } from "./Toast"
+import { fornecedoresApi } from "../../api"
+import Modal from "../../components/ui/Modal"
+import { useToast } from "../../components/ui/Toast"
 
 const VAZIO = {
   nome: "", documento: "", endereco: "", telefone: "", email: "",

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
-import { produtosApi, movimentacoesApi } from "../api"
-import { UNIDADES, PERIODICIDADES } from "../api/units"
-import Modal from "./Modal"
-import { useToast } from "./Toast"
+import { produtosApi, movimentacoesApi } from "../../api"
+import { UNIDADES, PERIODICIDADES } from "../../api/units"
+import Modal from "../../components/ui/Modal"
+import { useToast } from "../../components/ui/Toast"
 
 const VAZIO = {
   nome: "", numero_nota_fiscal: "", grupo: "", fornecedor: "",

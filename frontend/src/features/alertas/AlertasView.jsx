@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { motion } from "motion/react"
-import { Icon } from "../lib/icons.jsx"
+import { Icon } from "../../lib/icons.jsx"
 
 const CHIPS = [
   { key: "todos", label: "Todos" },

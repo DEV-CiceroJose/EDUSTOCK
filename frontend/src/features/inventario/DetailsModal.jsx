@@ -1,8 +1,8 @@
-import Modal from "./Modal"
-import { Icon } from "../lib/icons.jsx"
-import { categoryStyle } from "../lib/catalog"
-import { brl, qtd, dataBR, stockStatus, validadeStatus } from "../lib/format"
-import { unidadeLabel } from "../api/units"
+import Modal from "../../components/ui/Modal"
+import { Icon } from "../../lib/icons.jsx"
+import { categoryStyle } from "../../lib/catalog"
+import { brl, qtd, dataBR, stockStatus, validadeStatus } from "../../lib/format"
+import { unidadeLabel } from "../../api/units"
 
 function Linha({ label, children }) {
   return (

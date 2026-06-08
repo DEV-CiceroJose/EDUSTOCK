@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "motion/react"
-import { categoryStyle } from "../lib/catalog"
-import { Icon } from "../lib/icons.jsx"
+import { categoryStyle } from "../../lib/catalog"
+import { Icon } from "../../lib/icons.jsx"
 
 export default function CategoryRail({ categorias, grupos, counts, total, active, onPick, onAddCategory }) {
   const [aberta, setAberta] = useState(null)

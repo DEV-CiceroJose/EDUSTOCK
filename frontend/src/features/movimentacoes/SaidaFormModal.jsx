@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
-import { movimentacoesApi } from "../api"
-import { MOTIVOS_SAIDA } from "../api/units"
-import Modal from "./Modal"
-import { useToast } from "./Toast"
+import { movimentacoesApi } from "../../api"
+import { MOTIVOS_SAIDA } from "../../api/units"
+import Modal from "../../components/ui/Modal"
+import { useToast } from "../../components/ui/Toast"
 
 export default function SaidaFormModal({ open, produtos, onClose, onSaved }) {
   const [form, setForm] = useState({ produto: "", quantidade: "", motivo: "consumo" })

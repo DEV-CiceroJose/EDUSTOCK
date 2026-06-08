@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
-import { entradasApi } from "../api"
-import { brl } from "../lib/format"
-import { Icon } from "../lib/icons.jsx"
-import Modal from "./Modal"
-import { useToast } from "./Toast"
+import { entradasApi } from "../../api"
+import { brl } from "../../lib/format"
+import { Icon } from "../../lib/icons.jsx"
+import Modal from "../../components/ui/Modal"
+import { useToast } from "../../components/ui/Toast"
 
 const linhaVazia = () => ({ produto: "", quantidade: "", preco_unitario: "" })
 

@@ -1,5 +1,5 @@
 import Modal from "./Modal"
-import { Icon } from "../lib/icons.jsx"
+import { Icon } from "../../lib/icons.jsx"
 
 export default function ConfirmDialog({
   open, title, message, onConfirm, onCancel,

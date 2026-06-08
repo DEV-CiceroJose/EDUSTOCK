@@ -1,8 +1,8 @@
 import { motion } from "motion/react"
-import { categoryStyle } from "../lib/catalog"
-import { Icon } from "../lib/icons.jsx"
-import { qtd, dataBR, stockStatus, stockPercent, validadeStatus } from "../lib/format"
-import { unidadeLabel } from "../api/units"
+import { categoryStyle } from "../../lib/catalog"
+import { Icon } from "../../lib/icons.jsx"
+import { qtd, dataBR, stockStatus, stockPercent, validadeStatus } from "../../lib/format"
+import { unidadeLabel } from "../../api/units"
 
 const BAR = { ok: "var(--color-ok)", low: "var(--color-low)", out: "var(--color-out)" }
 

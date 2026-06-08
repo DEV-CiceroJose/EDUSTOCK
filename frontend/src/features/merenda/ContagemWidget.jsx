@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
-import { operacaoApi } from "../api"
-import { Icon } from "../lib/icons.jsx"
+import { operacaoApi } from "../../api"
+import { Icon } from "../../lib/icons.jsx"
 
 export default function ContagemWidget({ refreshKey = 0, onOpenContagem }) {
   const [resumo, setResumo] = useState(null)
