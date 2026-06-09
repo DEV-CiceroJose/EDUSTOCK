@@ -21,7 +21,7 @@ export default function Sidebar() {
   const sections = ["Operacional", "Gestão", "Sistema"]
   
   return (
-    <aside className="sticky top-0 hidden h-screen w-56 lg:w-56 w-16 shrink-0 flex-col gap-4 border-r border-line bg-surface/60 py-4 px-2 lg:flex">
+    <aside className="sticky top-0 hidden h-screen w-16 lg:w-56 shrink-0 flex-col gap-4 border-r border-line bg-surface/60 py-4 px-2 lg:flex">
       {sections.map((section) => {
         const items = navItems.filter(item => item.section === section)
         return (
