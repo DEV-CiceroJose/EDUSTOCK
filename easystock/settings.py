@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
+import dj_database_url
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,12 +22,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-$ara9&n@l3x^ey=o$k51e6q5+je!p6304nk4ks@39ts4px_938"
+SECRET_KEY = os.environ.get('SECRET_KEY', "django-insecure-$ara9&n@l3x^ey=o$k51e6q5+je!p6304nk4ks@39ts4px_938")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -45,6 +47,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     # CORS precisa vir o mais alto possível (antes do CommonMiddleware)
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -78,12 +81,22 @@ WSGI_APPLICATION = "easystock.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+# Use PostgreSQL in production (Render), SQLite in development
+if 'DATABASE_URL' in os.environ:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.environ.get('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation
@@ -121,6 +134,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# WhiteNoise configuration
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # ------------------------------------------------------------------
@@ -134,15 +154,28 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Origem do dev server do Vite (React)
+# Origem do dev server do Vite (React) e produção
+# Em produção, adicione os domínios da Render
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # frontend admin
+    "http://localhost:5173",  # frontend admin (dev)
     "http://127.0.0.1:5173",
-    "http://localhost:5174",  # app-alunos
+    "http://localhost:5174",  # app-alunos (dev)
     "http://127.0.0.1:5174",
-    "http://localhost:5175",  # app-cozinha
+    "http://localhost:5175",  # app-cozinha (dev)
     "http://127.0.0.1:5175",
 ]
+
+# Em produção, adicione dinamicamente os domínios do Render
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    CORS_ALLOWED_ORIGINS.extend([
+        f'https://{RENDER_EXTERNAL_HOSTNAME}',
+        'https://edustock-frontend.onrender.com',
+        'https://edustock-alunos.onrender.com',
+        'https://edustock-cozinha.onrender.com',
+    ])
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
 CORS_ALLOW_CREDENTIALS = True
 
 # ------------------------------------------------------------------
