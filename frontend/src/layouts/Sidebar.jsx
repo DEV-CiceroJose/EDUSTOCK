@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { NavLink } from "react-router-dom"
 import { Icon } from "../lib/icons.jsx"
 
@@ -18,15 +19,20 @@ const navItems = [
 ]
 
 export default function Sidebar() {
+  const [isExpanded, setIsExpanded] = useState(false)
   const sections = ["Operacional", "Gestão", "Sistema"]
   
   return (
-    <aside className="sticky top-0 hidden h-screen w-16 lg:w-56 shrink-0 flex-col gap-4 border-r border-line bg-surface/60 py-4 px-2 lg:flex">
+    <aside 
+      className={`sticky top-0 hidden h-screen ${isExpanded ? 'lg:w-56' : 'lg:w-16'} shrink-0 flex-col gap-4 border-r border-line bg-surface/60 py-4 px-2 lg:flex transition-all duration-300 ease-in-out`}
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
+    >
       {sections.map((section) => {
         const items = navItems.filter(item => item.section === section)
         return (
           <div key={section} className="flex flex-col gap-1">
-            <h3 className="hidden lg:inline px-3 py-1 text-xs font-medium text-neutral-400 uppercase tracking-wider">
+            <h3 className={`${isExpanded ? 'lg:inline' : 'lg:hidden'} px-3 py-1 text-xs font-medium text-neutral-400 uppercase tracking-wider`}>
               {section}
             </h3>
             {items.map((item) => (
@@ -45,7 +51,7 @@ export default function Sidebar() {
                 <span className="shrink-0">
                   {Icon[item.icon](21)}
                 </span>
-                <span className="hidden lg:inline text-sm font-medium">
+                <span className={`${isExpanded ? 'lg:inline' : 'lg:hidden'} text-sm font-medium`}>
                   {item.label}
                 </span>
               </NavLink>

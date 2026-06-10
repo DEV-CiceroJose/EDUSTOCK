@@ -13,7 +13,7 @@ function Linha({ label, children }) {
   )
 }
 
-export default function DetailsModal({ produto, onClose, onEdit, onDelete }) {
+export default function DetailsModal({ produto, onClose, onEdit, onDelete, onAdd, onRemove }) {
   if (!produto) return null
   const st = categoryStyle(produto.categoria_nome)
   const stock = stockStatus(produto.quantidade, produto.estoque_minimo)
@@ -57,11 +57,30 @@ export default function DetailsModal({ produto, onClose, onEdit, onDelete }) {
       </div>
 
       <div className="mt-5 flex justify-end gap-2">
-        <button onClick={() => onDelete(produto)} className="btn px-3" style={{ background: "var(--color-out-tint)", color: "var(--color-out)" }}>
-          {Icon.trash(16)} Excluir
+        <button 
+          onClick={() => onAdd(produto)} 
+          className="btn px-3" 
+          style={{ background: "var(--color-ok-tint)", color: "var(--color-ok)" }}
+        >
+          {Icon.plus(16)} Adicionar
+        </button>
+        <button 
+          onClick={() => onRemove(produto)} 
+          className="btn px-3" 
+          style={{ background: "var(--color-out-tint)", color: "var(--color-out)" }}
+          disabled={Number(produto.quantidade) <= 0}
+        >
+          {Icon.minus(16)} Retirar
         </button>
         <button onClick={() => onEdit(produto)} className="btn btn-brand">
-          {Icon.edit(16)} Editar item
+          {Icon.edit(16)} Editar
+        </button>
+        <button 
+          onClick={() => onDelete(produto)} 
+          className="btn px-3" 
+          style={{ background: "var(--color-out-tint)", color: "var(--color-out)" }}
+        >
+          {Icon.trash(16)} Excluir
         </button>
       </div>
     </Modal>

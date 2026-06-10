@@ -18,7 +18,7 @@ export default function MovimentacoesPage() {
   }
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-[1500px] px-6 py-8">
       <MovimentacoesView
         movimentacoes={movimentacoes}
         onNovaEntrada={() => setEntradaOpen(true)}
@@ -39,6 +39,6 @@ export default function MovimentacoesPage() {
         onClose={() => setSaidaOpen(false)}
         onSaved={carregar}
       />
-    </>
+    </div>
   )
 }

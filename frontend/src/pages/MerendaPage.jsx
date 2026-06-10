@@ -30,11 +30,11 @@ export default function MerendaPage() {
   }
 
   return (
-    <div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto w-full max-w-[1500px] px-6 py-8">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-bold">Merenda Escolar</h1>
-          <p className="text-sm text-ink-faint">{produtosMerenda.length} produtos • Gestão de alimentação</p>
+          <h1 className="font-display text-2xl font-bold leading-tight">Merenda Escolar</h1>
+          <p className="mt-2 text-sm leading-relaxed text-ink-faint">{produtosMerenda.length} produtos • Gestão de alimentação</p>
         </div>
         <div className="flex gap-2">
           {VIEWS.map((v) => (
@@ -52,9 +52,9 @@ export default function MerendaPage() {
       </div>
 
       {view === "contagem" ? (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
           <ContagemView onRegistrado={handleRegistrado} />
-          <div className="space-y-5">
+          <div className="space-y-6">
             <ContagemWidget refreshKey={refreshKey} />
             <KitchenPanel />
           </div>

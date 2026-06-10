@@ -9,6 +9,8 @@ import AlertasPage from "./pages/AlertasPage"
 import FornecedoresPage from "./pages/FornecedoresPage"
 import RelatoriosPage from "./pages/RelatoriosPage"
 import MerendaPage from "./pages/MerendaPage"
+import PerfilPage from "./pages/PerfilPage"
+import ConfiguracoesPage from "./pages/ConfiguracoesPage"
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -22,6 +24,8 @@ createRoot(document.getElementById("root")).render(
           <Route path="fornecedores" element={<FornecedoresPage />} />
           <Route path="relatorios" element={<RelatoriosPage />} />
           <Route path="merenda" element={<MerendaPage />} />
+          <Route path="perfil" element={<PerfilPage />} />
+          <Route path="configuracoes" element={<ConfiguracoesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

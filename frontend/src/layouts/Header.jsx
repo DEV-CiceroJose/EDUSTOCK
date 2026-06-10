@@ -1,4 +1,5 @@
 import { Icon } from "../lib/icons.jsx"
+import { Link } from "react-router-dom"
 
 export default function Header({ search, setSearch, onAddItem, onReport }) {
   return (
@@ -29,7 +30,7 @@ export default function Header({ search, setSearch, onAddItem, onReport }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar item no estoque…"
-            className="field pl-10"
+            className="field pl-10 relative z-10"
           />
         </div>
 
@@ -41,7 +42,10 @@ export default function Header({ search, setSearch, onAddItem, onReport }) {
           <button onClick={onReport} className="btn btn-ghost">
             {Icon.report(18)} <span className="hidden lg:inline">Relatório</span>
           </button>
-          <div className="ml-1 flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-3">
+          <Link 
+            to="/perfil" 
+            className="ml-1 flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-3 transition-colors hover:bg-surface-2 cursor-pointer"
+          >
             <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-tint font-display text-sm font-bold text-brand">
               A
             </span>
@@ -49,7 +53,7 @@ export default function Header({ search, setSearch, onAddItem, onReport }) {
               <div className="text-sm font-semibold">Administrador</div>
               <div className="text-[0.66rem] text-ink-faint">Almoxarife-chefe</div>
             </div>
-          </div>
+          </Link>
         </div>
       </div>
 
@@ -63,7 +67,7 @@ export default function Header({ search, setSearch, onAddItem, onReport }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar item…"
-            className="field pl-10"
+            className="field pl-10 relative z-10"
           />
         </div>
       </div>

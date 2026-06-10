@@ -43,22 +43,24 @@ export default function InventarioPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[230px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]">
-      <CategoryRail categorias={categorias} grupos={grupos} counts={counts} total={produtos.length} active={cat} onPick={setCat} onAddCategory={novaCategoria} />
-      <section>
-        <div className="mb-3 flex items-end justify-between">
+    <div className="mx-auto w-full max-w-[1500px] px-6 py-8">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <CategoryRail categorias={categorias} grupos={grupos} counts={counts} total={produtos.length} active={cat} onPick={setCat} onAddCategory={novaCategoria} />
+        <section>
+          <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <h2 className="font-display text-2xl font-bold leading-none">Inventário</h2>
-            <p className="mt-1 text-sm text-ink-faint">{produtosFiltrados.length} {produtosFiltrados.length === 1 ? "item" : "itens"}{cat.tipo !== "all" && " no filtro"}{search && ` para "${search}"`}</p>
+            <h2 className="font-display text-2xl font-bold leading-tight">Inventário</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-faint">{produtosFiltrados.length} {produtosFiltrados.length === 1 ? "item" : "itens"}{cat.tipo !== "all" && " no filtro"}{search && ` para "${search}"`}</p>
           </div>
           <button onClick={() => setAddOpen(true)} className="btn btn-brand">{Icon.plus(16)} Adicionar</button>
         </div>
         {loading ? <div className="grid place-items-center rounded-2xl border border-dashed border-line py-20 text-ink-faint">Carregando inventário…</div> :
          produtosFiltrados.length === 0 ? <div className="grid place-items-center rounded-2xl border border-dashed border-line py-20 text-center"><span className="mb-2 text-ink-faint">{Icon.box(40)}</span><p className="font-display text-lg font-bold">Nenhum item por aqui</p><p className="text-sm text-ink-faint">{search ? "Tente outra busca." : "Adicione o primeiro item do estoque."}</p></div> :
-         <motion.div layout className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(214px, 1fr))" }}><AnimatePresence>{produtosFiltrados.map((p, i) => <ProductCard key={p.id} produto={p} index={i} busy={busyId === p.id} onAdd={() => ajustar(p, +1)} onRemove={() => ajustar(p, -1)} onDetails={setDetalhe} />)}</AnimatePresence></motion.div>}
+         <motion.div layout className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(214px, 1fr))" }}><AnimatePresence>{produtosFiltrados.map((p, i) => <ProductCard key={p.id} produto={p} index={i} onDetails={setDetalhe} />)}</AnimatePresence></motion.div>}
       </section>
+      </div>
       <ProductFormModal open={addOpen || !!editProduto} produto={editProduto} grupos={grupos} fornecedores={fornecedores.filter(f => f.ativo)} onClose={() => { setAddOpen(false); setEditProduto(null) }} onSaved={carregar} />
-      <DetailsModal produto={detalhe} onClose={() => setDetalhe(null)} onEdit={(p) => { setDetalhe(null); setEditProduto(p) }} onDelete={setAExcluir} />
+      <DetailsModal produto={detalhe} onClose={() => setDetalhe(null)} onEdit={(p) => { setDetalhe(null); setEditProduto(p) }} onDelete={setAExcluir} onAdd={(p) => ajustar(p, +1)} onRemove={(p) => ajustar(p, -1)} />
       <ConfirmDialog open={!!aExcluir} title="Excluir item" message={aExcluir ? `Remover "${aExcluir.nome}" do estoque? Esta ação não pode ser desfeita.` : ""} onConfirm={excluir} onCancel={() => setAExcluir(null)} />
     </div>
   )

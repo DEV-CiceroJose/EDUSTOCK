@@ -37,7 +37,7 @@ export default function FornecedoresPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="mx-auto w-full max-w-[1500px] px-6 py-8">
       <FornecedoresView
         fornecedores={fornecedores}
         onNew={handleNew}

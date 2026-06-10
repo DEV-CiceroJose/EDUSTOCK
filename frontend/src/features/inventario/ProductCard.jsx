@@ -6,7 +6,7 @@ import { unidadeLabel } from "../../api/units"
 
 const BAR = { ok: "var(--color-ok)", low: "var(--color-low)", out: "var(--color-out)" }
 
-export default function ProductCard({ produto, index = 0, busy, onAdd, onRemove, onDetails }) {
+export default function ProductCard({ produto, index = 0, onDetails }) {
   const st = categoryStyle(produto.categoria_nome, index)
   const stock = stockStatus(produto.quantidade, produto.estoque_minimo)
   const val = validadeStatus(produto.validade)
@@ -83,25 +83,6 @@ export default function ProductCard({ produto, index = 0, busy, onAdd, onRemove,
       {produto.numero_nota_fiscal && (
         <div className="mt-1 font-mono text-[0.6rem] text-ink-faint">NF {produto.numero_nota_fiscal}</div>
       )}
-
-      {/* Controles: Adicionar / Retirar */}
-      <div className="mt-3 grid grid-cols-2 gap-1.5">
-        <button
-          onClick={() => onAdd(produto)}
-          disabled={busy}
-          className="btn btn-soft min-w-0 py-2 text-xs disabled:opacity-50"
-        >
-          {Icon.plus(15)} <span className="truncate">Adicionar</span>
-        </button>
-        <button
-          onClick={() => onRemove(produto)}
-          disabled={busy || Number(produto.quantidade) <= 0}
-          className="btn min-w-0 py-2 text-xs disabled:opacity-40"
-          style={{ background: "var(--color-out-tint)", color: "var(--color-out)" }}
-        >
-          {Icon.minus(15)} <span className="truncate">Retirar</span>
-        </button>
-      </div>
     </motion.div>
   )
 }

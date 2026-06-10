@@ -29,7 +29,7 @@ export default function AlertasPage() {
   }
 
   return (
-    <>
+    <div className="mx-auto w-full max-w-[1500px] overflow-x-hidden px-6 py-8">
       <AlertasView alertas={alertas} onPick={handlePickAlerta} />
       <AlertTicker alerts={alerts} onPick={handlePickTickerAlert} />
       <DetailsModal
@@ -38,6 +38,6 @@ export default function AlertasPage() {
         onEdit={() => {}}
         onDelete={() => {}}
       />
-    </>
+    </div>
   )
 }

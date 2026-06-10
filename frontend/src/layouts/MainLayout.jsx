@@ -1,18 +1,19 @@
 import { useState } from "react"
-import { Outlet } from "react-router-dom"
+import { Outlet, useNavigate } from "react-router-dom"
 import { ToastProvider } from "../components/ui/Toast"
 import Sidebar from "./Sidebar"
 import Header from "./Header"
 
 export default function MainLayout() {
   const [search, setSearch] = useState("")
+  const navigate = useNavigate()
   
   const handleAddItem = () => {
-    // To be implemented by pages via context or events
+    navigate('/inventario')
   }
   
   const handleReport = () => {
-    // To be implemented by pages via context or events
+    navigate('/relatorios')
   }
 
   return (
@@ -26,7 +27,7 @@ export default function MainLayout() {
             onAddItem={handleAddItem}
             onReport={handleReport}
           />
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto overflow-x-hidden">
             <Outlet />
           </main>
         </div>

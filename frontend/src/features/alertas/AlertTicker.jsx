@@ -18,7 +18,7 @@ export default function AlertTicker({ alerts, onPick }) {
             </span>
           )}
         </div>
-        <div className="relative min-w-0 flex-1 overflow-hidden">
+        <div className="relative min-w-0 flex-1 overflow-hidden overflow-x-hidden">
           <div className="marquee flex w-max items-center gap-6 py-2.5 pl-6">
             {loop.map((a, i) => (
               <button
