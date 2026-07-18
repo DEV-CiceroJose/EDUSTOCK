@@ -1,12 +1,19 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import PinLogin from './PinLogin.jsx'
 import ContagemView from './ContagemView.jsx'
-import { getSessao } from './api.js'
+import { getSessao, logout } from './api.js'
+import { useIdleLogout } from './useIdleLogout.js'
 
 /**
  * Guarda de rota — redireciona para /login se não há sessão ativa.
  */
 function Protegido({ children }) {
+  const navigate = useNavigate()
+  useIdleLogout(() => {
+    logout()
+    navigate('/login', { replace: true })
+  })
+
   return getSessao() ? children : <Navigate to="/login" replace />
 }
 
