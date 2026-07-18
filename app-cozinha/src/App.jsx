@@ -1,9 +1,16 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import PinLogin from './PinLogin.jsx'
 import ProducaoView from './ProducaoView.jsx'
-import { isLoggedIn } from './api.js'
+import { isLoggedIn, logout } from './api.js'
+import { useIdleLogout } from './useIdleLogout.js'
 
 function Protegido({ children }) {
+  const navigate = useNavigate()
+  useIdleLogout(() => {
+    logout()
+    navigate('/login', { replace: true })
+  })
+
   return isLoggedIn() ? children : <Navigate to="/login" replace />
 }
 
