@@ -11,27 +11,57 @@ function token() {
   return sessionStorage.getItem('cozinha_token') ?? ''
 }
 
-async function req(method, path, body) {
+function esperar(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+const BACKOFF_MS = [500, 1500]
+
+/**
+ * @param {string} method
+ * @param {string} path
+ * @param {object} [body]
+ * @param {{ retry?: boolean }} [opts] — retry: reenvia até 2x em falha de rede/timeout.
+ *   Nunca reenvia por causa de uma resposta HTTP de erro (4xx/5xx), só quando o
+ *   fetch falha antes de obter resposta (rede caiu, timeout).
+ */
+async function req(method, path, body, opts = {}) {
+  const { retry = false } = opts
   const headers = { 'Content-Type': 'application/json' }
   const t = token()
   if (t) headers['X-Operacao-Token'] = t
 
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: body != null ? JSON.stringify(body) : undefined,
-  })
+  const tentativasTotais = retry ? BACKOFF_MS.length + 1 : 1
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    const err = new Error(data.detail ?? `HTTP ${res.status}`)
-    err.status = res.status
-    err.data = data
-    throw err
+  let ultimoErroDeRede = null
+  for (let tentativa = 0; tentativa < tentativasTotais; tentativa++) {
+    if (tentativa > 0) await esperar(BACKOFF_MS[tentativa - 1])
+
+    let res
+    try {
+      res = await fetch(`${BASE}${path}`, {
+        method,
+        headers,
+        body: body != null ? JSON.stringify(body) : undefined,
+      })
+    } catch (e) {
+      ultimoErroDeRede = e
+      continue // falha de rede/timeout: tenta de novo se ainda houver tentativas
+    }
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      const err = new Error(data.detail ?? `HTTP ${res.status}`)
+      err.status = res.status
+      err.data = data
+      throw err // erro de aplicação: nunca reenviar
+    }
+
+    if (res.status === 204) return null
+    return res.json()
   }
 
-  if (res.status === 204) return null
-  return res.json()
+  throw ultimoErroDeRede
 }
 
 /**
@@ -56,21 +86,22 @@ export function isLoggedIn() {
 
 /**
  * Retorna o plano de produção do dia para o turno informado.
- * @param {string} data   — YYYY-MM-DD
- * @param {string} turno  — MANHA | TARDE | INTEGRAL
+ * GET é sempre seguro para retry — não tem efeito colateral.
  */
 export async function getPlano(data, turno) {
-  return req('GET', `/api/operacao/plano-do-dia/?data=${data}&turno=${turno}`)
+  return req('GET', `/api/operacao/plano-do-dia/?data=${data}&turno=${turno}`, undefined, { retry: true })
 }
 
 /**
  * Executa a baixa de produção: registra saídas de estoque para cada item.
- * @param {string} data
- * @param {string} turno
- * @param {Array?} itens — lista de overrides [{ produto_id, quantidade }]
+ *
+ * retry: false explícito — core/operacao.py:baixa_de_producao cria uma
+ * Movimentacao de saída a cada chamada, sem deduplicação. Reenviar
+ * automaticamente depois de uma falha de rede arrisca debitar o estoque
+ * duas vezes, então esta chamada NUNCA reenvia sozinha.
  */
 export async function baixaProducao(data, turno, itens) {
   const body = { data, turno }
   if (itens) body.itens = itens
-  return req('POST', '/api/operacao/baixa-de-producao/', body)
+  return req('POST', '/api/operacao/baixa-de-producao/', body, { retry: false })
 }
