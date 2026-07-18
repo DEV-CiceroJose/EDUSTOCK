@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ChefHat, Delete } from 'lucide-react'
 import { login } from './api.js'
 
 export default function PinLogin() {
@@ -47,31 +48,18 @@ export default function PinLogin() {
   const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back']
 
   return (
-    <div
-      className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
-      style={{ maxWidth: 420, margin: '0 auto' }}
-    >
+    <div className="mx-auto flex min-h-screen max-w-[420px] flex-col items-center justify-center bg-white px-6 py-10">
       <div className="mb-8 text-center">
         <div
-          className="mx-auto mb-4 grid place-items-center rounded-3xl"
-          style={{
-            width: 72, height: 72,
-            background: 'var(--color-brand)',
-            color: '#fff',
-            fontSize: '2rem',
-          }}
+          className="mx-auto mb-4 grid place-items-center rounded-3xl bg-accent text-white"
+          style={{ width: 72, height: 72 }}
         >
-          🍽️
+          <ChefHat size={32} data-testid="icone-cabecalho" />
         </div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>
-          Produção
-        </h1>
-        <p style={{ color: 'var(--color-ink-soft)', marginTop: 6, fontSize: '1rem' }}>
-          Digite o PIN da cozinha
-        </p>
+        <h1 className="m-0 text-[1.6rem] font-extrabold">Produção</h1>
+        <p className="mt-1.5 text-base text-ink-soft">Digite o PIN da cozinha</p>
       </div>
 
-      {/* Indicadores de dígito */}
       <div className="mb-6 flex items-center justify-center">
         {[0, 1, 2, 3].map((i) => (
           <span key={i} className={`pin-dot${i < pin.length ? ' filled' : ''}`} />
@@ -79,15 +67,7 @@ export default function PinLogin() {
       </div>
 
       {erro && (
-        <div
-          className="mb-4 w-full rounded-2xl px-4 py-3 text-center"
-          style={{
-            background: 'var(--color-err-tint)',
-            color: 'var(--color-err)',
-            fontWeight: 600,
-            fontSize: '0.95rem',
-          }}
-        >
+        <div className="mb-4 w-full rounded-2xl bg-err-tint px-4 py-3 text-center text-[0.95rem] font-semibold text-err">
           {erro}
         </div>
       )}
@@ -98,7 +78,7 @@ export default function PinLogin() {
           if (t === 'back') {
             return (
               <button key="back" onClick={() => pressKey('back')} className="numkey numkey-back" aria-label="Apagar" disabled={loading}>
-                ⌫
+                <Delete size={22} />
               </button>
             )
           }
@@ -111,9 +91,7 @@ export default function PinLogin() {
       </div>
 
       {loading && (
-        <p className="mt-6 text-center" style={{ color: 'var(--color-ink-soft)', fontSize: '0.95rem' }}>
-          Verificando…
-        </p>
+        <p className="mt-6 text-center text-[0.95rem] text-ink-soft">Verificando…</p>
       )}
     </div>
   )
