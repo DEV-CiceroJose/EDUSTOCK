@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { CheckCircle2, AlertTriangle, Delete } from 'lucide-react'
 import { getSessao, registrarContagem, logout } from './api.js'
 
 const TURNO_LABEL = { MANHA: 'Manhã', TARDE: 'Tarde', INTEGRAL: 'Integral' }
@@ -25,6 +26,7 @@ export default function ContagemView() {
   const [estado, setEstado] = useState('idle') // 'idle' | 'loading' | 'sucesso' | 'erro'
   const [resultado, setResultado] = useState(null)
   const [mensagemErro, setMensagemErro] = useState('')
+  const enviandoRef = useRef(false)
 
   // Redireciona se sessão expirou
   if (!sessao) {
@@ -45,6 +47,8 @@ export default function ContagemView() {
   async function confirmar() {
     const qtd = parseInt(numero, 10)
     if (!qtd || qtd <= 0) return
+    if (enviandoRef.current) return
+    enviandoRef.current = true
 
     setEstado('loading')
     try {
@@ -53,12 +57,13 @@ export default function ContagemView() {
       setEstado('sucesso')
     } catch (e) {
       if (e.status === 409) {
-        // Duplicata — mostra mensagem sem travar
         setMensagemErro('Frequência já registrada hoje para esta turma.')
       } else {
         setMensagemErro(e.message ?? 'Erro ao registrar. Tente novamente.')
       }
       setEstado('erro')
+    } finally {
+      enviandoRef.current = false
     }
   }
 
@@ -85,23 +90,17 @@ export default function ContagemView() {
         style={{ maxWidth: 420, margin: '0 auto' }}
       >
         <div className="result-card w-full">
-          {/* Ícone grande de sucesso */}
           <div
-            className="mx-auto mb-5 grid place-items-center rounded-full"
-            style={{
-              width: 80, height: 80,
-              background: 'var(--color-ok-tint)',
-              fontSize: '2.5rem',
-            }}
+            className="mx-auto mb-5 grid place-items-center rounded-full text-ok"
+            style={{ width: 80, height: 80, background: 'var(--color-ok-tint)' }}
           >
-            ✓
+            <CheckCircle2 size={40} data-testid="icone-sucesso" />
           </div>
 
           <p style={{ fontSize: '1rem', color: 'var(--color-ink-soft)', margin: 0 }}>
             Turma {resultado.turma} — {TURNO_LABEL[resultado.turno] ?? resultado.turno}
           </p>
 
-          {/* Número em destaque */}
           <div
             style={{
               fontSize: '4rem',
@@ -117,22 +116,16 @@ export default function ContagemView() {
             alunos registrados
           </p>
 
-          {/* Variação em relação à média */}
           {variacao && (
             <p
-              style={{
-                marginTop: '1rem',
-                fontSize: '0.95rem',
-                fontWeight: 600,
-                color: alerta ? 'var(--color-warn)' : 'var(--color-ink-soft)',
-              }}
+              className="mt-4 flex items-center justify-center gap-1.5 text-[0.95rem] font-semibold"
+              style={{ color: alerta ? 'var(--color-warn)' : 'var(--color-ink-soft)' }}
             >
-              {alerta ? '⚠️ ' : ''}
+              {alerta && <AlertTriangle size={16} />}
               {variacao}
             </p>
           )}
 
-          {/* Alerta de redução brusca */}
           {alerta && (
             <div
               className="mt-4 rounded-xl px-4 py-3"
@@ -174,10 +167,10 @@ export default function ContagemView() {
       >
         <div className="result-card w-full">
           <div
-            className="mx-auto mb-5 grid place-items-center rounded-full"
-            style={{ width: 80, height: 80, background: 'var(--color-err-tint)', fontSize: '2.5rem' }}
+            className="mx-auto mb-5 grid place-items-center rounded-full text-err"
+            style={{ width: 80, height: 80, background: 'var(--color-err-tint)' }}
           >
-            ⚠
+            <AlertTriangle size={40} data-testid="icone-erro" />
           </div>
           <p
             style={{
@@ -232,7 +225,6 @@ export default function ContagemView() {
       className="flex min-h-screen flex-col bg-white px-6 pb-8 pt-6"
       style={{ maxWidth: 420, margin: '0 auto' }}
     >
-      {/* Cabeçalho — turma e turno (somente leitura) */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>
@@ -259,7 +251,6 @@ export default function ContagemView() {
         </button>
       </div>
 
-      {/* Prompt */}
       <p
         className="mb-2 text-center"
         style={{ color: 'var(--color-ink-soft)', fontSize: '1rem' }}
@@ -267,7 +258,6 @@ export default function ContagemView() {
         Quantos alunos estão presentes?
       </p>
 
-      {/* Display do número digitado */}
       <div
         className="pin-display mb-6 flex items-center justify-center"
         style={{ minHeight: '5rem' }}
@@ -279,7 +269,6 @@ export default function ContagemView() {
         )}
       </div>
 
-      {/* Teclado numérico */}
       <div
         className="grid flex-1 gap-3"
         style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
@@ -296,7 +285,7 @@ export default function ContagemView() {
                 className="numkey numkey-back"
                 aria-label="Apagar"
               >
-                ⌫
+                <Delete size={22} />
               </button>
             )
           }
@@ -312,7 +301,6 @@ export default function ContagemView() {
         })}
       </div>
 
-      {/* Botão confirmar */}
       <button
         onClick={confirmar}
         disabled={!podeConfirmar}
