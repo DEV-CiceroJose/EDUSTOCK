@@ -6,6 +6,8 @@
   --color-brand:      #214d3f;
   --color-brand-dark: #1a3e33;
   --color-brand-tint: #e7efe8;
+  --color-accent:      #e07a3e;
+  --color-accent-tint: #fbe9d9;
   --color-surface:    #ffffff;
   --color-canvas:     #f5f5f5;
   --color-line:       #e4e4e4;
@@ -68,11 +70,11 @@ html, body, #root {
 .btn-action:active { transform: scale(0.98); }
 .btn-action:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 .btn-primary {
-  background: var(--color-brand);
+  background: var(--color-accent);
   color: #fff;
-  box-shadow: 0 8px 24px -10px rgba(33, 77, 63, 0.55);
+  box-shadow: 0 8px 24px -10px rgba(224, 122, 62, 0.55);
 }
-.btn-primary:hover:not(:disabled) { background: var(--color-brand-dark); }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.04); }
 
 /* Chips de turno */
 .turno-chip {
@@ -107,11 +109,11 @@ html, body, #root {
 }
 .numkey:active { transform: scale(0.94); background: var(--color-brand-tint); }
 .numkey-confirm {
-  background: var(--color-brand);
+  background: var(--color-accent);
   color: #fff;
-  border-color: var(--color-brand);
+  border-color: var(--color-accent);
 }
-.numkey-confirm:active { background: var(--color-brand-dark); }
+.numkey-confirm:active { filter: brightness(0.92); }
 .numkey-confirm:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 .numkey-back { font-size: 1.2rem; color: var(--color-ink-soft); }
 

@@ -14,28 +14,57 @@ function token() {
   return sessionStorage.getItem('operacao_token') ?? ''
 }
 
-async function req(method, path, body) {
+function esperar(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+const BACKOFF_MS = [500, 1500]
+
+/**
+ * @param {string} method
+ * @param {string} path
+ * @param {object} [body]
+ * @param {{ retry?: boolean }} [opts] — retry: reenvia até 2x em falha de rede/timeout.
+ *   Nunca reenvia por causa de uma resposta HTTP de erro (4xx/5xx), só quando o
+ *   fetch falha antes de obter resposta (rede caiu, timeout).
+ */
+async function req(method, path, body, opts = {}) {
+  const { retry = false } = opts
   const headers = { 'Content-Type': 'application/json' }
   const t = token()
   if (t) headers['X-Operacao-Token'] = t
 
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: body != null ? JSON.stringify(body) : undefined,
-  })
+  const tentativasTotais = retry ? BACKOFF_MS.length + 1 : 1
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    const err = new Error(data.detail ?? `HTTP ${res.status}`)
-    err.status = res.status
-    err.data = data
-    throw err
+  let ultimoErroDeRede = null
+  for (let tentativa = 0; tentativa < tentativasTotais; tentativa++) {
+    if (tentativa > 0) await esperar(BACKOFF_MS[tentativa - 1])
+
+    let res
+    try {
+      res = await fetch(`${BASE}${path}`, {
+        method,
+        headers,
+        body: body != null ? JSON.stringify(body) : undefined,
+      })
+    } catch (e) {
+      ultimoErroDeRede = e
+      continue
+    }
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      const err = new Error(data.detail ?? `HTTP ${res.status}`)
+      err.status = res.status
+      err.data = data
+      throw err
+    }
+
+    if (res.status === 204) return null
+    return res.json()
   }
 
-  // 204 No Content não tem corpo
-  if (res.status === 204) return null
-  return res.json()
+  throw ultimoErroDeRede
 }
 
 /**
@@ -50,7 +79,6 @@ export async function login(pin, turma, turno) {
     pin,
     perfil: 'ALUNO_REP',
   })
-  // Salva o token e os dados da sessão
   sessionStorage.setItem('operacao_token', data.token)
   sessionStorage.setItem('operacao_sessao', JSON.stringify({
     turma: data.turma || turma,
@@ -75,6 +103,11 @@ export function getSessao() {
 
 /**
  * Registra a frequência de hoje para a turma autenticada.
+ *
+ * retry: true — o backend tem constraint única em FrequenciaDiaria e devolve
+ * 409 numa segunda tentativa idêntica (core/operacao_views.py), então reenviar
+ * depois de uma falha de rede nunca duplica o registro.
+ *
  * @param {number} quantidade_alunos
  * @param {string?} data — YYYY-MM-DD (omitir = hoje)
  * @returns {{ id, data, turno, turma, quantidade_alunos, previsao }}
@@ -82,5 +115,5 @@ export function getSessao() {
 export async function registrarContagem(quantidade_alunos, data) {
   const body = { quantidade_alunos }
   if (data) body.data = data
-  return req('POST', '/api/operacao/contagem/', body)
+  return req('POST', '/api/operacao/contagem/', body, { retry: true })
 }

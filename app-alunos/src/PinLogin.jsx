@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { School, Delete } from 'lucide-react'
 import { login } from './api.js'
 
 /**
@@ -49,7 +50,6 @@ export default function PinLogin() {
     } else if (pin.length < 4) {
       const novoPin = pin + val
       setPin(novoPin)
-      // Auto-confirma quando completa 4 dígitos
       if (novoPin.length === 4) {
         confirmar(novoPin)
       }
@@ -80,111 +80,56 @@ export default function PinLogin() {
   const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back']
 
   return (
-    <div
-      className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
-      style={{ maxWidth: 420, margin: '0 auto' }}
-    >
-      {/* Cabeçalho */}
+    <div className="mx-auto flex min-h-screen max-w-[420px] flex-col items-center justify-center bg-white px-6 py-10">
       <div className="mb-8 text-center">
         <div
-          className="mx-auto mb-4 grid place-items-center rounded-3xl"
-          style={{
-            width: 72, height: 72,
-            background: 'var(--color-brand)',
-            color: '#fff',
-            fontSize: '2rem',
-          }}
+          className="mx-auto mb-4 grid place-items-center rounded-3xl bg-brand text-white"
+          style={{ width: 72, height: 72 }}
         >
-          🏫
+          <School size={32} data-testid="icone-cabecalho" />
         </div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>
-          Frequência
-        </h1>
-        <p style={{ color: 'var(--color-ink-soft)', marginTop: 6, fontSize: '1rem' }}>
-          Digite o PIN da sua turma
-        </p>
+        <h1 className="m-0 text-[1.6rem] font-extrabold">Frequência</h1>
+        <p className="mt-1.5 text-base text-ink-soft">Digite o PIN da sua turma</p>
       </div>
 
-      {/* Indicadores de dígito */}
       <div className="mb-6 flex items-center justify-center">
         {[0, 1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className={`pin-dot${i < pin.length ? ' filled' : ''}`}
-          />
+          <span key={i} className={`pin-dot${i < pin.length ? ' filled' : ''}`} />
         ))}
       </div>
 
-      {/* Mensagem de erro */}
       {erro && (
-        <div
-          className="mb-4 w-full rounded-2xl px-4 py-3 text-center"
-          style={{
-            background: 'var(--color-err-tint)',
-            color: 'var(--color-err)',
-            fontWeight: 600,
-            fontSize: '0.95rem',
-          }}
-        >
+        <div className="mb-4 w-full rounded-2xl bg-err-tint px-4 py-3 text-center text-[0.95rem] font-semibold text-err">
           {erro}
         </div>
       )}
 
-      {/* Teclado numérico */}
-      <div
-        className="grid w-full gap-3"
-        style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
-      >
+      <div className="grid w-full gap-3" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         {teclas.map((t, i) => {
           if (t === '') return <div key={i} />
           if (t === 'back') {
             return (
-              <button
-                key="back"
-                onClick={() => pressKey('back')}
-                className="numkey numkey-back"
-                aria-label="Apagar"
-                disabled={loading}
-              >
-                ⌫
+              <button key="back" onClick={() => pressKey('back')} className="numkey numkey-back" aria-label="Apagar" disabled={loading}>
+                <Delete size={22} />
               </button>
             )
           }
           return (
-            <button
-              key={t}
-              onClick={() => pressKey(t)}
-              className="numkey"
-              disabled={loading || pin.length >= 4}
-            >
+            <button key={t} onClick={() => pressKey(t)} className="numkey" disabled={loading || pin.length >= 4}>
               {t}
             </button>
           )
         })}
       </div>
 
-      {/* Estado de loading */}
       {loading && (
-        <p
-          className="mt-6 text-center"
-          style={{ color: 'var(--color-ink-soft)', fontSize: '0.95rem' }}
-        >
-          Verificando…
-        </p>
+        <p className="mt-6 text-center text-[0.95rem] text-ink-soft">Verificando…</p>
       )}
 
-      {/* Rodapé com turno identificado (feedback visual antes de confirmar) */}
       {pin.length === 4 && MAPA_PINS[pin] && !loading && (
-        <div
-          className="mt-6 rounded-2xl px-5 py-3 text-center"
-          style={{ background: 'var(--color-brand-tint)', fontSize: '1rem' }}
-        >
-          <span style={{ fontWeight: 700, color: 'var(--color-brand)' }}>
-            Turma {MAPA_PINS[pin].turma}
-          </span>{' '}
-          <span style={{ color: 'var(--color-ink-soft)' }}>
-            — {TURNO_LABEL[MAPA_PINS[pin].turno] ?? MAPA_PINS[pin].turno}
-          </span>
+        <div className="mt-6 rounded-2xl bg-brand-tint px-5 py-3 text-center text-base">
+          <span className="font-bold text-brand">Turma {MAPA_PINS[pin].turma}</span>{' '}
+          <span className="text-ink-soft">— {TURNO_LABEL[MAPA_PINS[pin].turno] ?? MAPA_PINS[pin].turno}</span>
         </div>
       )}
     </div>

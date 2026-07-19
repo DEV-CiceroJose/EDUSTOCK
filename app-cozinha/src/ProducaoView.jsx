@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getPlano, baixaProducao, logout } from './api.js'
+import { UtensilsCrossed, Droplets, Package, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 const TURNOS = [
   { key: 'MANHA', label: 'Manhã' },
@@ -30,43 +31,22 @@ function turnoAtual() {
   return 'INTEGRAL'
 }
 
-/* ─── Ícones SVG inline por categoria ───────────────────────────────── */
+/* ─── Ícone por categoria ────────────────────────────────────────────── */
 function IconeCategoria({ nome }) {
   const n = (nome ?? '').toLowerCase()
-  // Alimentos → prato
   if (n.includes('alimento') || n.includes('merenda') || n.includes('refeit')) {
-    return (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 3v9m0 0 4-4m-4 4-4-4" />
-      </svg>
-    )
+    return <UtensilsCrossed size={24} data-testid="icone-categoria-alimento" />
   }
-  // Limpeza → balde
   if (n.includes('limpeza') || n.includes('higie')) {
-    return (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M7 7h10l-1 10H8L7 7Z" />
-        <path d="M5 7h14" />
-        <path d="M10 3h4v4h-4z" />
-      </svg>
-    )
+    return <Droplets size={24} data-testid="icone-categoria-limpeza" />
   }
-  // Padrão → caixa
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 8V21H3V8" />
-      <path d="M23 3H1v5h22V3z" />
-      <path d="M10 12h4" />
-    </svg>
-  )
+  return <Package size={24} data-testid="icone-categoria-padrao" />
 }
 
 /* ─── Card de produto ─────────────────────────────────────────────────── */
 function CardProduto({ item }) {
   return (
     <div className={`recipe-card${item.estoque_insuficiente ? ' insufficient' : ''}`}>
-      {/* Ícone da categoria */}
       <div
         className="grid shrink-0 place-items-center rounded-2xl"
         style={{
@@ -78,7 +58,6 @@ function CardProduto({ item }) {
         <IconeCategoria nome={item.categoria_nome} />
       </div>
 
-      {/* Conteúdo */}
       <div className="min-w-0 flex-1">
         <div style={{ fontSize: '1.05rem', fontWeight: 700, lineHeight: 1.2 }}>
           {item.produto_nome}
@@ -88,7 +67,6 @@ function CardProduto({ item }) {
         </div>
       </div>
 
-      {/* Quantidade em destaque */}
       <div className="text-right shrink-0">
         <div
           style={{
@@ -101,19 +79,8 @@ function CardProduto({ item }) {
           {item.quantidade_legivel ?? `${item.quantidade} ${item.unidade}`}
         </div>
         {item.estoque_insuficiente && (
-          <div
-            style={{
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              color: 'var(--color-err)',
-              marginTop: 4,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: 4,
-            }}
-          >
-            ⚠ Estoque insuficiente
+          <div className="mt-1 flex items-center justify-end gap-1 text-[0.78rem] font-bold text-err">
+            <AlertTriangle size={14} /> Estoque insuficiente
           </div>
         )}
       </div>
@@ -128,28 +95,18 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
   return (
     <div className="modal-overlay" onClick={onCancelar}>
       <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: '0 0 4px' }}>
+        <h2 className="m-0 mb-1 text-[1.3rem] font-extrabold">
           Confirmar baixa de produção
         </h2>
-        <p style={{ color: 'var(--color-ink-soft)', fontSize: '0.9rem', margin: '0 0 1.25rem' }}>
+        <p className="m-0 mb-5 text-[0.9rem] text-ink-soft">
           Serão registradas saídas de estoque para os itens abaixo.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1.5rem' }}>
+        <div className="mb-6 flex flex-col gap-2">
           {itensDisponiveis.map((item) => (
-            <div
-              key={item.produto_id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '0.7rem 1rem',
-                background: 'var(--color-canvas)',
-                borderRadius: 14,
-              }}
-            >
-              <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{item.produto_nome}</span>
-              <span style={{ fontWeight: 800, color: 'var(--color-brand)', fontSize: '1rem' }}>
+            <div key={item.produto_id} className="flex items-center justify-between rounded-[14px] bg-canvas px-4 py-3">
+              <span className="text-[0.95rem] font-semibold">{item.produto_nome}</span>
+              <span className="text-base font-extrabold text-brand">
                 {item.quantidade_legivel ?? `${item.quantidade} ${item.unidade}`}
               </span>
             </div>
@@ -157,17 +114,7 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
         </div>
 
         {plano.itens.some((i) => i.estoque_insuficiente) && (
-          <div
-            style={{
-              background: 'var(--color-warn-tint)',
-              color: 'var(--color-warn)',
-              borderRadius: 14,
-              padding: '0.7rem 1rem',
-              fontSize: '0.88rem',
-              fontWeight: 600,
-              marginBottom: '1.25rem',
-            }}
-          >
+          <div className="mb-5 rounded-[14px] bg-warn-tint px-4 py-3 text-[0.88rem] font-semibold text-warn">
             Itens com estoque insuficiente serão ignorados.
           </div>
         )}
@@ -177,21 +124,15 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
           onClick={onConfirmar}
           disabled={loading || itensDisponiveis.length === 0}
         >
-          {loading ? 'Registrando…' : '✓ Dar baixa'}
+          {loading ? 'Registrando…' : (
+            <>
+              <CheckCircle2 size={20} /> Dar baixa
+            </>
+          )}
         </button>
         <button
           onClick={onCancelar}
-          style={{
-            marginTop: '0.75rem',
-            width: '100%',
-            padding: '0.9rem',
-            background: 'transparent',
-            border: 'none',
-            fontSize: '0.95rem',
-            color: 'var(--color-ink-soft)',
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
+          className="mt-3 w-full cursor-pointer border-none bg-transparent p-[0.9rem] text-[0.95rem] font-semibold text-ink-soft"
         >
           Cancelar
         </button>
@@ -202,53 +143,37 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
 
 /* ─── Modal de resultado da baixa ───────────────────────────────────── */
 function ModalResultado({ resultado, onFechar }) {
+  const IconeResultado = resultado.falhas === 0 ? CheckCircle2 : AlertTriangle
+  const corIcone = resultado.falhas === 0 ? 'text-ok' : 'text-warn'
+
   return (
     <div className="modal-overlay">
-      <div className="modal-sheet" style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '3rem', marginBottom: '0.5rem' }}>
-          {resultado.falhas === 0 ? '✅' : '⚠️'}
-        </div>
-        <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: '0 0 8px' }}>
+      <div className="modal-sheet text-center">
+        <IconeResultado size={48} className={`mx-auto mb-2 ${corIcone}`} data-testid="icone-resultado" />
+        <h2 className="m-0 mb-2 text-[1.3rem] font-extrabold">
           Baixa concluída
         </h2>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, margin: '1rem 0 1.25rem' }}>
+        <div className="my-4 flex justify-center gap-6">
           <div>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-ok)' }}>
-              {resultado.sucesso}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--color-ink-soft)' }}>sucesso(s)</div>
+            <div className="text-[2rem] font-extrabold text-ok">{resultado.sucesso}</div>
+            <div className="text-[0.8rem] text-ink-soft">sucesso(s)</div>
           </div>
           {resultado.falhas > 0 && (
             <div>
-              <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--color-err)' }}>
-                {resultado.falhas}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--color-ink-soft)' }}>falha(s)</div>
+              <div className="text-[2rem] font-extrabold text-err">{resultado.falhas}</div>
+              <div className="text-[0.8rem] text-ink-soft">falha(s)</div>
             </div>
           )}
         </div>
 
-        {/* Detalhe das falhas */}
         {resultado.resultados?.filter((r) => !r.ok).map((r) => (
-          <div
-            key={r.produto_id}
-            style={{
-              background: 'var(--color-err-tint)',
-              color: 'var(--color-err)',
-              borderRadius: 12,
-              padding: '0.6rem 0.9rem',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              marginBottom: 6,
-              textAlign: 'left',
-            }}
-          >
+          <div key={r.produto_id} className="mb-1.5 rounded-xl bg-err-tint px-3.5 py-2.5 text-left text-[0.85rem] font-semibold text-err">
             {r.produto_nome}: {r.erro}
           </div>
         ))}
 
-        <button className="btn-action btn-primary" style={{ marginTop: '1rem' }} onClick={onFechar}>
+        <button className="btn-action btn-primary mt-4" onClick={onFechar}>
           Fechar
         </button>
       </div>
@@ -267,6 +192,7 @@ export default function ProducaoView() {
   const [modalAberto, setModalAberto] = useState(false)
   const [loadingBaixa, setLoadingBaixa] = useState(false)
   const [resultado, setResultado] = useState(null)
+  const enviandoRef = useRef(false)
 
   const carregarPlano = useCallback(async () => {
     setLoadingPlano(true)
@@ -291,22 +217,36 @@ export default function ProducaoView() {
   }, [carregarPlano])
 
   async function executarBaixa() {
+    if (enviandoRef.current) return
+    enviandoRef.current = true
     setLoadingBaixa(true)
     try {
       const res = await baixaProducao(data, turno)
       setResultado(res)
       setModalAberto(false)
     } catch (e) {
-      setErroPlano(e.message ?? 'Erro ao registrar baixa.')
+      const semResposta = e.status === undefined
       setModalAberto(false)
+      if (semResposta) {
+        // Sem resposta do servidor: não sabemos se a baixa foi registrada.
+        // Recarrega o plano primeiro (isso zera erroPlano internamente) e só
+        // então define o aviso, para que carregarPlano não o sobrescreva.
+        await carregarPlano()
+        setErroPlano(
+          'Não foi possível confirmar se a baixa foi registrada. O plano foi recarregado — confira o saldo antes de tentar de novo.'
+        )
+      } else {
+        setErroPlano(e.message ?? 'Erro ao registrar baixa.')
+      }
     } finally {
       setLoadingBaixa(false)
+      enviandoRef.current = false
     }
   }
 
   function fecharResultado() {
     setResultado(null)
-    carregarPlano() // recarrega para refletir novos saldos
+    carregarPlano()
   }
 
   function sair() {
@@ -327,66 +267,35 @@ export default function ProducaoView() {
         margin: '0 auto',
       }}
     >
-      {/* ── Cabeçalho ── */}
-      <header
-        style={{
-          background: 'var(--color-brand)',
-          color: '#fff',
-          padding: '1rem 1.25rem',
-          position: 'sticky',
-          top: 0,
-          zIndex: 20,
-        }}
-      >
-        {/* Alerta de frequência baixa */}
+      <header className="sticky top-0 z-20 bg-accent px-5 py-4 text-white">
         {plano?.previsao?.alerta_reducao && (
-          <div
-            style={{
-              background: 'var(--color-warn)',
-              color: '#fff',
-              borderRadius: 12,
-              padding: '0.6rem 1rem',
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              marginBottom: '0.75rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            ⚠️ Frequência abaixo de 50% da média — considere reduzir a produção
+          <div className="mb-3 flex items-center gap-2 rounded-xl bg-warn px-4 py-2.5 text-[0.9rem] font-bold text-white">
+            <AlertTriangle size={18} />
+            Frequência abaixo de 50% da média — considere reduzir a produção
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+        <div className="mb-3 flex items-center justify-between">
           <div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 800, lineHeight: 1.1 }}>
-              Ordem de Produção
-            </div>
-            <div style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: 2 }}>
-              {formatarData(data)}
-            </div>
+            <div className="text-[1.3rem] font-extrabold leading-tight">Ordem de Produção</div>
+            <div className="mt-0.5 text-[0.9rem] opacity-80">{formatarData(data)}</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
+          <div className="text-right">
             {plano && (
               <>
-                <div style={{ fontSize: '1.8rem', fontWeight: 800, lineHeight: 1 }}>
-                  {plano.total_alunos}
-                </div>
-                <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>alunos</div>
+                <div className="text-[1.8rem] font-extrabold leading-none">{plano.total_alunos}</div>
+                <div className="text-[0.8rem] opacity-80">alunos</div>
               </>
             )}
           </div>
         </div>
 
-        {/* Chips de turno */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="flex gap-2">
           {TURNOS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTurno(t.key)}
-              className={`turno-chip${turno === t.key ? ' active' : ''}`}
-              style={turno !== t.key ? { color: 'rgba(255,255,255,0.75)', borderColor: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)' } : undefined}
+              className={`turno-chip${turno === t.key ? ' active' : ' border-white/30 bg-white/10 text-white/75'}`}
             >
               {t.label}
             </button>
@@ -394,7 +303,6 @@ export default function ProducaoView() {
         </div>
       </header>
 
-      {/* ── Corpo ── */}
       <main style={{ flex: 1, padding: '1.25rem', paddingBottom: '7rem' }}>
         {loadingPlano && (
           <div style={{ textAlign: 'center', color: 'var(--color-ink-faint)', paddingTop: '3rem', fontSize: '1rem' }}>
@@ -440,40 +348,16 @@ export default function ProducaoView() {
         )}
       </main>
 
-      {/* ── Rodapé fixo com botão de baixa ── */}
-      <footer
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: 'var(--color-surface)',
-          borderTop: '1.5px solid var(--color-line)',
-          padding: '1rem 1.25rem',
-          maxWidth: 640,
-          margin: '0 auto',
-        }}
-      >
-        <div style={{ display: 'flex', gap: 8 }}>
+      <footer className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t-[1.5px] border-line bg-surface px-5 py-4">
+        <div className="flex gap-2">
           <button
             onClick={sair}
-            style={{
-              padding: '0.9rem 1rem',
-              borderRadius: 16,
-              border: '1.5px solid var(--color-line)',
-              background: 'var(--color-canvas)',
-              fontSize: '0.9rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              color: 'var(--color-ink-soft)',
-              flexShrink: 0,
-            }}
+            className="shrink-0 cursor-pointer rounded-2xl border-[1.5px] border-line bg-canvas px-4 py-3.5 text-[0.9rem] font-semibold text-ink-soft"
           >
             Sair
           </button>
           <button
-            className="btn-action btn-primary"
-            style={{ flex: 1 }}
+            className="btn-action btn-primary flex-1"
             disabled={!plano || itensDisponiveis.length === 0 || loadingPlano}
             onClick={() => setModalAberto(true)}
           >
@@ -482,7 +366,6 @@ export default function ProducaoView() {
         </div>
       </footer>
 
-      {/* ── Modal de confirmação ── */}
       {modalAberto && plano && (
         <ModalBaixa
           plano={plano}
@@ -492,7 +375,6 @@ export default function ProducaoView() {
         />
       )}
 
-      {/* ── Modal de resultado ── */}
       {resultado && (
         <ModalResultado resultado={resultado} onFechar={fecharResultado} />
       )}
