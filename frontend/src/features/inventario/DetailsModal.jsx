@@ -3,6 +3,7 @@ import { Icon } from "../../lib/icons.jsx"
 import { categoryStyle } from "../../lib/catalog"
 import { brl, qtd, dataBR, stockStatus, validadeStatus } from "../../lib/format"
 import { unidadeLabel } from "../../api/units"
+import { getConfig } from "../../lib/config"
 
 function Linha({ label, children }) {
   return (
@@ -15,6 +16,7 @@ function Linha({ label, children }) {
 
 export default function DetailsModal({ produto, onClose, onEdit, onDelete, onAdd, onRemove }) {
   if (!produto) return null
+  const { mostrarPreco } = getConfig()
   const st = categoryStyle(produto.categoria_nome)
   const stock = stockStatus(produto.quantidade, produto.estoque_minimo)
   const val = validadeStatus(produto.validade)
@@ -37,10 +39,14 @@ export default function DetailsModal({ produto, onClose, onEdit, onDelete, onAdd
         <Linha label="Quantidade atual">
           {qtd(produto.quantidade)} {unidadeLabel(produto.unidade).toLowerCase()}
         </Linha>
-        <Linha label="Preço unitário">{brl(produto.preco)}</Linha>
-        <Linha label="Valor em estoque">
-          {produto.preco ? brl(Number(produto.preco) * Number(produto.quantidade)) : "—"}
-        </Linha>
+        {mostrarPreco && (
+          <>
+            <Linha label="Preço unitário">{brl(produto.preco)}</Linha>
+            <Linha label="Valor em estoque">
+              {produto.preco ? brl(Number(produto.preco) * Number(produto.quantidade)) : "—"}
+            </Linha>
+          </>
+        )}
         <Linha label="Validade">
           {produto.validade ? (
             <span className={val.code === "expired" ? "text-out" : val.code === "soon" ? "text-low" : ""}>
