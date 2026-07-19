@@ -4,10 +4,12 @@ import { brl } from "../../lib/format"
 import { Icon } from "../../lib/icons.jsx"
 import Modal from "../../components/ui/Modal"
 import { useToast } from "../../components/ui/Toast"
+import { getConfig } from "../../lib/config"
 
 const linhaVazia = () => ({ produto: "", quantidade: "", preco_unitario: "" })
 
 export default function EntradaFormModal({ open, produtos, fornecedores, onClose, onSaved }) {
+  const { mostrarPreco } = getConfig()
   const [cab, setCab] = useState({ fornecedor: "", numero_nota_fiscal: "", data: "", observacao: "" })
   const [linhas, setLinhas] = useState([linhaVazia()])
   const [erro, setErro] = useState("")
@@ -86,13 +88,20 @@ export default function EntradaFormModal({ open, produtos, fornecedores, onClose
         <div className="space-y-2">
           <span className="text-sm font-semibold">Itens</span>
           {linhas.map((l, i) => (
-            <div key={i} className="grid grid-cols-[1fr_80px_90px_auto] items-center gap-2">
+            <div
+              key={i}
+              className={`grid items-center gap-2 ${
+                mostrarPreco ? "grid-cols-[1fr_80px_90px_auto]" : "grid-cols-[1fr_80px_auto]"
+              }`}
+            >
               <select className="field" value={l.produto} onChange={setL(i, "produto")}>
                 <option value="">— produto —</option>
                 {produtos.map((p) => (<option key={p.id} value={p.id}>{p.nome}</option>))}
               </select>
               <input type="number" step="any" min="0" className="field" value={l.quantidade} onChange={setL(i, "quantidade")} placeholder="Qtd" />
-              <input type="number" step="0.01" min="0" className="field" value={l.preco_unitario} onChange={setL(i, "preco_unitario")} placeholder="R$" />
+              {mostrarPreco && (
+                <input type="number" step="0.01" min="0" className="field" value={l.preco_unitario} onChange={setL(i, "preco_unitario")} placeholder="R$" />
+              )}
               <button type="button" onClick={() => rmLinha(i)} className="grid h-9 w-9 place-items-center rounded-lg text-ink-faint hover:bg-surface-2" title="Remover">
                 {Icon.trash(15)}
               </button>
@@ -103,10 +112,12 @@ export default function EntradaFormModal({ open, produtos, fornecedores, onClose
           </button>
         </div>
 
-        <div className="flex items-center justify-between border-t border-line pt-3">
-          <span className="text-sm text-ink-soft">Total</span>
-          <span className="font-display text-xl font-bold">{brl(total)}</span>
-        </div>
+        {mostrarPreco && (
+          <div className="flex items-center justify-between border-t border-line pt-3">
+            <span className="text-sm text-ink-soft">Total</span>
+            <span className="font-display text-xl font-bold">{brl(total)}</span>
+          </div>
+        )}
 
         {erro && <p className="text-xs text-out">{erro}</p>}
         <div className="flex justify-end gap-2">
