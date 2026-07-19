@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.test import TestCase
 
@@ -44,6 +45,42 @@ class PinAcessoModelTest(TestCase):
     def test_papel_default_e_aluno_rep(self):
         p = PinAcesso(turma=self.turma, pin="5555")
         self.assertEqual(p.papel, PinAcesso.ALUNO_REP)
+
+
+class PinAcessoCleanValidationTest(TestCase):
+    """Garante que o form do admin (/admin/core/pinacesso/) rejeite
+    combinações inválidas com um ValidationError amigável em vez de deixar
+    o IntegrityError da CheckConstraint estourar como erro 500."""
+
+    def setUp(self):
+        self.turma = Turma.objects.create(nome="Test Turma Clean", curso=Turma.DS, ano=1)
+
+    def test_aluno_rep_sem_turma_levanta_validation_error(self):
+        p = PinAcesso(papel=PinAcesso.ALUNO_REP, turma=None, pin="1111")
+        with self.assertRaises(ValidationError) as ctx:
+            p.clean()
+        self.assertIn(
+            "Representante de turma exige uma turma selecionada.",
+            ctx.exception.messages,
+        )
+        # full_clean() (chamado automaticamente pelo admin) também deve levantar
+        with self.assertRaises(ValidationError):
+            p.full_clean()
+
+    def test_cozinha_com_turma_levanta_validation_error(self):
+        p = PinAcesso(papel=PinAcesso.COZINHA, turma=self.turma, pin="2222")
+        with self.assertRaises(ValidationError) as ctx:
+            p.clean()
+        self.assertIn(
+            "PIN de cozinha não deve ter turma vinculada.",
+            ctx.exception.messages,
+        )
+        with self.assertRaises(ValidationError):
+            p.full_clean()
+
+    def test_combinacao_valida_nao_levanta_erro(self):
+        p = PinAcesso(papel=PinAcesso.ALUNO_REP, turma=self.turma, pin="3333")
+        p.full_clean()  # não deve levantar
 
 
 class SeedTurmasTest(TestCase):

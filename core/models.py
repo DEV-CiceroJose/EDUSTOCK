@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Q
@@ -333,3 +334,15 @@ class PinAcesso(models.Model):
     def __str__(self):
         alvo = self.turma.nome if self.turma else "Cozinha"
         return f"{alvo} — {self.pin}"
+
+    def clean(self):
+        super().clean()
+        if self.papel == self.ALUNO_REP and self.turma_id is None:
+            raise ValidationError(
+                "Representante de turma exige uma turma selecionada."
+            )
+        if self.papel == self.COZINHA and self.turma_id is not None:
+            raise ValidationError(
+                "PIN de cozinha não deve ter turma vinculada."
+            )
+

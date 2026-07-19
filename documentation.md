@@ -92,6 +92,7 @@ O **EduStock** é um sistema digital de gestão de estoque para escolas pública
 │  │  Categoria | Grupo | Produto | Fornecedor | BemPermanente    │  │
 │  │  Entrada | Movimentacao | Perfil                             │  │
 │  │  FrequenciaDiaria | FatorConsumo                             │  │
+│  │  Turma | PinAcesso  ← PINs de operação (geridos via /admin/) │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                              │                                      │
 │                       SQLite (db.sqlite3)                           │
@@ -248,16 +249,15 @@ cp .env.example .env          # Linux/Mac
 Editar `app-alunos/.env`:
 
 ```env
-# PINs das turmas no formato TURMA:PIN,TURMA:PIN,...
-VITE_PINS=6A:1001,6B:1002,7A:1003,7B:1004,8A:1005,8B:1006,9A:1007
-
-# Turno de cada turma (padrão MANHA se omitido)
-VITE_TURNOS=6A:MANHA,6B:MANHA,7A:MANHA,7B:TARDE,8A:TARDE,8B:TARDE,9A:INTEGRAL
+# URL base da API Django (vazio = usa proxy do Vite)
+VITE_API_BASE=
 ```
 
-> Os PINs no `.env` são usados para validação local (resposta imediata na UI).
-> A validação final é **sempre feita pelo backend** via `POST /api/operacao/auth/`.
-> Os PINs configurados em `settings.py` (`OPERACAO_PINS_ALUNOS`) precisam coincidir.
+> O app-alunos **não guarda PINs nem mapeamento de turma/turno localmente** —
+> nada disso é embutido no bundle JS. Todo PIN digitado é enviado direto para
+> `POST /api/operacao/auth/`; turma e turno da sessão vêm sempre da resposta
+> do backend. Os PINs de cada turma são cadastrados e consultados apenas via
+> Django Admin, em `/admin/core/turma/` (ver seção 4.5).
 
 ```bash
 npm run dev
@@ -280,11 +280,18 @@ cp .env.example .env          # Linux/Mac
 Editar `app-cozinha/.env`:
 
 ```env
-# PIN único da cozinha
-VITE_PIN_COZINHA=9999
+# URL base da API Django (vazio = usa proxy do Vite)
+VITE_API_BASE=
 ```
 
-> Precisa coincidir com `OPERACAO_PIN_COZINHA` em `settings.py`.
+> `VITE_PIN_COZINHA` **não é mais necessário** — deixe-o ausente/vazio. O app
+> envia o PIN digitado direto para `POST /api/operacao/auth/` e a validação
+> é sempre feita pelo backend contra `PinAcesso` (papel "Equipe da cozinha",
+> sem turma). Se a variável estiver definida, o `PinLogin.jsx` ainda faz uma
+> checagem local opcional antes de chamar o backend (só para reduzir a
+> latência percebida quando o PIN está claramente errado); ela nunca
+> substitui a validação do backend e não expõe PINs de turma alguma, já que
+> a cozinha tem um único PIN. O padrão recomendado é deixá-la sem definir.
 
 ```bash
 npm run dev
@@ -296,24 +303,23 @@ Disponível em **`http://localhost:5175`**.
 
 ### 4.5 Configurar os PINs no backend
 
-Em `easystock/settings.py`, ajuste as listas para corresponder ao `.env` de cada app:
+Os PINs **não ficam mais em `settings.py`**. Eles são registros no banco de
+dados (modelos `Turma` e `PinAcesso`, em `core/models.py`) e são geridos
+exclusivamente pelo Django Admin:
+
+1. Crie um superusuário (se ainda não tiver): `python manage.py createsuperuser`.
+2. Acesse `http://localhost:8000/admin/core/turma/`.
+   - Cada `Turma` (nome, curso, ano, turno) tem um inline de até 3 PINs
+     (`PinAcesso` com `papel=ALUNO_REP`) — os representantes daquela turma.
+3. Acesse `http://localhost:8000/admin/core/pinacesso/` para cadastrar PINs
+   avulsos, incluindo o(s) PIN(s) da cozinha (`papel=COZINHA`, sem turma
+   vinculada).
+4. O backend (`core/operacao_auth.py`) consulta `PinAcesso` diretamente a
+   cada tentativa de login — não há PIN nem mapeamento de turma
+   hardcoded em nenhum lugar do código ou do bundle JS dos apps.
 
 ```python
-# PINs das turmas (validados pelo backend no login)
-OPERACAO_PINS_ALUNOS = [
-    {"pin": "1001", "turma": "6A", "turno": "MANHA"},
-    {"pin": "1002", "turma": "6B", "turno": "MANHA"},
-    {"pin": "1003", "turma": "7A", "turno": "MANHA"},
-    {"pin": "1004", "turma": "7B", "turno": "TARDE"},
-    {"pin": "1005", "turma": "8A", "turno": "TARDE"},
-    {"pin": "1006", "turma": "8B", "turno": "TARDE"},
-    {"pin": "1007", "turma": "9A", "turno": "INTEGRAL"},
-]
-
-# PIN único da cozinha
-OPERACAO_PIN_COZINHA = "9999"
-
-# TTL dos tokens de sessão em horas (padrão 12h)
+# easystock/settings.py — ainda controla apenas o TTL das sessões de operação
 OPERACAO_TOKEN_TTL_HORAS = 12
 ```
 
@@ -411,6 +417,46 @@ Constraint única: (`data`, `turno`, `turma`) — bloqueia duplicatas com HTTP 4
 | `produto` | OneToOneField → Produto | PROTECT |
 | `gramas_por_aluno` | Decimal(6,2) | quantidade em gramas por aluno |
 | `ativo` | Boolean | padrão True |
+
+---
+
+#### Modelos de Autenticação por PIN
+
+Única fonte de verdade dos PINs de operação (`/api/operacao/auth/`). Geridos
+somente via Django Admin — nenhum PIN é hardcoded em `settings.py` nem
+embutido no bundle JS do `app-alunos`/`app-cozinha`.
+
+**`Turma`** — Turma da escola.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `nome` | CharField(50) | único, ex.: "1º DS-A" |
+| `curso` | choices | `DS` (Desenvolvimento de Sistemas), `TET` (Eletrotécnica) |
+| `ano` | PositiveSmallIntegerField | |
+| `turno` | choices | MANHA, TARDE, INTEGRAL (padrão INTEGRAL) |
+| `ativo` | Boolean | padrão True |
+
+No admin (`/admin/core/turma/`), cada `Turma` tem um inline de até 3
+`PinAcesso` (representantes daquela turma).
+
+**`PinAcesso`** — Um PIN de 4 dígitos e o papel que ele autentica.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `papel` | choices | `ALUNO_REP` (representante de turma) ou `COZINHA` |
+| `turma` | FK → Turma, null/blank | obrigatório para `ALUNO_REP`, deve ser nulo para `COZINHA` |
+| `pin` | CharField(4) | único, validado por regex `^\d{4}$` |
+| `titular` | CharField(100) | nome de quem escolheu o PIN, opcional |
+| `ativo` | Boolean | padrão True — PINs inativos são ignorados no login |
+
+Constraint (`turma_obrigatoria_apenas_para_aluno_rep`): `papel=ALUNO_REP`
+exige `turma` definida; `papel=COZINHA` exige `turma` nula. O model também
+implementa `clean()` para essa mesma regra, então o form do admin em
+`/admin/core/pinacesso/` (cadastro avulso, fora do inline de `Turma`) rejeita
+combinações inválidas com uma mensagem amigável em vez de um erro 500.
+
+PINs da cozinha são cadastrados diretamente em `/admin/core/pinacesso/` com
+`papel=COZINHA` e `turma` vazia.
 
 ---
 
@@ -522,11 +568,19 @@ Body:   { "data": "2026-06-07", "turno": "MANHA" }
 
 ### 5.4 Autenticação por PIN (`operacao_auth.py`)
 
-Sistema de tokens de sessão em memória (dict Python), sem dependência de banco de dados ou sessões Django.
+Os **PINs** são registros no banco (modelos `Turma`/`PinAcesso`, geridos via
+Django Admin — ver seção 4.5); os **tokens de sessão** gerados após o login
+é que ficam em um dict Python em memória, sem depender de sessões Django.
 
 **Fluxo:**
 1. `POST /api/operacao/auth/` com PIN + perfil.
-2. Backend valida o PIN contra `settings.OPERACAO_PINS_ALUNOS` ou `settings.OPERACAO_PIN_COZINHA`.
+2. Backend valida o PIN consultando `PinAcesso` no banco: para
+   `perfil=ALUNO_REP`, busca `PinAcesso.objects.filter(papel=ALUNO_REP, ativo=True)`
+   e resolve a `turma`/`turno` a partir do relacionamento `PinAcesso.turma`;
+   para `perfil=COZINHA`, verifica se existe um `PinAcesso` ativo com
+   `papel=COZINHA` e aquele PIN (sem turma). Nenhum PIN é hardcoded em
+   `settings.py` nem embutido no bundle JS de nenhum app — o servidor é a
+   única fonte de verdade.
 3. Gera um token UUID e armazena em `_SESSOES` com TTL.
 4. Retorna o token para o app, que o salva em `sessionStorage`.
 5. Cada request subsequente inclui `X-Operacao-Token: <token>`.
@@ -631,6 +685,9 @@ Retorna JSON agrupado por fornecedor e NF. Suporta dados legados (produtos com N
 | `0009` | Saldo inicial: movimentações de entrada para o saldo existente |
 | `0010` | Modelos `FrequenciaDiaria` e `FatorConsumo` (Módulo E) |
 | `0011` | Campo `registrado_por_turma` em `FrequenciaDiaria` |
+| `0012` | Ajuste de `registrado_por_turma` em `FrequenciaDiaria` |
+| `0013` | Modelos `Turma` e `PinAcesso` (substituem os PINs hardcoded em `settings.py`/`.env`) |
+| `0014` | Seed de dados: as 12 turmas reais da escola |
 
 ---
 
@@ -687,8 +744,10 @@ Aplicação React independente para representantes de turma. **Sem acesso a dado
 Abrir app → /login (PinLogin)
   └─ Digitar 4 dígitos
   └─ Auto-confirma ao completar
-  └─ Validação local (VITE_PINS) + POST /api/operacao/auth/
-  └─ Sessão salva em sessionStorage
+  └─ POST /api/operacao/auth/ { pin, perfil: "ALUNO_REP" }
+       (única validação — não há PIN nem turma copiados localmente)
+  └─ Sessão (token + turma + turno, vindos da resposta do backend)
+       salva em sessionStorage
 
 → /registrar (ContagemView)
   └─ Exibe turma e turno (somente leitura)
@@ -706,16 +765,18 @@ Abrir app → /login (PinLogin)
 |---|---|
 | `src/api.js` | `login()`, `logout()`, `getSessao()`, `registrarContagem()` |
 | `src/App.jsx` | Roteamento + guarda de rota (redireciona sem sessão) |
-| `src/PinLogin.jsx` | Teclado 4 dígitos, auto-confirma, lê `VITE_PINS` |
+| `src/PinLogin.jsx` | Teclado 4 dígitos, auto-confirma, envia direto ao backend |
 | `src/ContagemView.jsx` | Display numérico, teclado, estados: idle/loading/sucesso/erro |
 
 ### Variáveis de ambiente
 
 ```env
-VITE_PINS=6A:1001,6B:1002,...         # obrigatório
-VITE_TURNOS=6A:MANHA,7B:TARDE,...     # opcional (padrão MANHA)
 VITE_API_BASE=                        # vazio = usa proxy do Vite
 ```
+
+> Não há mais `VITE_PINS`/`VITE_TURNOS` — o app não guarda PIN nem
+> mapeamento de turma algum. PINs são geridos via Django Admin
+> (`/admin/core/turma/`, ver seção 4.5).
 
 ---
 
@@ -752,13 +813,13 @@ Abrir app → /login (PinLogin)
 |---|---|
 | `src/api.js` | `login()`, `logout()`, `isLoggedIn()`, `getPlano()`, `baixaProducao()` |
 | `src/App.jsx` | Roteamento + guarda de rota |
-| `src/PinLogin.jsx` | Teclado 4 dígitos, PIN único via `VITE_PIN_COZINHA` |
+| `src/PinLogin.jsx` | Teclado 4 dígitos, envia direto ao backend; `VITE_PIN_COZINHA` opcional só faz uma checagem local extra |
 | `src/ProducaoView.jsx` | Cabeçalho, cards, modal de confirmação, modal de resultado |
 
 ### Variáveis de ambiente
 
 ```env
-VITE_PIN_COZINHA=9999      # obrigatório
+VITE_PIN_COZINHA=          # opcional — deixe vazio; validação real é sempre no backend
 VITE_API_BASE=             # vazio = usa proxy do Vite
 ```
 
@@ -887,6 +948,7 @@ Para o Módulo E funcionar com dados reais, configure `FatorConsumo` para os pro
 | D — Relatórios | 2026-06-07 | Prestação de contas, exportação CSV/PDF |
 | E — Merenda | 2026-06-07 | FrequenciaDiaria, FatorConsumo, endpoints /operacao/*, autenticação PIN, app-alunos, app-cozinha, 104 testes |
 | Fix CSS | 2026-06-07 | `padding` shorthand sobrescrevia `pl-10` na barra de busca |
+| Turmas/PINs no banco | 2026-07-18 | Modelos `Turma`/`PinAcesso` substituem `OPERACAO_PINS_ALUNOS`/`OPERACAO_PIN_COZINHA` (settings.py) e `VITE_PINS`/`VITE_TURNOS`/`VITE_PIN_COZINHA` (env do app-alunos); corrige vazamento de PINs no bundle JS público — gestão passa a ser 100% via Django Admin |
 
 ---
 
@@ -938,11 +1000,12 @@ cd app-cozinha && npm run build
 | App | Variável | Padrão | Descrição |
 |---|---|---|---|
 | frontend | `VITE_USE_MOCK` | `true` | `false` para usar backend real |
-| app-alunos | `VITE_PINS` | — | `TURMA:PIN,...` obrigatório |
-| app-alunos | `VITE_TURNOS` | — | `TURMA:TURNO,...` opcional |
 | app-alunos | `VITE_API_BASE` | `""` | URL base da API (vazio = proxy Vite) |
-| app-cozinha | `VITE_PIN_COZINHA` | — | PIN único da cozinha, obrigatório |
+| app-cozinha | `VITE_PIN_COZINHA` | — | opcional, deixe vazio; checagem local extra apenas |
 | app-cozinha | `VITE_API_BASE` | `""` | URL base da API |
+
+> PINs não são mais variáveis de ambiente. São geridos via Django Admin
+> (modelos `Turma`/`PinAcesso`, seção 4.5/5.1).
 
 ### Configurações Django relevantes
 
@@ -954,9 +1017,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5175",  # app-cozinha
 ]
 
-# settings.py — PINs de operação
-OPERACAO_PINS_ALUNOS = [...]   # lista de { pin, turma, turno }
-OPERACAO_PIN_COZINHA = "9999"
+# settings.py — TTL das sessões de operação (PINs em si vivem no banco,
+# nos modelos Turma/PinAcesso — geridos via /admin/, não em settings.py)
 OPERACAO_TOKEN_TTL_HORAS = 12
 ```
 
@@ -973,4 +1035,4 @@ OPERACAO_TOKEN_TTL_HORAS = 12
 
 ---
 
-*Documentação atualizada em 07 de junho de 2026 — branches: `tudo-finalizado-mas-feio` (baseline) e `apps-merenda-e-alunosv1` (Módulo E).*
+*Documentação atualizada em 18 de julho de 2026 — branches: `tudo-finalizado-mas-feio` (baseline), `apps-merenda-e-alunosv1` (Módulo E) e `worktree-turmas-pins-preco` (PINs movidos para os modelos `Turma`/`PinAcesso`, geridos via Django Admin).*
