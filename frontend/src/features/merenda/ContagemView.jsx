@@ -10,7 +10,11 @@ const TURNOS = [
   { key: "INTEGRAL", label: "Integral" },
 ]
 
-const TURMAS_RAPIDAS = ["Total", "6A", "7B", "8C"]
+const TURMAS_RAPIDAS = [
+  "Total",
+  "1º DS-A", "1º DS-B", "2º DS-A", "2º DS-B", "3º DS-A", "3º DS-B",
+  "1º TET-A", "1º TET-B", "2º TET-A", "2º TET-B", "3º TET-A", "3º TET-B",
+]
 
 // Teclado numérico grande para uso em tablet/celular na hora da chamada
 function TecladoNumerico({ valor, onChange, onConfirm, disabled }) {
