@@ -13,6 +13,7 @@ import {
 import { gerarPdfPrestacaoContas } from "../../lib/prestacaoPdf"
 import { Icon } from "../../lib/icons.jsx"
 import { useToast } from "../../components/ui/Toast"
+import { getConfig } from "../../lib/config"
 
 const CHIPS = [
   { key: "mes", label: "Mês Atual" },
@@ -22,6 +23,7 @@ const CHIPS = [
 
 export default function RelatoriosView() {
   const toast = useToast()
+  const { mostrarPreco } = getConfig()
   const [preset, setPreset] = useState("mes")
   const [inicio, setInicio] = useState(periodoMesAtual().inicio)
   const [fim, setFim] = useState(isoHoje())
@@ -173,22 +175,24 @@ export default function RelatoriosView() {
 
       {!loading && dados && (
         <div className="mt-8 space-y-6">
-          <div className="card p-5">
-            <h3 className="font-display text-lg font-bold">Resumo financeiro</h3>
-            <p className="mt-1 text-sm text-ink-faint">
-              Total geral: <strong className="text-brand">{brl(dados.resumo_financeiro?.total_geral)}</strong>
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {(dados.resumo_financeiro?.por_categoria ?? []).map((c) => (
-                <span
-                  key={c.categoria_id}
-                  className="rounded-full bg-brand-tint px-3 py-1 text-sm font-semibold text-brand"
-                >
-                  {c.categoria_nome}: {brl(c.total)}
-                </span>
-              ))}
+          {mostrarPreco && (
+            <div className="card p-5">
+              <h3 className="font-display text-lg font-bold">Resumo financeiro</h3>
+              <p className="mt-1 text-sm text-ink-faint">
+                Total geral: <strong className="text-brand">{brl(dados.resumo_financeiro?.total_geral)}</strong>
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(dados.resumo_financeiro?.por_categoria ?? []).map((c) => (
+                  <span
+                    key={c.categoria_id}
+                    className="rounded-full bg-brand-tint px-3 py-1 text-sm font-semibold text-brand"
+                  >
+                    {c.categoria_nome}: {brl(c.total)}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {(dados.fornecedores ?? []).length === 0 && (
             <div className="grid place-items-center rounded-2xl border border-dashed border-line py-16 text-center">
@@ -205,9 +209,11 @@ export default function RelatoriosView() {
                   <h3 className="font-display text-lg font-bold">{f.fornecedor_nome}</h3>
                   {f.documento && <p className="text-sm text-ink-faint">{f.documento}</p>}
                 </div>
-                <span className="font-display text-xl font-bold text-brand">
-                  {brl(f.total_fornecedor)}
-                </span>
+                {mostrarPreco && (
+                  <span className="font-display text-xl font-bold text-brand">
+                    {brl(f.total_fornecedor)}
+                  </span>
+                )}
               </div>
 
               <div className="mt-4 space-y-4">
@@ -218,7 +224,9 @@ export default function RelatoriosView() {
                         NF {doc.numero_nota_fiscal || "—"}
                       </span>
                       <span className="text-sm text-ink-faint">{dataBR(doc.data)}</span>
-                      <span className="font-semibold text-brand">{brl(doc.total)}</span>
+                      {mostrarPreco && (
+                        <span className="font-semibold text-brand">{brl(doc.total)}</span>
+                      )}
                       {doc.legado && (
                         <span className="rounded-full bg-low-tint px-2 py-0.5 text-[0.66rem] font-bold uppercase text-low">
                           Legado
@@ -231,8 +239,12 @@ export default function RelatoriosView() {
                           <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-faint">
                             <th className="py-2 pr-3">Produto</th>
                             <th className="py-2 pr-3">Qtd</th>
-                            <th className="py-2 pr-3">Preço</th>
-                            <th className="py-2">Subtotal</th>
+                            {mostrarPreco && (
+                              <>
+                                <th className="py-2 pr-3">Preço</th>
+                                <th className="py-2">Subtotal</th>
+                              </>
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -247,8 +259,12 @@ export default function RelatoriosView() {
                                 )}
                               </td>
                               <td className="py-2 pr-3">{it.quantidade}</td>
-                              <td className="py-2 pr-3">{it.preco_unitario ? brl(it.preco_unitario) : "—"}</td>
-                              <td className="py-2">{brl(it.subtotal)}</td>
+                              {mostrarPreco && (
+                                <>
+                                  <td className="py-2 pr-3">{it.preco_unitario ? brl(it.preco_unitario) : "—"}</td>
+                                  <td className="py-2">{brl(it.subtotal)}</td>
+                                </>
+                              )}
                             </tr>
                           ))}
                         </tbody>

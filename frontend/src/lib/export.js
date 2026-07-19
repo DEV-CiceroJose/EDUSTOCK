@@ -1,4 +1,5 @@
 import { dataBR } from "./format"
+import { getConfig } from "./config"
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -51,31 +52,32 @@ export function toCsv(rows, sep = ";") {
 }
 
 export function prestacaoContasToCsv(dados) {
-  const header = [
-    "Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd",
-    "Preço Unit.", "Subtotal", "Categoria", "Legado",
-  ]
+  const { mostrarPreco } = getConfig()
+  const header = mostrarPreco
+    ? ["Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd", "Preço Unit.", "Subtotal", "Categoria", "Legado"]
+    : ["Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd", "Categoria", "Legado"]
   const rows = [header]
   for (const f of dados.fornecedores ?? []) {
     for (const doc of f.documentos ?? []) {
       for (const it of doc.itens ?? []) {
-        rows.push([
+        const linha = [
           f.fornecedor_nome,
           f.documento || "",
           doc.numero_nota_fiscal || it.numero_nota_fiscal_legado || "",
           dataBR(doc.data),
           it.produto_nome,
           it.quantidade,
-          it.preco_unitario ?? "",
-          it.subtotal,
-          "",
-          doc.legado ? "Sim" : "Não",
-        ])
+        ]
+        if (mostrarPreco) linha.push(it.preco_unitario ?? "", it.subtotal)
+        linha.push("", doc.legado ? "Sim" : "Não")
+        rows.push(linha)
       }
     }
   }
-  for (const c of dados.resumo_financeiro?.por_categoria ?? []) {
-    rows.push(["", "", "", "", "", "", "", c.total, c.categoria_nome, "Resumo"])
+  if (mostrarPreco) {
+    for (const c of dados.resumo_financeiro?.por_categoria ?? []) {
+      rows.push(["", "", "", "", "", "", "", c.total, c.categoria_nome, "Resumo"])
+    }
   }
   return "\uFEFF" + toCsv(rows)
 }
