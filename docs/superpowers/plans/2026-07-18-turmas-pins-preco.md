@@ -14,7 +14,7 @@
 - `PinAcesso.pin` é único globalmente (não só por papel/turma).
 - `Turma`/`PinAcesso` não são expostos via API REST — gestão só pelo Django Admin.
 - As 12 turmas (todas `turno=INTEGRAL`): 1º/2º/3º DS-A/B, 1º/2º/3º TET-A/B — nomes exatos: `"1º DS-A"`, `"1º DS-B"`, `"2º DS-A"`, `"2º DS-B"`, `"3º DS-A"`, `"3º DS-B"`, `"1º TET-A"`, `"1º TET-B"`, `"2º TET-A"`, `"2º TET-B"`, `"3º TET-A"`, `"3º TET-B"`.
-- `app-alunos` não tem infraestrutura de teste automatizado hoje (só `vite`/`react`/`react-router-dom` em `package.json`) — mudanças lá são verificadas manualmente (rodando o dev server), não por Vitest. Adicionar essa infraestrutura é escopo de outro plano já existente (`docs/superpowers/plans/2026-07-17-redesign-apps-pin.md`), não deste.
+- `app-alunos` e `app-cozinha` já têm Vitest + Testing Library configurados (mergeados via PR #5 do plano `docs/superpowers/plans/2026-07-17-redesign-apps-pin.md`, que também adicionou ícones `lucide-react`, logout por inatividade e retry-safety em `api.js`) — confirme sempre o estado **atual** desses arquivos antes de aplicar qualquer diff deste plano, pois foram escritos após sincronizar com esse merge, mas podem ter mudado de novo desde então.
 - `frontend/` já tem Vitest + Testing Library configurados — toda mudança lá ganha teste automatizado.
 - `useDashboardData.js` calcula um `resumo.valor` (valor total em estoque) que **não é consumido em nenhuma página** (confirmado por busca em todo `frontend/src`) — não faz parte deste plano; gating nele seria trabalho sem efeito observável.
 
@@ -568,18 +568,114 @@ git commit -m "chore: remove PINs fixos de settings.py (substituidos por PinAces
 
 ### Task 6: `app-alunos` — remover mapeamento local de PIN
 
+> **Nota:** esta task foi escrita depois de sincronizar a branch local com
+> `origin/main` (PR #5, já mergeado), que reformulou `PinLogin.jsx`/`api.js`
+> com ícones `lucide-react`, retry-safety e testes Vitest. As mudanças
+> abaixo partem **desse** código atual, não da versão antiga sem ícones —
+> confira o estado real de cada arquivo antes de aplicar o diff caso ele já
+> tenha mudado de novo.
+
 **Files:**
 - Modify: `app-alunos/src/PinLogin.jsx`
-- Modify: `app-alunos/src/api.js:41-61`
+- Modify: `app-alunos/src/api.js`
+- Modify: `app-alunos/src/PinLogin.test.jsx`
+- Modify: `app-alunos/src/api.test.js`
 - Modify: `app-alunos/.env.example`
 
 **Interfaces:**
 - Consumes: `POST /api/operacao/auth/` (já existe, inalterado — Task 4 só mudou a fonte de dados no backend).
 - Produces: `login(pin)` — nova assinatura sem `turma`/`turno`.
 
-- [ ] **Step 1: Simplificar `api.js`**
+- [ ] **Step 1: Atualizar os testes existentes (falhando após a Step 3)**
 
-Modify `app-alunos/src/api.js` — substituir as linhas 41-61 (função `login`) por:
+Modify `app-alunos/src/PinLogin.test.jsx` — remover os `vi.stubEnv` (linhas 13-14) e o `afterEach` de `vi.unstubAllEnvs()` (linha 17-19, já não há env para desfazer, mas mantenha o `afterEach` vazio é desnecessário — remova o bloco todo), e trocar o segundo teste para refletir a nova assinatura de `login`:
+
+```jsx
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+
+vi.mock('./api.js', () => ({
+  login: vi.fn(),
+}))
+
+describe('PinLogin (app-alunos)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+  })
+
+  it('mostra o ícone School no cabeçalho, sem emoji', async () => {
+    const { default: PinLogin } = await import('./PinLogin.jsx')
+
+    render(
+      <MemoryRouter>
+        <PinLogin />
+      </MemoryRouter>
+    )
+
+    expect(screen.getByTestId('icone-cabecalho')).toBeInTheDocument()
+    expect(screen.queryByText('🏫')).not.toBeInTheDocument()
+  })
+
+  it('chama login apenas com o PIN ao completar os 4 dígitos', async () => {
+    const { login } = await import('./api.js')
+    login.mockResolvedValue({ token: 'abc', turma: '1º DS-A', turno: 'INTEGRAL' })
+    const { default: PinLogin } = await import('./PinLogin.jsx')
+
+    render(
+      <MemoryRouter>
+        <PinLogin />
+      </MemoryRouter>
+    )
+
+    ;['1', '2', '3', '4'].forEach((digito) => {
+      fireEvent.click(screen.getByRole('button', { name: digito }))
+    })
+
+    expect(login).toHaveBeenCalledWith('1234')
+  })
+
+  it('mostra erro do backend sem travar a interface quando o PIN não é reconhecido', async () => {
+    const { login } = await import('./api.js')
+    login.mockRejectedValue(new Error('PIN inválido.'))
+    const { default: PinLogin } = await import('./PinLogin.jsx')
+
+    render(
+      <MemoryRouter>
+        <PinLogin />
+      </MemoryRouter>
+    )
+
+    ;['0', '0', '0', '0'].forEach((digito) => {
+      fireEvent.click(screen.getByRole('button', { name: digito }))
+    })
+
+    expect(await screen.findByText('PIN inválido.')).toBeInTheDocument()
+  })
+})
+```
+
+Modify `app-alunos/src/api.test.js` linha 39 — trocar a chamada de `login` para a nova assinatura:
+
+```js
+  it('login NUNCA tenta de novo depois de uma falha de rede', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    global.fetch = fetchMock
+
+    await expect(login('1234')).rejects.toThrow('Failed to fetch')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+```
+
+- [ ] **Step 2: Rodar os testes para confirmar que falham**
+
+Run: `cd app-alunos && npm test`
+Expected: `FAIL` em `PinLogin.test.jsx` (o componente ainda chama `login(pinVal, entrada.turma, entrada.turno)` e só quando o PIN está no mapa local) e em `api.test.js` (assinatura de `login` ainda aceita `turma`/`turno`).
+
+- [ ] **Step 3: Simplificar `api.js`**
+
+Modify `app-alunos/src/api.js` — substituir a função `login` (linhas 70-89 no arquivo atual) por:
 
 ```js
 /**
@@ -603,37 +699,24 @@ export async function login(pin) {
 }
 ```
 
-Atualizar também o comentário do cabeçalho do arquivo (linha 8, `"Nenhuma função aqui expõe preços..."`) — sem mudança de conteúdo necessária, só confirme que ainda reflete a realidade (reflete).
+Note que `login` continua sem passar `{ retry: true }` para `req()` — preserva a garantia testada em `api.test.js` ("login NUNCA tenta de novo").
 
-- [ ] **Step 2: Reescrever `PinLogin.jsx` sem o mapeamento local**
+- [ ] **Step 4: Remover o mapeamento local em `PinLogin.jsx`, preservando ícones e layout atuais**
 
-Replace `app-alunos/src/PinLogin.jsx` inteiro por:
+Modify `app-alunos/src/PinLogin.jsx` — remover as linhas 6-38 (comentário `/** Lê o mapa de PINs... */`, `carregarMapaPins()`, `const MAPA_PINS = ...`, `const TURNO_LABEL = ...`) — o arquivo passa a começar assim:
 
 ```jsx
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { School, Delete } from 'lucide-react'
 import { login } from './api.js'
 
 export default function PinLogin() {
-  const [pin, setPin] = useState('')
-  const [erro, setErro] = useState('')
-  const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
+```
 
-  const pressKey = useCallback((val) => {
-    setErro('')
-    if (val === 'back') {
-      setPin((p) => p.slice(0, -1))
-    } else if (pin.length < 4) {
-      const novoPin = pin + val
-      setPin(novoPin)
-      // Auto-confirma quando completa 4 dígitos
-      if (novoPin.length === 4) {
-        confirmar(novoPin)
-      }
-    }
-  }, [pin]) // eslint-disable-line
+Modify a função `confirmar` (linhas 59-78 no arquivo atual) — remove o gate local:
 
+```jsx
   async function confirmar(pinVal = pin) {
     if (pinVal.length !== 4) return
 
@@ -648,110 +731,22 @@ export default function PinLogin() {
       setLoading(false)
     }
   }
+```
 
-  const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back']
+Modify o final do JSX (linhas 125-134 no arquivo atual) — remove o rodapé de pré-visualização "Turma X — turno" (dependia do `MAPA_PINS` que não existe mais); o bloco de loading é o último elemento do componente:
 
-  return (
-    <div
-      className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
-      style={{ maxWidth: 420, margin: '0 auto' }}
-    >
-      {/* Cabeçalho */}
-      <div className="mb-8 text-center">
-        <div
-          className="mx-auto mb-4 grid place-items-center rounded-3xl"
-          style={{
-            width: 72, height: 72,
-            background: 'var(--color-brand)',
-            color: '#fff',
-            fontSize: '2rem',
-          }}
-        >
-          🏫
-        </div>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>
-          Frequência
-        </h1>
-        <p style={{ color: 'var(--color-ink-soft)', marginTop: 6, fontSize: '1rem' }}>
-          Digite o PIN da sua turma
-        </p>
-      </div>
-
-      {/* Indicadores de dígito */}
-      <div className="mb-6 flex items-center justify-center">
-        {[0, 1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className={`pin-dot${i < pin.length ? ' filled' : ''}`}
-          />
-        ))}
-      </div>
-
-      {/* Mensagem de erro */}
-      {erro && (
-        <div
-          className="mb-4 w-full rounded-2xl px-4 py-3 text-center"
-          style={{
-            background: 'var(--color-err-tint)',
-            color: 'var(--color-err)',
-            fontWeight: 600,
-            fontSize: '0.95rem',
-          }}
-        >
-          {erro}
-        </div>
-      )}
-
-      {/* Teclado numérico */}
-      <div
-        className="grid w-full gap-3"
-        style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
-      >
-        {teclas.map((t, i) => {
-          if (t === '') return <div key={i} />
-          if (t === 'back') {
-            return (
-              <button
-                key="back"
-                onClick={() => pressKey('back')}
-                className="numkey numkey-back"
-                aria-label="Apagar"
-                disabled={loading}
-              >
-                ⌫
-              </button>
-            )
-          }
-          return (
-            <button
-              key={t}
-              onClick={() => pressKey(t)}
-              className="numkey"
-              disabled={loading || pin.length >= 4}
-            >
-              {t}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Estado de loading */}
+```jsx
       {loading && (
-        <p
-          className="mt-6 text-center"
-          style={{ color: 'var(--color-ink-soft)', fontSize: '0.95rem' }}
-        >
-          Verificando…
-        </p>
+        <p className="mt-6 text-center text-[0.95rem] text-ink-soft">Verificando…</p>
       )}
     </div>
   )
 }
 ```
 
-Mudanças em relação ao original: removidas as funções `carregarMapaPins()`/`MAPA_PINS`/`TURNO_LABEL`, o early-return de "PIN inválido" antes de chamar o servidor, e o rodapé de pré-visualização "Turma X — turno" (dependia do mapeamento local que não existe mais). `confirmar()` agora sempre chama `login()`.
+Ícones (`School`, `Delete`), classes Tailwind e `data-testid="icone-cabecalho"` **não mudam** — são do redesign já mergeado e não fazem parte desta task.
 
-- [ ] **Step 3: Atualizar `.env.example`**
+- [ ] **Step 5: Atualizar `.env.example`**
 
 Modify `app-alunos/.env.example` — substituir todo o conteúdo por:
 
@@ -766,18 +761,23 @@ VITE_API_BASE=
 # Acesse /admin/core/turma/ para cadastrar/consultar os PINs.
 ```
 
-- [ ] **Step 4: Verificar manualmente**
+- [ ] **Step 6: Rodar os testes**
+
+Run: `cd app-alunos && npm test`
+Expected: `PASS` em todos os arquivos.
+
+- [ ] **Step 7: Verificar manualmente**
 
 Run: `cd app-alunos && npm run dev` (deixe rodando; garanta que o backend Django também está rodando e que já existe pelo menos um `PinAcesso` cadastrado — use o admin ou o shell: `python manage.py shell -c "from core.models import Turma, PinAcesso; t = Turma.objects.first(); PinAcesso.objects.get_or_create(turma=t, pin='1234')"`)
 
-No navegador, acesse `http://localhost:5174`, digite `1234` (ou o PIN cadastrado) e confirme que navega para `/registrar`. Digite um PIN não cadastrado (ex.: `0000`) e confirme que aparece "PIN inválido. Tente novamente." sem travar a interface.
+No navegador, acesse `http://localhost:5174`, digite `1234` (ou o PIN cadastrado) e confirme que navega para `/registrar`. Digite um PIN não cadastrado (ex.: `0000`) e confirme que aparece a mensagem de erro do backend sem travar a interface.
 
 Expected: login com PIN válido navega para `/registrar`; PIN inválido mostra erro e permite nova tentativa.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add app-alunos/src/PinLogin.jsx app-alunos/src/api.js app-alunos/.env.example
+git add app-alunos/src/PinLogin.jsx app-alunos/src/api.js app-alunos/src/PinLogin.test.jsx app-alunos/src/api.test.js app-alunos/.env.example
 git commit -m "feat(app-alunos): remove mapeamento local de PIN, valida sempre no backend"
 ```
 
