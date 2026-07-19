@@ -131,26 +131,15 @@ npm install
 
 # Criar arquivo .env
 cp .env.example .env
-# Edite o .env com os PINs das turmas
 
 npm run dev
 ```
 
 App Alunos rodando em: http://localhost:5174/
 
-## 🔐 Credenciais Padrão
+## 🔐 Gestão de PINs
 
-### PINs do App Alunos
-- **1001** - Turma 6A (Manhã)
-- **1002** - Turma 6B (Manhã)
-- **1003** - Turma 7A (Manhã)
-- **1004** - Turma 7B (Tarde)
-- **1005** - Turma 8A (Tarde)
-- **1006** - Turma 8B (Tarde)
-- **1007** - Turma 9A (Integral)
-
-### PIN do App Cozinha
-- **9999** - Acesso da cozinha
+Os PINs de acesso (turmas e equipe da cozinha) **não ficam mais em arquivos `.env`** — são cadastrados pelo Django Admin, em `/admin/core/turma/` (PINs de representantes de turma, 3 por turma) e `/admin/core/pinacesso/` (PINs da equipe da cozinha). Veja `docs/superpowers/specs/2026-07-18-turmas-pins-preco-design.md` para o desenho completo.
 
 ## 🚀 Deploy na Render
 

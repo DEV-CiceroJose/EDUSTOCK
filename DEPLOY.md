@@ -140,8 +140,6 @@ URL: `https://edustock-cozinha.onrender.com`
 3. **Environment Variables**:
    ```
    VITE_API_BASE = https://edustock-backend.onrender.com
-   VITE_PINS = 6A:1001,6B:1002,7A:1003,7B:1004,8A:1005,8B:1006,9A:1007
-   VITE_TURNOS = 6A:MANHA,6B:MANHA,7A:MANHA,7B:TARDE,8A:TARDE,8B:TARDE,9A:INTEGRAL
    ```
 
 4. Clique em **"Create Static Site"**
@@ -177,8 +175,8 @@ O código já está preparado para adicionar os domínios automaticamente.
 Acesse cada URL e teste:
 
 - **Admin**: https://edustock-frontend.onrender.com
-- **Cozinha**: https://edustock-cozinha.onrender.com (PIN: 9999)
-- **Alunos**: https://edustock-alunos.onrender.com (PINs: 1001-1007)
+- **Cozinha**: https://edustock-cozinha.onrender.com (PIN cadastrado no Django Admin)
+- **Alunos**: https://edustock-alunos.onrender.com (PIN cadastrado no Django Admin, por turma)
 - **Admin Django**: https://edustock-backend.onrender.com/admin
 
 ## ⚡ Plano Gratuito da Render
