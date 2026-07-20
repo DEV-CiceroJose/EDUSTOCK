@@ -194,3 +194,8 @@ CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
 
 # Tempo de vida dos tokens de sessão em horas (padrão 12h)
 OPERACAO_TOKEN_TTL_HORAS = 12
+
+# ------------------------------------------------------------------
+# Autenticação da plataforma (dashboard admin)
+# ------------------------------------------------------------------
+LOGIN_TOKEN_TTL_HORAS = int(os.environ.get('LOGIN_TOKEN_TTL_HORAS', 12))
