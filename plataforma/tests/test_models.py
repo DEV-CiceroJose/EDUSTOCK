@@ -9,12 +9,12 @@ from plataforma.models import Modulo, Perfil, TokenAcesso
 
 class ModuloModelTest(TestCase):
     def test_str_retorna_nome(self):
-        m = Modulo.objects.create(slug="inventario", nome="Inventário")
-        self.assertEqual(str(m), "Inventário")
+        m = Modulo.objects.create(slug="custom_modulo", nome="Módulo Customizado")
+        self.assertEqual(str(m), "Módulo Customizado")
 
     def test_depende_de_permite_autorreferencia(self):
-        base = Modulo.objects.create(slug="inventario", nome="Inventário")
-        dependente = Modulo.objects.create(slug="merenda", nome="Merenda", depende_de=base)
+        base = Modulo.objects.create(slug="base_modulo", nome="Módulo Base")
+        dependente = Modulo.objects.create(slug="dep_modulo", nome="Módulo Dependente", depende_de=base)
         self.assertEqual(dependente.depende_de, base)
         self.assertIn(dependente, base.dependentes.all())
 
