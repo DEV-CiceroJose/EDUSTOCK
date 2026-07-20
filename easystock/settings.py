@@ -178,6 +178,13 @@ if RENDER_EXTERNAL_HOSTNAME:
 
 CORS_ALLOW_CREDENTIALS = True
 
+# Origens confiáveis para o Origin-check de CSRF do Django (Django 4+).
+# Sem isso, qualquer POST vindo dos apps React via proxy do Vite (ex.:
+# login por PIN em /api/operacao/auth/) recebe 403 "CSRF Failed: Origin
+# checking failed", mesmo com CORS liberado — CORS e CSRF são checagens
+# independentes. Mesma lista de origens que CORS_ALLOWED_ORIGINS.
+CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
+
 # ------------------------------------------------------------------
 # Módulo de Operação da Merenda
 # ------------------------------------------------------------------
