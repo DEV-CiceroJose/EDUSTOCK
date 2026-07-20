@@ -3,7 +3,9 @@ from datetime import datetime
 from rest_framework import viewsets, filters, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
+from plataforma.permissions import RequerModuloAtivo
 from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
 from .serializers import (
     ProdutoSerializer, CategoriaSerializer, GrupoSerializer,
@@ -25,6 +27,8 @@ def _parse_date_param(value, label):
 
 
 class AlertasView(APIView):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("alertas")]
+
     def get(self, request):
         tipo = request.query_params.get("tipo")
         urgencia = request.query_params.get("urgencia")
@@ -36,6 +40,8 @@ class AlertasView(APIView):
 
 
 class PrestacaoContasView(APIView):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("relatorios")]
+
     def get(self, request):
         inicio, err = _parse_date_param(request.query_params.get("inicio"), "inicio")
         if err:
@@ -52,11 +58,13 @@ class PrestacaoContasView(APIView):
 
 
 class CategoriaViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
     queryset = Categoria.objects.all().order_by("name")
     serializer_class = CategoriaSerializer
 
 
 class ProdutoViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
     serializer_class = ProdutoSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["nome"]
@@ -86,11 +94,13 @@ class ProdutoViewSet(viewsets.ModelViewSet):
 
 
 class GrupoViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
     queryset = Grupo.objects.select_related("categoria").all()
     serializer_class = GrupoSerializer
 
 
 class BemPermanenteViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
     queryset = BemPermanente.objects.all()
     serializer_class = BemPermanenteSerializer
 
@@ -104,6 +114,7 @@ class BemPermanenteViewSet(viewsets.ModelViewSet):
 
 
 class FornecedorViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("fornecedores")]
     serializer_class = FornecedorSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["nome", "documento"]
@@ -126,6 +137,7 @@ class FornecedorViewSet(viewsets.ModelViewSet):
 
 
 class MovimentacaoViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("movimentacoes")]
     serializer_class = MovimentacaoSerializer
     http_method_names = ["get", "post", "head", "options"]  # append-only
 
@@ -160,6 +172,7 @@ class MovimentacaoViewSet(viewsets.ModelViewSet):
 
 
 class EntradaViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("movimentacoes")]
     serializer_class = EntradaSerializer
     http_method_names = ["get", "post", "head", "options"]  # append-only
 

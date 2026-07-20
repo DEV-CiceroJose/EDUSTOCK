@@ -149,9 +149,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ------------------------------------------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": None,
-    # Em produção troque para IsAuthenticated e configure auth de sessão/token
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "plataforma.authentication.TokenAcessoAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
     ],
 }
 
