@@ -11,8 +11,7 @@ const STORAGE_KEY = "edustock:config";
 export const DEFAULT_CONFIG = {
   useMock: false,
   validityAlertDays: 30,
-  cardDensity: "confortavel",
-  mostrarPreco: false
+  cardDensity: "confortavel"
 };
 
 /**
@@ -47,11 +46,6 @@ function isValidConfig(config) {
   // Validate cardDensity
   if (config.cardDensity !== undefined &&
       !VALID_CARD_DENSITIES.includes(config.cardDensity)) {
-    return false;
-  }
-
-  // Validate mostrarPreco
-  if (config.mostrarPreco !== undefined && typeof config.mostrarPreco !== "boolean") {
     return false;
   }
 

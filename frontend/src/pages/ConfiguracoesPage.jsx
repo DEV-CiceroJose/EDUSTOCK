@@ -32,11 +32,6 @@ export default function ConfiguracoesPage() {
     window.location.reload()
   }
 
-  const handlePrecoToggle = () => {
-    updateConfig({ mostrarPreco: !config.mostrarPreco })
-    window.location.reload()
-  }
-
   const handleValidityDaysChange = (e) => {
     const value = parseInt(e.target.value, 10)
     // Validate positive integer
@@ -88,41 +83,6 @@ export default function ConfiguracoesPage() {
               <span
                 className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-[#f4f1e7] shadow ring-0 transition duration-200 ease-in-out ${
                   config.useMock ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-        </section>
-
-        {/* Exibição de Custos Section */}
-        <section className="rounded-2xl border border-line bg-surface p-6">
-          <div className="mb-4">
-            <h2 className="font-display text-lg font-bold leading-tight">Exibição de Custos</h2>
-            <p className="mt-1 text-sm text-ink-faint">
-              Controla se preço/custo aparece nos cadastros, formulários e relatórios
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <label htmlFor="preco-toggle" className="font-medium">
-                Mostrar preços e custos
-              </label>
-              <p className="text-sm text-ink-faint">A página será recarregada após alternar</p>
-            </div>
-            <button
-              id="preco-toggle"
-              type="button"
-              role="switch"
-              aria-checked={config.mostrarPreco}
-              onClick={handlePrecoToggle}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${
-                config.mostrarPreco ? "bg-brand" : "bg-line"
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-[#f4f1e7] shadow ring-0 transition duration-200 ease-in-out ${
-                  config.mostrarPreco ? "translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>

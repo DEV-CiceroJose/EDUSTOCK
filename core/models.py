@@ -6,14 +6,6 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 
-class Perfil(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    matricula = models.CharField(max_length=50, unique=True)
-
-    def __str__(self):
-        return f"{self.user.username} - {self.matricula}"
-
-
 class Categoria(models.Model):
     name = models.CharField(max_length=100, unique=True)
 

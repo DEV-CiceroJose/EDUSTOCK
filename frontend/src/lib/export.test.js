@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import { prestacaoContasToCsv } from "./export"
-import * as config from "./config"
+import * as auth from "./auth"
 
 const DADOS = {
   fornecedores: [{
@@ -15,14 +15,14 @@ const DADOS = {
 
 describe("prestacaoContasToCsv — colunas de preço", () => {
   it("omite cabeçalho e valores de preço quando mostrarPreco é false", () => {
-    vi.spyOn(config, "getConfig").mockReturnValue({ mostrarPreco: false })
+    vi.spyOn(auth, "getModulosAtivos").mockReturnValue([])
     const csv = prestacaoContasToCsv(DADOS)
     expect(csv).not.toContain("Preço Unit.")
     expect(csv).not.toContain("10.00")
   })
 
   it("inclui cabeçalho e valores de preço quando mostrarPreco é true", () => {
-    vi.spyOn(config, "getConfig").mockReturnValue({ mostrarPreco: true })
+    vi.spyOn(auth, "getModulosAtivos").mockReturnValue(["financeiro"])
     const csv = prestacaoContasToCsv(DADOS)
     expect(csv).toContain("Preço Unit.")
     expect(csv).toContain("10.00")

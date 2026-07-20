@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
-from rest_framework.test import APITestCase
 
 from core.alerts import (
     CRITICO_DIAS,
@@ -13,6 +12,7 @@ from core.alerts import (
     urgencia_validade,
 )
 from core.models import Categoria, Grupo, Produto
+from core.tests.utils import AutenticadoAPITestCase
 
 
 class AlertHelpersTest(TestCase):
@@ -138,8 +138,9 @@ class ColetarAlertasTest(TestCase):
         self.assertEqual(result["resumo"]["total_estoque_critico"], 1)
 
 
-class AlertasApiTest(APITestCase):
+class AlertasApiTest(AutenticadoAPITestCase):
     def setUp(self):
+        super().setUp()
         self.hoje = timezone.localdate()
         cat = Categoria.objects.create(name="Alimentos")
         grupo = Grupo.objects.create(nome="Geral", categoria=cat)

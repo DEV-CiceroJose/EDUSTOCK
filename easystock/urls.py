@@ -23,6 +23,9 @@ from core import views
 urlpatterns = [
     path("admin/", admin.site.urls),
 
+    # 🔐 Autenticação e módulos da plataforma
+    path("api/", include("plataforma.urls")),
+
     # 🔌 API REST (consumida pelo frontend React)
     path("api/", include("core.api_urls")),
 

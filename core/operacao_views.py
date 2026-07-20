@@ -5,6 +5,9 @@ from django.db.models import Sum
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+
+from plataforma.permissions import RequerModuloAtivo
 
 from .models import FrequenciaDiaria
 from .operacao import baixa_de_producao, gerar_plano_do_dia
@@ -48,6 +51,15 @@ class OperacaoLoginView(APIView):
     chamar, mas só PINs válidos geram um token de sessão.
     """
 
+    # Sem isso, o DRF aplica SessionAuthentication por padrão e passa a
+    # exigir CSRF sempre que o navegador tiver um cookie de sessão do
+    # Django Admin (mesmo em outra aba/porta — cookies não são isolados
+    # por porta em "localhost"), quebrando o login por PIN com
+    # "CSRF Failed: CSRF token missing." Este módulo usa só o esquema de
+    # token próprio (X-Operacao-Token), nunca sessão/cookie do Django.
+    authentication_classes = []
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
+
     def post(self, request):
         pin = str(request.data.get("pin", "")).strip()
         perfil = str(request.data.get("perfil", "")).strip().upper()
@@ -81,6 +93,9 @@ class OperacaoLoginView(APIView):
 class OperacaoLogoutView(APIView):
     """DELETE /api/operacao/auth/ — invalida o token."""
 
+    authentication_classes = []  # ver comentário em OperacaoLoginView
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
+
     def delete(self, request):
         token = request.headers.get("X-Operacao-Token", "").strip()
         if token:
@@ -99,6 +114,9 @@ class ContagemView(APIView):
 
     Autenticação: header X-Operacao-Token (rejeita tokens de admin Django).
     """
+
+    authentication_classes = []  # ver comentário em OperacaoLoginView
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
 
     @requer_perfil_operacao(PERFIL_ALUNO)
     def post(self, request):
@@ -194,6 +212,9 @@ class ContagemView(APIView):
 # --------------------------------------------------------------------------
 
 class ResumoFrequenciaView(APIView):
+    authentication_classes = []  # ver comentário em OperacaoLoginView
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
+
     def get(self, request):
         data, err = _parse_date(request.query_params.get("data"), default_today=True)
         if err:
@@ -206,6 +227,8 @@ class ResumoFrequenciaView(APIView):
 # --------------------------------------------------------------------------
 
 class PlanoDoDiaView(APIView):
+    authentication_classes = []  # ver comentário em OperacaoLoginView
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
 
     @requer_perfil_operacao(PERFIL_COZINHA)
     def get(self, request):
@@ -226,6 +249,8 @@ class PlanoDoDiaView(APIView):
 # --------------------------------------------------------------------------
 
 class BaixaProducaoView(APIView):
+    authentication_classes = []  # ver comentário em OperacaoLoginView
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
 
     @requer_perfil_operacao(PERFIL_COZINHA)
     def post(self, request):

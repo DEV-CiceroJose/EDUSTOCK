@@ -148,17 +148,37 @@ URL: `https://edustock-alunos.onrender.com`
 
 ## 🔧 Configurações Pós-Deploy
 
-### 1. Criar Superusuário Django
+### 1. Criar os Acessos Administrativos
 
-Após o backend estar rodando, acesse o **Shell** do serviço:
+Após o backend estar rodando, acesse o **Shell** do serviço (no Dashboard da
+Render, entre no serviço `edustock-backend` → **"Shell"** no menu lateral).
 
-1. No Dashboard da Render, entre no serviço `edustock-backend`
-2. Clique em **"Shell"** no menu lateral
-3. Execute:
-   ```bash
-   python manage.py createsuperuser
-   ```
-4. Siga as instruções para criar o admin
+São **dois** acessos distintos, para duas finalidades diferentes — crie os dois:
+
+**a) Admin do painel React (dashboard `edustock-frontend`)** — necessário para
+fazer login no dashboard e usar a tela de Módulos (`/admin/modulos`) e a gestão
+de usuários. O sistema de autorização do painel usa o papel `ADMIN` do modelo
+`Perfil` (conceito próprio, separado do superusuário do Django):
+
+```bash
+python manage.py criar_admin <usuario> <senha-forte>
+```
+
+> ⚠️ **Não use `createsuperuser` para isso.** Um superusuário do Django que
+> faça login no painel React recebe o papel padrão `OPERADOR` e **não** consegue
+> abrir a tela de Módulos nem gerenciar usuários. É `criar_admin` que cria o
+> `Perfil` com papel `ADMIN`.
+
+**b) Superusuário do Django Admin (`/admin/`)** — necessário para acessar o
+Django Admin, onde se cadastram as Turmas e os PINs de acesso
+(`/admin/core/turma/`, `/admin/core/pinacesso/`):
+
+```bash
+python manage.py createsuperuser
+```
+
+Podem ser a mesma pessoa (crie os dois com o mesmo usuário/senha, se preferir),
+mas são registros e mecanismos independentes.
 
 ### 2. Atualizar CORS no Backend
 

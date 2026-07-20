@@ -3,11 +3,11 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
-from rest_framework.test import APITestCase
 
 from core.models import Categoria, Fornecedor, Grupo, Produto
 from core.relatorios import gerar_prestacao_contas
 from core.services import registrar_entrada
+from core.tests.utils import AutenticadoAPITestCase
 
 
 class PrestacaoContasTest(TestCase):
@@ -127,8 +127,9 @@ class PrestacaoContasTest(TestCase):
         self.assertEqual(item["numero_nota_fiscal_legado"], "NF-PROD")
 
 
-class PrestacaoContasApiTest(APITestCase):
+class PrestacaoContasApiTest(AutenticadoAPITestCase):
     def setUp(self):
+        super().setUp()
         cat = Categoria.objects.create(name="Alimentos")
         grupo = Grupo.objects.create(nome="Geral", categoria=cat)
         self.p = Produto.objects.create(nome="Arroz", grupo=grupo, quantidade=0, unidade="KG")

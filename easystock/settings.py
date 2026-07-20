@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "core",
+    "plataforma",
 ]
 
 MIDDLEWARE = [
@@ -148,9 +149,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ------------------------------------------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": None,
-    # Em produção troque para IsAuthenticated e configure auth de sessão/token
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "plataforma.authentication.TokenAcessoAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
     ],
 }
 
@@ -178,6 +181,13 @@ if RENDER_EXTERNAL_HOSTNAME:
 
 CORS_ALLOW_CREDENTIALS = True
 
+# Origens confiáveis para o Origin-check de CSRF do Django (Django 4+).
+# Sem isso, qualquer POST vindo dos apps React via proxy do Vite (ex.:
+# login por PIN em /api/operacao/auth/) recebe 403 "CSRF Failed: Origin
+# checking failed", mesmo com CORS liberado — CORS e CSRF são checagens
+# independentes. Mesma lista de origens que CORS_ALLOWED_ORIGINS.
+CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
+
 # ------------------------------------------------------------------
 # Módulo de Operação da Merenda
 # ------------------------------------------------------------------
@@ -186,3 +196,8 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Tempo de vida dos tokens de sessão em horas (padrão 12h)
 OPERACAO_TOKEN_TTL_HORAS = 12
+
+# ------------------------------------------------------------------
+# Autenticação da plataforma (dashboard admin)
+# ------------------------------------------------------------------
+LOGIN_TOKEN_TTL_HORAS = int(os.environ.get('LOGIN_TOKEN_TTL_HORAS', 12))

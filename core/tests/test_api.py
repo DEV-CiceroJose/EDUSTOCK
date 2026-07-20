@@ -1,8 +1,8 @@
-from rest_framework.test import APITestCase
 from core.models import Categoria, Grupo, Produto
+from core.tests.utils import AutenticadoAPITestCase
 
 
-class GrupoApiTest(APITestCase):
+class GrupoApiTest(AutenticadoAPITestCase):
     def test_lista_e_cria_grupo(self):
         cat = Categoria.objects.create(name="Alimentos")
         resp = self.client.post(
@@ -16,8 +16,9 @@ class GrupoApiTest(APITestCase):
         self.assertEqual(len(resp.data), 1)
 
 
-class ProdutoApiTest(APITestCase):
+class ProdutoApiTest(AutenticadoAPITestCase):
     def setUp(self):
+        super().setUp()
         self.cat = Categoria.objects.create(name="Alimentos")
         self.grupo = Grupo.objects.create(nome="Carboidratos", categoria=self.cat)
 
@@ -45,7 +46,7 @@ class ProdutoApiTest(APITestCase):
         self.assertEqual(nomes, ["Arroz"])
 
 
-class BemPermanenteApiTest(APITestCase):
+class BemPermanenteApiTest(AutenticadoAPITestCase):
     def test_crud_basico(self):
         resp = self.client.post("/api/bens-permanentes/", {
             "nome": "Projetor", "numero_patrimonio": "PAT-77",
@@ -62,7 +63,7 @@ class BemPermanenteApiTest(APITestCase):
         self.assertEqual(resp.status_code, 204)
 
 
-class FornecedorApiTest(APITestCase):
+class FornecedorApiTest(AutenticadoAPITestCase):
     def test_crud_e_filtro(self):
         resp = self.client.post("/api/fornecedores/", {
             "nome": "Atacadão", "documento": "12.345.678/0001-99",
@@ -97,8 +98,9 @@ class FornecedorApiTest(APITestCase):
         self.assertEqual([f["nome"] for f in resp.data], ["Papelaria Central"])
 
 
-class ProdutoFornecedorApiTest(APITestCase):
+class ProdutoFornecedorApiTest(AutenticadoAPITestCase):
     def setUp(self):
+        super().setUp()
         self.cat = Categoria.objects.create(name="Alimentos")
         self.grupo = Grupo.objects.create(nome="Geral", categoria=self.cat)
 
@@ -122,8 +124,9 @@ class ProdutoFornecedorApiTest(APITestCase):
         self.assertIsNone(resp.data["fornecedor_nome"])
 
 
-class MovimentacaoApiTest(APITestCase):
+class MovimentacaoApiTest(AutenticadoAPITestCase):
     def setUp(self):
+        super().setUp()
         cat = Categoria.objects.create(name="Alimentos")
         self.grupo = Grupo.objects.create(nome="Geral", categoria=cat)
         self.p = Produto.objects.create(nome="Arroz", grupo=self.grupo, quantidade=10, unidade="KG")
@@ -158,8 +161,9 @@ class MovimentacaoApiTest(APITestCase):
         self.assertEqual(self.client.patch(f"/api/movimentacoes/{mid}/", {"quantidade": "2"}, format="json").status_code, 405)
 
 
-class EntradaApiTest(APITestCase):
+class EntradaApiTest(AutenticadoAPITestCase):
     def setUp(self):
+        super().setUp()
         cat = Categoria.objects.create(name="Alimentos")
         self.grupo = Grupo.objects.create(nome="Geral", categoria=cat)
         self.p1 = Produto.objects.create(nome="Arroz", grupo=self.grupo, quantidade=0, unidade="KG")
@@ -189,8 +193,9 @@ class EntradaApiTest(APITestCase):
         self.assertEqual(self.client.delete(f"/api/entradas/{eid}/").status_code, 405)
 
 
-class ProdutoQuantidadeReadOnlyTest(APITestCase):
+class ProdutoQuantidadeReadOnlyTest(AutenticadoAPITestCase):
     def setUp(self):
+        super().setUp()
         cat = Categoria.objects.create(name="Alimentos")
         self.grupo = Grupo.objects.create(nome="Geral", categoria=cat)
 

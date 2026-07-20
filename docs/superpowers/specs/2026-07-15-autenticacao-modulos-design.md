@@ -165,6 +165,20 @@ Esta mesma auditoria já havia identificado que `settings.py:152-154` define `DE
 | Confundir usuários operacionais (cozinha/alunos) com a mudança | Nenhuma mudança visível para eles — PIN continua igual; só o dashboard admin ganha login |
 | Esquecer de popular `Modulo` com `ativo=True` na migração e "desligar" o sistema inteiro no primeiro deploy | Testar a migration em ambiente de staging antes; a migration de seed é parte obrigatória do mesmo PR |
 
+## Extensão (2026-07-20): módulo "Financeiro"
+
+Adicionada depois da primeira versão deste documento, quando o cliente pediu para "tirar o dinheiro" do sistema mas ressaltou que, ao vender para outros clientes, mostrar preço/custo pode ser desejável — ou seja, precisa ser uma opção ligável, não uma remoção definitiva.
+
+Nesse meio-tempo, um plano separado (`docs/superpowers/plans/2026-07-18-turmas-pins-preco.md`, Tasks 9-13) já havia implementado exatamente essa necessidade como um toggle `mostrarPreco` em `frontend/src/lib/config.js`, persistido em `localStorage` e exposto num switch na página Configurações — funcional, mas por navegador/dispositivo, não uma decisão única do administrador para todo o sistema. Com o painel de módulos agora sendo construído, faz sentido esse controle migrar para lá.
+
+**Decisão:** um 7º módulo, slug `financeiro`, **independente** dos outros 6 (não amarrado a `relatorios`). Motivo: `relatorios` controla acesso à página inteira de Relatórios; `financeiro` controla só a exibição de valores em R$ — em Relatórios, mas também em Inventário (cadastro/detalhes de produto) e Movimentações (formulário de entrada), lugares que não têm nada a ver com a página de Relatórios em si. As duas preocupações são ortogonais.
+
+**Diferença do seed dos outros módulos:** os 6 módulos originais nascem `ativo=True` na migração (preservam 100% do comportamento atual no dia do deploy). `financeiro` nasce **`ativo=False`** — esse já é o estado real de produção hoje (o toggle `mostrarPreco` já está desligado por padrão) e é exatamente o que o cliente atual pediu.
+
+**Frontend — substitui, não convive com, o mecanismo antigo:** os 6 arquivos que hoje leem `getConfig().mostrarPreco` (`ProductFormModal.jsx`, `DetailsModal.jsx`, `EntradaFormModal.jsx`, `RelatoriosView.jsx`, `prestacaoPdf.js`, `export.js`) passam a ler `getModulosAtivos().includes("financeiro")` de `frontend/src/lib/auth.js` (já criado na Task 12 deste plano). O campo `mostrarPreco` e sua validação saem de `config.js`/`config.test.js`, e o switch "Mostrar preços e custos" sai de `ConfiguracoesPage.jsx` — a partir de agora, essa decisão é do ADMIN em `/admin/modulos`, não de cada usuário na própria máquina. O efeito é imediato para todo mundo a partir do próximo login (os módulos ativos vêm no payload de `/api/auth/login/`).
+
+**Fora de escopo (deliberado):** enforcement no backend a nível de campo (ex. remover `preco`/`preco_unitario` da resposta JSON de `/api/produtos/` quando `financeiro` está desativado). O pedido do cliente é sobre o que aparece na tela, não sobre um requisito de compliance que exija blindar a API contra alguém abrindo o DevTools — mesmo padrão de escopo que o `mostrarPreco` original já tinha. Pode ser revisitado se um cliente futuro pedir isso explicitamente.
+
 ## Próximos passos (fora deste documento)
 
 Depois deste projeto entregue e implantado: (1) lista de funcionalidades profissionais candidatas a novos módulos (pedido de compra, código de barras, múltiplos depósitos, etc.), cada uma com seu próprio spec; (2) aprofundamento do módulo escolar (cardápio nutricional, múltiplas unidades escolares); (3) considerar aplicar o mesmo padrão de `TokenAcesso` persistido para substituir o dicionário em memória do `operacao_auth.py`, hoje usado só pelo PIN.

@@ -32,8 +32,7 @@ describe("config utility", () => {
       expect(DEFAULT_CONFIG).toEqual({
         useMock: false,
         validityAlertDays: 30,
-        cardDensity: "confortavel",
-        mostrarPreco: false
+        cardDensity: "confortavel"
       });
     });
   });
@@ -56,8 +55,7 @@ describe("config utility", () => {
       expect(config).toEqual({
         useMock: true,
         validityAlertDays: 30,
-        cardDensity: "confortavel",
-        mostrarPreco: false
+        cardDensity: "confortavel"
       });
     });
 
@@ -69,7 +67,7 @@ describe("config utility", () => {
       };
       localStorage.setItem("edustock:config", JSON.stringify(validConfig));
       const config = getConfig();
-      expect(config).toEqual({ ...validConfig, mostrarPreco: false });
+      expect(config).toEqual(validConfig);
     });
 
     it("deve retornar defaults quando useMock não é boolean", () => {
@@ -111,17 +109,6 @@ describe("config utility", () => {
       const config = getConfig();
       expect(config).toEqual(DEFAULT_CONFIG);
     });
-
-    it("deve retornar defaults quando mostrarPreco não é boolean", () => {
-      localStorage.setItem("edustock:config", JSON.stringify({
-        useMock: false,
-        validityAlertDays: 30,
-        cardDensity: "confortavel",
-        mostrarPreco: "sim"
-      }));
-      const config = getConfig();
-      expect(config).toEqual(DEFAULT_CONFIG);
-    });
   });
 
   describe("setConfig", () => {
@@ -144,8 +131,7 @@ describe("config utility", () => {
       expect(result).toEqual({
         useMock: true,
         validityAlertDays: 45,
-        cardDensity: "denso",
-        mostrarPreco: false
+        cardDensity: "denso"
       });
     });
 
@@ -158,8 +144,7 @@ describe("config utility", () => {
       expect(result).toEqual({
         useMock: true,
         validityAlertDays: 30,
-        cardDensity: "compacto",
-        mostrarPreco: false
+        cardDensity: "compacto"
       });
     });
 
@@ -191,17 +176,6 @@ describe("config utility", () => {
       expect(() => setConfig({ cardDensity: "confortavel" })).not.toThrow();
       expect(() => setConfig({ cardDensity: "compacto" })).not.toThrow();
       expect(() => setConfig({ cardDensity: "denso" })).not.toThrow();
-    });
-
-    it("deve persistir mostrarPreco", () => {
-      const result = setConfig({ mostrarPreco: true });
-      expect(result.mostrarPreco).toBe(true);
-    });
-
-    it("deve lançar erro quando mostrarPreco não é boolean", () => {
-      expect(() => {
-        setConfig({ mostrarPreco: "true" });
-      }).toThrow("Invalid configuration values");
     });
   });
 });

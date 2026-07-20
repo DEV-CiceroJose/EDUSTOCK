@@ -10,12 +10,18 @@
      ...idem /api/categorias/
 ------------------------------------------------------------------ */
 
+import { getToken } from "../lib/auth"
+
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
 async function req(path, { method = "GET", body } = {}) {
+  const token = getToken()
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Token ${token}` } : {}),
+    },
     credentials: "include",
     body: body ? JSON.stringify(body) : undefined,
   })

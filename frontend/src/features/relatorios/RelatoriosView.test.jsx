@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import RelatoriosView from "./RelatoriosView"
-import * as config from "../../lib/config"
+import * as auth from "../../lib/auth"
 
 afterEach(cleanup)
 
@@ -26,7 +26,7 @@ vi.mock("../../api", () => ({
 
 describe("RelatoriosView — colunas e resumo financeiro", () => {
   it("não renderiza Resumo financeiro nem colunas de preço quando mostrarPreco é false", async () => {
-    vi.spyOn(config, "getConfig").mockReturnValue({ mostrarPreco: false })
+    vi.spyOn(auth, "getModulosAtivos").mockReturnValue([])
     const user = userEvent.setup()
     render(<RelatoriosView />)
     await user.click(screen.getByText("Gerar relatório"))
@@ -38,7 +38,7 @@ describe("RelatoriosView — colunas e resumo financeiro", () => {
   })
 
   it("renderiza Resumo financeiro e colunas de preço quando mostrarPreco é true", async () => {
-    vi.spyOn(config, "getConfig").mockReturnValue({ mostrarPreco: true })
+    vi.spyOn(auth, "getModulosAtivos").mockReturnValue(["financeiro"])
     const user = userEvent.setup()
     render(<RelatoriosView />)
     await user.click(screen.getByText("Gerar relatório"))

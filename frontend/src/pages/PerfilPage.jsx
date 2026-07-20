@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom"
+import { getToken, limparSessao } from "../lib/auth"
 
 export default function PerfilPage() {
   const navigate = useNavigate()
@@ -10,12 +11,25 @@ export default function PerfilPage() {
   // Get first letter of name for avatar
   const avatarLetter = userName.charAt(0).toUpperCase()
 
-  const handleLogout = () => {
-    // Clear localStorage
-    localStorage.clear()
-    
-    // Navigate to inventario
-    navigate("/inventario")
+  const handleLogout = async () => {
+    const token = getToken()
+    if (token) {
+      try {
+        const base = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
+        await fetch(`${base}/auth/logout/`, {
+          method: "POST",
+          headers: { Authorization: `Token ${token}` },
+        })
+      } catch {
+        // Falha de rede não deve impedir o logout local
+      }
+    }
+
+    // Limpa a sessão real (token/papel/módulos_ativos)
+    limparSessao()
+
+    // Navigate to login
+    navigate("/login")
   }
 
   return (

@@ -4,12 +4,12 @@ import { brl } from "../../lib/format"
 import { Icon } from "../../lib/icons.jsx"
 import Modal from "../../components/ui/Modal"
 import { useToast } from "../../components/ui/Toast"
-import { getConfig } from "../../lib/config"
+import { getModulosAtivos } from "../../lib/auth"
 
 const linhaVazia = () => ({ produto: "", quantidade: "", preco_unitario: "" })
 
 export default function EntradaFormModal({ open, produtos, fornecedores, onClose, onSaved }) {
-  const { mostrarPreco } = getConfig()
+  const mostrarPreco = getModulosAtivos().includes("financeiro")
   const [cab, setCab] = useState({ fornecedor: "", numero_nota_fiscal: "", data: "", observacao: "" })
   const [linhas, setLinhas] = useState([linhaVazia()])
   const [erro, setErro] = useState("")

@@ -3,7 +3,7 @@ import { Icon } from "../../lib/icons.jsx"
 import { categoryStyle } from "../../lib/catalog"
 import { brl, qtd, dataBR, stockStatus, validadeStatus } from "../../lib/format"
 import { unidadeLabel } from "../../api/units"
-import { getConfig } from "../../lib/config"
+import { getModulosAtivos } from "../../lib/auth"
 
 function Linha({ label, children }) {
   return (
@@ -16,7 +16,7 @@ function Linha({ label, children }) {
 
 export default function DetailsModal({ produto, onClose, onEdit, onDelete, onAdd, onRemove }) {
   if (!produto) return null
-  const { mostrarPreco } = getConfig()
+  const mostrarPreco = getModulosAtivos().includes("financeiro")
   const st = categoryStyle(produto.categoria_nome)
   const stock = stockStatus(produto.quantidade, produto.estoque_minimo)
   const val = validadeStatus(produto.validade)

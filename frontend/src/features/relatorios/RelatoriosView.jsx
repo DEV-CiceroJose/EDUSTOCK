@@ -13,7 +13,7 @@ import {
 import { gerarPdfPrestacaoContas } from "../../lib/prestacaoPdf"
 import { Icon } from "../../lib/icons.jsx"
 import { useToast } from "../../components/ui/Toast"
-import { getConfig } from "../../lib/config"
+import { getModulosAtivos } from "../../lib/auth"
 
 const CHIPS = [
   { key: "mes", label: "Mês Atual" },
@@ -23,7 +23,7 @@ const CHIPS = [
 
 export default function RelatoriosView() {
   const toast = useToast()
-  const { mostrarPreco } = getConfig()
+  const mostrarPreco = getModulosAtivos().includes("financeiro")
   const [preset, setPreset] = useState("mes")
   const [inicio, setInicio] = useState(periodoMesAtual().inicio)
   const [fim, setFim] = useState(isoHoje())

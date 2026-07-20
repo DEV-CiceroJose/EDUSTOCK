@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
 import DetailsModal from "./DetailsModal"
-import * as config from "../../lib/config"
+import * as auth from "../../lib/auth"
 
 afterEach(cleanup)
 
@@ -14,14 +14,14 @@ const PRODUTO = {
 
 describe("DetailsModal — linhas de preço", () => {
   it("não renderiza preço/valor em estoque quando mostrarPreco é false", () => {
-    vi.spyOn(config, "getConfig").mockReturnValue({ mostrarPreco: false })
+    vi.spyOn(auth, "getModulosAtivos").mockReturnValue([])
     render(<DetailsModal produto={PRODUTO} onClose={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onAdd={vi.fn()} onRemove={vi.fn()} />)
     expect(screen.queryByText("Preço unitário")).not.toBeInTheDocument()
     expect(screen.queryByText("Valor em estoque")).not.toBeInTheDocument()
   })
 
   it("renderiza preço/valor em estoque quando mostrarPreco é true", () => {
-    vi.spyOn(config, "getConfig").mockReturnValue({ mostrarPreco: true })
+    vi.spyOn(auth, "getModulosAtivos").mockReturnValue(["financeiro"])
     render(<DetailsModal produto={PRODUTO} onClose={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} onAdd={vi.fn()} onRemove={vi.fn()} />)
     expect(screen.getByText("Preço unitário")).toBeInTheDocument()
     expect(screen.getByText("Valor em estoque")).toBeInTheDocument()
