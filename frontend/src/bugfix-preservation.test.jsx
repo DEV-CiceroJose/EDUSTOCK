@@ -116,7 +116,7 @@ describe('Preservation Property Tests - Existing Correct Behaviors', () => {
 
       // Verify links have proper structure (icon + label)
       const links = container.querySelectorAll('a[href]')
-      expect(links.length).toBe(8) // All 8 navigation items
+      expect(links.length).toBe(9) // All 8 navigation items + admin-only "Módulos" (papel: ADMIN in this suite)
 
       // Each link should have icon and label structure
       links.forEach((link) => {

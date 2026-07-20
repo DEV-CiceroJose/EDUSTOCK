@@ -15,6 +15,7 @@ import MerendaPage from "./pages/MerendaPage"
 import PerfilPage from "./pages/PerfilPage"
 import ConfiguracoesPage from "./pages/ConfiguracoesPage"
 import ModuloIndisponivelPage from "./pages/ModuloIndisponivelPage"
+import AdminModulosPage from "./pages/AdminModulosPage"
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -46,6 +47,7 @@ createRoot(document.getElementById("root")).render(
 
             <Route path="perfil" element={<PerfilPage />} />
             <Route path="configuracoes" element={<ConfiguracoesPage />} />
+            <Route path="admin/modulos" element={<AdminModulosPage />} />
             <Route path="modulo-indisponivel" element={<ModuloIndisponivelPage />} />
           </Route>
         </Route>

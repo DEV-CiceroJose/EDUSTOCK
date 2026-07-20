@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { NavLink } from "react-router-dom"
 import { Icon } from "../lib/icons.jsx"
-import { getModulosAtivos } from "../lib/auth"
+import { getModulosAtivos, ehAdmin } from "../lib/auth"
 
 const navItems = [
   { to: "/inventario", label: "Inventário", icon: "grid", section: "Operacional", modulo: "inventario" },
@@ -12,12 +12,16 @@ const navItems = [
   { to: "/merenda", label: "Merenda", icon: "food", section: "Gestão", modulo: "merenda" },
   { to: "/perfil", label: "Perfil", icon: "home", section: "Sistema", modulo: null },
   { to: "/configuracoes", label: "Configurações", icon: "gear", section: "Sistema", modulo: null },
+  { to: "/admin/modulos", label: "Módulos", icon: "gear", section: "Sistema", modulo: null, somenteAdmin: true },
 ]
 
 export default function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false)
   const modulosAtivos = getModulosAtivos()
-  const itensVisiveis = navItems.filter((item) => !item.modulo || modulosAtivos.includes(item.modulo))
+  const itensVisiveis = navItems.filter((item) => {
+    if (item.somenteAdmin && !ehAdmin()) return false
+    return !item.modulo || modulosAtivos.includes(item.modulo)
+  })
   const sections = ["Operacional", "Gestão", "Sistema"]
 
   return (
