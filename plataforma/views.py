@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -11,7 +12,7 @@ from rest_framework.views import APIView
 from .authentication import TokenAcessoAuthentication
 from .models import Modulo, Perfil, TokenAcesso
 from .permissions import EhAdmin
-from .serializers import ModuloSerializer
+from .serializers import ModuloSerializer, UsuarioSerializer
 
 
 class LoginView(APIView):
@@ -75,3 +76,11 @@ class ModuloViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         return super().partial_update(request, *args, **kwargs)
+
+
+class UsuarioViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.select_related("perfil").all().order_by("username")
+    serializer_class = UsuarioSerializer
+    authentication_classes = [TokenAcessoAuthentication]
+    permission_classes = [EhAdmin]
+    http_method_names = ["get", "post", "patch", "head", "options"]

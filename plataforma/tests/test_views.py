@@ -96,3 +96,43 @@ class ModuloViewSetTest(APITestCase):
         self._autenticar(Perfil.OPERADOR)
         resp = self.client.patch(f"/api/modulos/{self.merenda.slug}/", {"ativo": False}, format="json")
         self.assertEqual(resp.status_code, 403)
+
+
+class UsuarioViewSetTest(APITestCase):
+    def _autenticar_admin(self):
+        admin = User.objects.create_user(username="admin1", password="x")
+        Perfil.objects.create(user=admin, papel=Perfil.ADMIN)
+        token = TokenAcesso.objects.create(
+            user=admin, expira_em=timezone.now() + timedelta(hours=1)
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.token}")
+
+    def test_admin_cria_operador(self):
+        self._autenticar_admin()
+        resp = self.client.post("/api/usuarios/", {
+            "username": "maria", "password": "senha-boa-123", "papel": "OPERADOR",
+        }, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        maria = User.objects.get(username="maria")
+        self.assertEqual(maria.perfil.papel, "OPERADOR")
+
+    def test_admin_altera_papel_de_usuario(self):
+        self._autenticar_admin()
+        u = User.objects.create_user(username="maria", password="x")
+        Perfil.objects.create(user=u, papel=Perfil.OPERADOR)
+        resp = self.client.patch(f"/api/usuarios/{u.id}/", {"papel": "ADMIN"}, format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        u.refresh_from_db()
+        self.assertEqual(u.perfil.papel, "ADMIN")
+
+    def test_operador_nao_pode_criar_usuario(self):
+        operador = User.objects.create_user(username="op1", password="x")
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        token = TokenAcesso.objects.create(
+            user=operador, expira_em=timezone.now() + timedelta(hours=1)
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.token}")
+        resp = self.client.post("/api/usuarios/", {
+            "username": "outro", "password": "senha-boa-123", "papel": "OPERADOR",
+        }, format="json")
+        self.assertEqual(resp.status_code, 403)
