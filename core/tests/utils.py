@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from plataforma.models import Modulo, Perfil, TokenAcesso
 
-MODULOS_PADRAO = ["inventario", "movimentacoes", "fornecedores", "alertas", "relatorios", "merenda"]
+MODULOS_PADRAO = ["inventario", "movimentacoes", "fornecedores", "alertas", "relatorios", "merenda", "financeiro"]
 
 
 class AutenticadoAPITestCase(APITestCase):

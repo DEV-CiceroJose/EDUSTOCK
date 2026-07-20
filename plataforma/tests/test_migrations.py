@@ -33,7 +33,25 @@ class SeedModulosMigrationTest(TransactionTestCase):
         Modulo = apps.get_model("plataforma", "Modulo")
         self.assertEqual(Modulo.objects.count(), 0)
 
+    def test_seed_cria_financeiro_desativado_e_independente(self):
+        # Garante estado limpo (0001) antes de migrar para frente
+        self._migrate(("plataforma", "0001_initial"))
+
+        apps = self._migrate(("plataforma", "0004_seed_modulo_financeiro"))
+        Modulo = apps.get_model("plataforma", "Modulo")
+
+        financeiro = Modulo.objects.get(slug="financeiro")
+        self.assertFalse(financeiro.ativo)
+        self.assertIsNone(financeiro.depende_de_id)
+        # os outros 6 continuam ativos, este seed não mexe neles
+        self.assertEqual(Modulo.objects.filter(ativo=True).count(), 6)
+
+        # reverte e confirma que a migration reversa funciona
+        apps = self._migrate(("plataforma", "0002_seed_modulos"))
+        Modulo = apps.get_model("plataforma", "Modulo")
+        self.assertFalse(Modulo.objects.filter(slug="financeiro").exists())
+
     def tearDown(self):
         # deixa o banco de teste na migração mais recente, como as demais
         # suítes de migration deste projeto (core.tests.test_migrations)
-        self._migrate(("plataforma", "0002_seed_modulos"))
+        self._migrate(("plataforma", "0004_seed_modulo_financeiro"))
