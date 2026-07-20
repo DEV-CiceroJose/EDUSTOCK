@@ -21,7 +21,10 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         papel = validated_data.pop("perfil")["papel"]
-        password = validated_data.pop("password")
+        # password é required=False: se omitido, create_user recebe None e
+        # define uma senha inutilizável (conta criada pelo admin que definirá
+        # a própria senha depois), em vez de levantar KeyError → HTTP 500.
+        password = validated_data.pop("password", None)
         user = User.objects.create_user(username=validated_data["username"], password=password)
         Perfil.objects.create(user=user, papel=papel)
         return user

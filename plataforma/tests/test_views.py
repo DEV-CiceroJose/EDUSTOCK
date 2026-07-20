@@ -136,3 +136,15 @@ class UsuarioViewSetTest(APITestCase):
             "username": "outro", "password": "senha-boa-123", "papel": "OPERADOR",
         }, format="json")
         self.assertEqual(resp.status_code, 403)
+
+    def test_admin_cria_usuario_sem_senha(self):
+        """password é required=False: criar sem senha deve dar 201, não 500."""
+        self._autenticar_admin()
+        resp = self.client.post("/api/usuarios/", {
+            "username": "joao", "papel": "OPERADOR",
+        }, format="json")
+        self.assertEqual(resp.status_code, 201, resp.content)
+        joao = User.objects.get(username="joao")
+        self.assertEqual(joao.perfil.papel, "OPERADOR")
+        # sem senha usável — não pode autenticar por senha, mas a conta existe
+        self.assertFalse(joao.has_usable_password())
