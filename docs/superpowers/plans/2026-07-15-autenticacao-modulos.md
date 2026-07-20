@@ -2258,11 +2258,319 @@ git commit -m "feat(frontend): painel admin de módulos ativáveis"
 
 ---
 
-## Validação final (depois da Task 15)
+### Task 16: Seed do módulo "Financeiro" (independente, `ativo=False`)
+
+**Files:**
+- Create: `plataforma/migrations/0003_seed_modulo_financeiro.py`
+- Modify: `core/tests/utils.py` (Task 11 já criou este arquivo — adicionar `financeiro` à lista de módulos padrão usada pelos testes autenticados)
+- Test: `plataforma/tests/test_migrations.py` (adicionar caso)
+
+**Interfaces:**
+- Consumes: `plataforma.models.Modulo` (Task 1)
+- Produces: registro `Modulo(slug="financeiro", ativo=False)`, sem `depende_de` — independente dos outros 6.
+
+**Contexto:** ver "Extensão (2026-07-20): módulo Financeiro" em `docs/superpowers/specs/2026-07-15-autenticacao-modulos-design.md`. Diferente da seed da Task 2 (todos os 6 módulos originais nascem `ativo=True`, preservando o comportamento atual), este módulo nasce **desligado** — é o estado real de produção hoje (o toggle `mostrarPreco`, que este módulo substitui, já está desligado por padrão).
+
+- [ ] **Step 1: Escrever a data migration**
+
+```python
+from django.db import migrations
+
+
+def seed_financeiro(apps, schema_editor):
+    Modulo = apps.get_model("plataforma", "Modulo")
+    Modulo.objects.create(
+        slug="financeiro", nome="Financeiro",
+        descricao="Exibição de preço/custo no cadastro de produtos, entradas e relatórios.",
+        ativo=False,
+    )
+
+
+def remover_financeiro(apps, schema_editor):
+    Modulo = apps.get_model("plataforma", "Modulo")
+    Modulo.objects.filter(slug="financeiro").delete()
+
+
+class Migration(migrations.Migration):
+    dependencies = [("plataforma", "0002_seed_modulos")]
+    operations = [migrations.RunPython(seed_financeiro, remover_financeiro)]
+```
+
+- [ ] **Step 2: Adicionar o teste em `plataforma/tests/test_migrations.py`**
+
+Adicionar ao final do arquivo (mesmo padrão do teste da Task 2, mas migrando um passo adiante):
+
+```python
+class SeedModuloFinanceiroMigrationTest(TestCase):
+    def test_seed_cria_financeiro_desativado_e_independente(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate([("plataforma", "0003_seed_modulo_financeiro")])
+        state = executor.loader.project_state(("plataforma", "0003_seed_modulo_financeiro"))
+        Modulo = state.apps.get_model("plataforma", "Modulo")
+
+        financeiro = Modulo.objects.get(slug="financeiro")
+        self.assertFalse(financeiro.ativo)
+        self.assertIsNone(financeiro.depende_de_id)
+        # os outros 6 continuam ativos, este seed não mexe neles
+        self.assertEqual(Modulo.objects.filter(ativo=True).count(), 6)
+
+        executor = MigrationExecutor(connection)
+        executor.migrate([("plataforma", "0002_seed_modulos")])
+        state = executor.loader.project_state(("plataforma", "0002_seed_modulos"))
+        Modulo = state.apps.get_model("plataforma", "Modulo")
+        self.assertFalse(Modulo.objects.filter(slug="financeiro").exists())
+```
+
+- [ ] **Step 3: Rodar o teste**
+
+Run: `python manage.py test plataforma.tests.test_migrations -v 2`
+Expected: `OK` — 2 testes passando (o da Task 2 + este).
+
+- [ ] **Step 4: Atualizar `core/tests/utils.py` (criado na Task 11) para incluir `financeiro`**
+
+Localizar:
+```python
+MODULOS_PADRAO = ["inventario", "movimentacoes", "fornecedores", "alertas", "relatorios", "merenda"]
+```
+
+Substituir por:
+```python
+MODULOS_PADRAO = ["inventario", "movimentacoes", "fornecedores", "alertas", "relatorios", "merenda", "financeiro"]
+```
+
+(`AutenticadoAPITestCase` usa `get_or_create` com `ativo=True` para todos os módulos desta lista — isso é o comportamento certo para testes de API que não são sobre o módulo financeiro em si, já que eles precisam de acesso total. Testes que precisam especificamente de `financeiro` desligado continuam livres para fazer `Modulo.objects.filter(slug="financeiro").update(ativo=False)` explicitamente.)
+
+- [ ] **Step 5: Rodar a suíte completa do backend**
+
+Run: `python manage.py test`
+Expected: `OK` — nenhuma regressão.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add plataforma/migrations/0003_seed_modulo_financeiro.py plataforma/tests/test_migrations.py core/tests/utils.py
+git commit -m "feat(plataforma): seed do modulo Financeiro, independente e desligado por padrao"
+```
+
+---
+
+### Task 17: Frontend — módulo "Financeiro" substitui `mostrarPreco`
+
+**Files:**
+- Modify: `frontend/src/features/inventario/ProductFormModal.jsx`
+- Modify: `frontend/src/features/inventario/DetailsModal.jsx`
+- Modify: `frontend/src/features/movimentacoes/EntradaFormModal.jsx`
+- Modify: `frontend/src/features/relatorios/RelatoriosView.jsx`
+- Modify: `frontend/src/lib/prestacaoPdf.js`
+- Modify: `frontend/src/lib/export.js`
+- Modify: `frontend/src/features/inventario/ProductFormModal.test.jsx`
+- Modify: `frontend/src/features/inventario/DetailsModal.test.jsx`
+- Modify: `frontend/src/features/movimentacoes/EntradaFormModal.test.jsx`
+- Modify: `frontend/src/features/relatorios/RelatoriosView.test.jsx`
+- Modify: `frontend/src/lib/export.test.js`
+- Modify: `frontend/src/lib/config.js`
+- Modify: `frontend/src/lib/config.test.js`
+- Modify: `frontend/src/pages/ConfiguracoesPage.jsx`
+
+**Interfaces:**
+- Consumes: `getModulosAtivos()` de `frontend/src/lib/auth.js` (Task 12)
+
+**Contexto:** todos os 6 arquivos de origem seguem o **mesmo padrão exato** hoje — `import { getConfig } from ".../lib/config"` seguido de `const { mostrarPreco } = getConfig()`. A troca é sempre essas duas linhas; o resto de cada arquivo (todo `{mostrarPreco && (...)}`, o grid condicional em `EntradaFormModal.jsx`, os blocos `if (mostrarPreco)` em `prestacaoPdf.js`/`export.js`) **não muda**, porque a variável continua se chamando `mostrarPreco` — só a fonte dela muda, de `localStorage` para os módulos ativos do usuário logado.
+
+- [ ] **Step 1: Escrever/ajustar os testes primeiro (TDD)**
+
+Em cada um dos 5 arquivos de teste abaixo, trocar o import e as duas chamadas `vi.spyOn`:
+
+`frontend/src/features/inventario/ProductFormModal.test.jsx`, `frontend/src/features/inventario/DetailsModal.test.jsx`, `frontend/src/features/movimentacoes/EntradaFormModal.test.jsx`, `frontend/src/features/relatorios/RelatoriosView.test.jsx` — trocar:
+```js
+import * as config from "../../lib/config"
+```
+por:
+```js
+import * as auth from "../../lib/auth"
+```
+E trocar cada:
+```js
+vi.spyOn(config, "getConfig").mockReturnValue({ mostrarPreco: false })
+```
+por:
+```js
+vi.spyOn(auth, "getModulosAtivos").mockReturnValue([])
+```
+E cada:
+```js
+vi.spyOn(config, "getConfig").mockReturnValue({ mostrarPreco: true })
+```
+por:
+```js
+vi.spyOn(auth, "getModulosAtivos").mockReturnValue(["financeiro"])
+```
+
+`frontend/src/lib/export.test.js` — mesma troca, mas o import original é `import * as config from "./config"` → `import * as auth from "./auth"` (mesmo diretório, sem `../../`).
+
+- [ ] **Step 2: Rodar os 5 arquivos de teste e confirmar que falham**
+
+Run: `cd frontend && npm test -- ProductFormModal.test.jsx DetailsModal.test.jsx EntradaFormModal.test.jsx RelatoriosView.test.jsx export.test.js`
+Expected: `FAIL` — os componentes/funções ainda leem `getConfig()`, não `getModulosAtivos()`.
+
+- [ ] **Step 3: Atualizar os 6 arquivos de origem**
+
+`frontend/src/features/inventario/ProductFormModal.jsx` — trocar:
+```js
+import { getConfig } from "../../lib/config"
+```
+por:
+```js
+import { getModulosAtivos } from "../../lib/auth"
+```
+E trocar:
+```js
+  const { mostrarPreco } = getConfig()
+```
+por:
+```js
+  const mostrarPreco = getModulosAtivos().includes("financeiro")
+```
+
+`frontend/src/features/inventario/DetailsModal.jsx` — mesma troca (import `../../lib/auth`, mesma linha de atribuição).
+
+`frontend/src/features/movimentacoes/EntradaFormModal.jsx` — mesma troca (import `../../lib/auth`, mesma linha de atribuição). O grid condicional (linha com `grid-cols-[1fr_80px_90px_auto]`/`grid-cols-[1fr_80px_auto]`) e o resto do arquivo não mudam — continuam lendo a variável `mostrarPreco`.
+
+`frontend/src/features/relatorios/RelatoriosView.jsx` — mesma troca (import `../../lib/auth`, mesma linha de atribuição). Os 5 usos de `{mostrarPreco && (...)}` na tela não mudam.
+
+`frontend/src/lib/prestacaoPdf.js` — trocar:
+```js
+import { getConfig } from "./config"
+```
+por:
+```js
+import { getModulosAtivos } from "./auth"
+```
+E trocar:
+```js
+  const { mostrarPreco } = getConfig()
+```
+por:
+```js
+  const mostrarPreco = getModulosAtivos().includes("financeiro")
+```
+Os blocos `if (mostrarPreco)` (resumo por categoria, subtotal do fornecedor, colunas da tabela de itens) não mudam.
+
+`frontend/src/lib/export.js` — mesma troca do import (`./auth`) e da linha de atribuição. O `header`/linhas condicionais em `prestacaoContasToCsv` não mudam.
+
+- [ ] **Step 4: Rodar os 5 arquivos de teste novamente**
+
+Run: `cd frontend && npm test -- ProductFormModal.test.jsx DetailsModal.test.jsx EntradaFormModal.test.jsx RelatoriosView.test.jsx export.test.js`
+Expected: `PASS`
+
+- [ ] **Step 5: Remover `mostrarPreco` de `config.js`, já que não é mais a fonte de verdade**
+
+Modify `frontend/src/lib/config.js` — remover `mostrarPreco: false` de `DEFAULT_CONFIG` (volta a ter 3 chaves: `useMock`, `validityAlertDays`, `cardDensity`) e remover o bloco de validação:
+```js
+  // Validate mostrarPreco
+  if (config.mostrarPreco !== undefined && typeof config.mostrarPreco !== "boolean") {
+    return false;
+  }
+```
+
+- [ ] **Step 6: Atualizar `frontend/src/lib/config.test.js`**
+
+Reverter os pontos que a Task 9 do plano `2026-07-18-turmas-pins-preco` havia adicionado:
+- No teste "deve ter valores padrão corretos" (dentro de `describe("DEFAULT_CONFIG")`), remover a linha `mostrarPreco: false` do objeto esperado.
+- No teste "deve fazer merge com defaults quando config armazenado é parcial", remover a linha `mostrarPreco: false` do objeto esperado.
+- No teste "deve retornar config válido completo", trocar `expect(config).toEqual({ ...validConfig, mostrarPreco: false });` por `expect(config).toEqual(validConfig);`.
+- Remover o teste inteiro "deve retornar defaults quando mostrarPreco não é boolean" (dentro de `describe("getConfig")`).
+- No teste "deve fazer merge com config existente", remover a linha `mostrarPreco: false` do objeto esperado.
+- No teste "deve retornar novo config após merge", remover a linha `mostrarPreco: false` do objeto esperado.
+- Remover os dois testes inteiros "deve persistir mostrarPreco" e "deve lançar erro quando mostrarPreco não é boolean" (dentro de `describe("setConfig")`).
+
+- [ ] **Step 7: Rodar `config.test.js`**
+
+Run: `cd frontend && npm test -- config.test.js`
+Expected: `PASS` — de volta a exatamente os testes que existiam antes da Task 9 do plano de turmas/PINs.
+
+- [ ] **Step 8: Remover o toggle "Exibição de Custos" de `ConfiguracoesPage.jsx`**
+
+Modify `frontend/src/pages/ConfiguracoesPage.jsx` — remover o handler:
+```js
+  const handlePrecoToggle = () => {
+    updateConfig({ mostrarPreco: !config.mostrarPreco })
+    window.location.reload()
+  }
+```
+
+E remover a seção JSX inteira "Exibição de Custos" (o `<section>` entre "Dados de Demonstração" e "Alertas de Validade"):
+```jsx
+        {/* Exibição de Custos Section */}
+        <section className="rounded-2xl border border-line bg-surface p-6">
+          <div className="mb-4">
+            <h2 className="font-display text-lg font-bold leading-tight">Exibição de Custos</h2>
+            <p className="mt-1 text-sm text-ink-faint">
+              Controla se preço/custo aparece nos cadastros, formulários e relatórios
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <label htmlFor="preco-toggle" className="font-medium">
+                Mostrar preços e custos
+              </label>
+              <p className="text-sm text-ink-faint">A página será recarregada após alternar</p>
+            </div>
+            <button
+              id="preco-toggle"
+              type="button"
+              role="switch"
+              aria-checked={config.mostrarPreco}
+              onClick={handlePrecoToggle}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${
+                config.mostrarPreco ? "bg-brand" : "bg-line"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-[#f4f1e7] shadow ring-0 transition duration-200 ease-in-out ${
+                  config.mostrarPreco ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </section>
+
+```
+
+Depois dessa remoção, o admin controla a exibição de preço exclusivamente pela tela `/admin/modulos` (Task 15), desativando/ativando o módulo "Financeiro" — não há mais nada em Configurações sobre isso.
+
+- [ ] **Step 9: Rodar a suíte completa do frontend**
+
+Run: `cd frontend && npm test`
+Expected: `PASS` — nenhuma regressão.
+
+- [ ] **Step 10: Rodar o build**
+
+Run: `cd frontend && npm run build`
+Expected: sucesso, sem erros (confirma que não sobrou nenhuma referência a `getConfig`/`mostrarPreco` quebrada nesses arquivos).
+
+- [ ] **Step 11: Commit**
+
+```bash
+cd frontend
+git add src/features/inventario/ProductFormModal.jsx src/features/inventario/DetailsModal.jsx \
+        src/features/movimentacoes/EntradaFormModal.jsx src/features/relatorios/RelatoriosView.jsx \
+        src/lib/prestacaoPdf.js src/lib/export.js \
+        src/features/inventario/ProductFormModal.test.jsx src/features/inventario/DetailsModal.test.jsx \
+        src/features/movimentacoes/EntradaFormModal.test.jsx src/features/relatorios/RelatoriosView.test.jsx \
+        src/lib/export.test.js src/lib/config.js src/lib/config.test.js src/pages/ConfiguracoesPage.jsx
+git commit -m "feat(frontend): modulo Financeiro substitui o toggle local mostrarPreco"
+```
+
+---
+
+## Validação final (depois da Task 17)
 
 - [ ] Rodar `python manage.py test` na raiz do projeto — suíte completa (core + plataforma) deve passar 100%.
 - [ ] Rodar `cd frontend && npm test` — suíte completa deve passar 100%.
 - [ ] Rodar `cd frontend && npm run build` — build deve completar sem erros.
 - [ ] Criar o primeiro admin manualmente: `python manage.py criar_admin admin <senha-forte>`.
-- [ ] Testar manualmente no navegador: login com o admin criado, ver os 6 módulos ativos na Sidebar, desativar "Fornecedores" na tela `/admin/modulos`, confirmar que o item some da Sidebar e que `GET /api/fornecedores/` retorna 403.
+- [ ] Testar manualmente no navegador: login com o admin criado, ver os 6 módulos operacionais ativos na Sidebar (e "Financeiro" **não** aparece na Sidebar — não é uma página, só um interruptor), desativar "Fornecedores" na tela `/admin/modulos`, confirmar que o item some da Sidebar e que `GET /api/fornecedores/` retorna 403.
+- [ ] Confirmar que "Financeiro" aparece na tela `/admin/modulos` desligado por padrão; ativar, fazer login de novo (ou o mecanismo de refresh de sessão que a Task 12-15 implementou), confirmar que preço passa a aparecer em Inventário/Entrada/Relatórios; desativar de novo, confirmar que some.
 - [ ] Confirmar que `app-alunos`/`app-cozinha` continuam logando por PIN normalmente sem nenhuma mudança visível.
