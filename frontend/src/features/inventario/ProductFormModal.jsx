@@ -3,7 +3,7 @@ import { produtosApi, movimentacoesApi } from "../../api"
 import { UNIDADES, PERIODICIDADES } from "../../api/units"
 import Modal from "../../components/ui/Modal"
 import { useToast } from "../../components/ui/Toast"
-import { getConfig } from "../../lib/config"
+import { getModulosAtivos } from "../../lib/auth"
 
 const VAZIO = {
   nome: "", numero_nota_fiscal: "", grupo: "", fornecedor: "",
@@ -25,7 +25,7 @@ function Campo({ label, hint, children, full }) {
 
 export default function ProductFormModal({ open, produto, grupos, fornecedores = [], onClose, onSaved }) {
   const editando = Boolean(produto)
-  const { mostrarPreco } = getConfig()
+  const mostrarPreco = getModulosAtivos().includes("financeiro")
   const [form, setForm] = useState(VAZIO)
   const [erros, setErros] = useState({})
   const [salvando, setSalvando] = useState(false)

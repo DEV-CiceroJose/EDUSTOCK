@@ -1,5 +1,5 @@
 import { dataBR } from "./format"
-import { getConfig } from "./config"
+import { getModulosAtivos } from "./auth"
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -52,7 +52,7 @@ export function toCsv(rows, sep = ";") {
 }
 
 export function prestacaoContasToCsv(dados) {
-  const { mostrarPreco } = getConfig()
+  const mostrarPreco = getModulosAtivos().includes("financeiro")
   const header = mostrarPreco
     ? ["Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd", "Preço Unit.", "Subtotal", "Categoria", "Legado"]
     : ["Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd", "Categoria", "Legado"]

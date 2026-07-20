@@ -2,10 +2,10 @@ import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
 import { brl, dataBR } from "./format"
 import { formatPeriodoLabel } from "./export"
-import { getConfig } from "./config"
+import { getModulosAtivos } from "./auth"
 
 export function gerarPdfPrestacaoContas(dados) {
-  const { mostrarPreco } = getConfig()
+  const mostrarPreco = getModulosAtivos().includes("financeiro")
   const { inicio, fim } = dados.periodo
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
   const titulo = formatPeriodoLabel(inicio, fim)
