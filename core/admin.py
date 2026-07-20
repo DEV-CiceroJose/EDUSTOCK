@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Categoria, Produto
+from .models import Categoria, PinAcesso, Produto, Turma
 
 
 # 🔹 Categoria
@@ -70,3 +70,27 @@ class ProdutoAdmin(admin.ModelAdmin):
             obj.criado_por = request.user
         obj.atualizado_por = request.user
         super().save_model(request, obj, form, change)
+
+
+# 🔹 PinAcesso Inline
+class PinAcessoInline(admin.TabularInline):
+    model = PinAcesso
+    extra = 3
+    fields = ("pin", "titular", "ativo")
+
+
+# 🔹 Turma
+@admin.register(Turma)
+class TurmaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "curso", "ano", "turno", "ativo")
+    list_filter = ("curso", "turno", "ativo")
+    ordering = ("curso", "ano", "nome")
+    inlines = [PinAcessoInline]
+
+
+# 🔹 PinAcesso
+@admin.register(PinAcesso)
+class PinAcessoAdmin(admin.ModelAdmin):
+    list_display = ("pin", "papel", "turma", "titular", "ativo")
+    list_filter = ("papel", "ativo")
+    search_fields = ("pin", "titular", "turma__nome")

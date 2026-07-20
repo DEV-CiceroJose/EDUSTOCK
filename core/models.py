@@ -1,4 +1,7 @@
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import User
 from django.utils import timezone
 
@@ -267,3 +270,79 @@ class FatorConsumo(models.Model):
 
     def __str__(self):
         return f"{self.produto.nome}: {self.gramas_por_aluno}/aluno"
+
+
+class Turma(models.Model):
+    DS = "DS"
+    TET = "TET"
+    CURSO_CHOICES = [(DS, "Desenvolvimento de Sistemas"), (TET, "Eletrotécnica")]
+
+    MANHA = "MANHA"
+    TARDE = "TARDE"
+    INTEGRAL = "INTEGRAL"
+    TURNO_CHOICES = [(MANHA, "Manhã"), (TARDE, "Tarde"), (INTEGRAL, "Integral")]
+
+    nome = models.CharField(max_length=50, unique=True)
+    curso = models.CharField(max_length=3, choices=CURSO_CHOICES)
+    ano = models.PositiveSmallIntegerField()
+    turno = models.CharField(max_length=10, choices=TURNO_CHOICES, default=INTEGRAL)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["curso", "ano", "nome"]
+        verbose_name = "Turma"
+        verbose_name_plural = "Turmas"
+
+    def __str__(self):
+        return self.nome
+
+
+class PinAcesso(models.Model):
+    ALUNO_REP = "ALUNO_REP"
+    COZINHA = "COZINHA"
+    PAPEL_CHOICES = [(ALUNO_REP, "Representante de turma"), (COZINHA, "Equipe da cozinha")]
+
+    papel = models.CharField(max_length=10, choices=PAPEL_CHOICES, default=ALUNO_REP)
+    turma = models.ForeignKey(
+        Turma, on_delete=models.CASCADE, null=True, blank=True, related_name="pins"
+    )
+    pin = models.CharField(
+        max_length=4,
+        unique=True,
+        validators=[RegexValidator(r"^\d{4}$", "PIN deve ter exatamente 4 dígitos.")],
+    )
+    titular = models.CharField(
+        "Nome de quem escolheu o PIN", max_length=100, blank=True, default=""
+    )
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["turma__nome", "papel"]
+        verbose_name = "PIN de acesso"
+        verbose_name_plural = "PINs de acesso"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(papel="ALUNO_REP", turma__isnull=False)
+                    | Q(papel="COZINHA", turma__isnull=True)
+                ),
+                name="turma_obrigatoria_apenas_para_aluno_rep",
+            )
+        ]
+
+    def __str__(self):
+        alvo = self.turma.nome if self.turma else "Cozinha"
+        return f"{alvo} — {self.pin}"
+
+    def clean(self):
+        super().clean()
+        if self.papel == self.ALUNO_REP and self.turma_id is None:
+            raise ValidationError(
+                "Representante de turma exige uma turma selecionada."
+            )
+        if self.papel == self.COZINHA and self.turma_id is not None:
+            raise ValidationError(
+                "PIN de cozinha não deve ter turma vinculada."
+            )
+

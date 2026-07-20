@@ -3,40 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { School, Delete } from 'lucide-react'
 import { login } from './api.js'
 
-/**
- * Lê o mapa de PINs do .env:
- *   VITE_PINS=6A:1001,6B:1002,...
- *   VITE_TURNOS=6A:MANHA,7B:TARDE,...
- *
- * Retorna { [pin]: { turma, turno } }
- */
-function carregarMapaPins() {
-  const raw = import.meta.env.VITE_PINS ?? ''
-  const turnos = import.meta.env.VITE_TURNOS ?? ''
-
-  const mapasTurnos = {}
-  for (const par of turnos.split(',')) {
-    const [turma, turno] = par.split(':')
-    if (turma && turno) mapasTurnos[turma.trim()] = turno.trim()
-  }
-
-  const mapa = {}
-  for (const par of raw.split(',')) {
-    const [turma, pin] = par.split(':')
-    if (turma && pin) {
-      mapa[pin.trim()] = {
-        turma: turma.trim(),
-        turno: mapasTurnos[turma.trim()] ?? 'MANHA',
-      }
-    }
-  }
-  return mapa
-}
-
-const MAPA_PINS = carregarMapaPins()
-
-const TURNO_LABEL = { MANHA: 'Manhã', TARDE: 'Tarde', INTEGRAL: 'Integral' }
-
 export default function PinLogin() {
   const [pin, setPin] = useState('')
   const [erro, setErro] = useState('')
@@ -58,19 +24,13 @@ export default function PinLogin() {
 
   async function confirmar(pinVal = pin) {
     if (pinVal.length !== 4) return
-    const entrada = MAPA_PINS[pinVal]
-    if (!entrada) {
-      setErro('PIN inválido. Tente novamente.')
-      setPin('')
-      return
-    }
 
     setLoading(true)
     try {
-      await login(pinVal, entrada.turma, entrada.turno)
+      await login(pinVal)
       navigate('/registrar', { replace: true })
     } catch (e) {
-      setErro(e.message ?? 'Falha na conexão.')
+      setErro(e.message ?? 'PIN inválido. Tente novamente.')
       setPin('')
     } finally {
       setLoading(false)
@@ -124,13 +84,6 @@ export default function PinLogin() {
 
       {loading && (
         <p className="mt-6 text-center text-[0.95rem] text-ink-soft">Verificando…</p>
-      )}
-
-      {pin.length === 4 && MAPA_PINS[pin] && !loading && (
-        <div className="mt-6 rounded-2xl bg-brand-tint px-5 py-3 text-center text-base">
-          <span className="font-bold text-brand">Turma {MAPA_PINS[pin].turma}</span>{' '}
-          <span className="text-ink-soft">— {TURNO_LABEL[MAPA_PINS[pin].turno] ?? MAPA_PINS[pin].turno}</span>
-        </div>
       )}
     </div>
   )

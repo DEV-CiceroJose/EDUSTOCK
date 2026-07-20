@@ -68,21 +68,20 @@ async function req(method, path, body, opts = {}) {
 }
 
 /**
- * Login via PIN — troca PIN+perfil por token de sessão.
- * @param {string} pin  — 4 dígitos
- * @param {string} turma — identificador da turma (ex.: "6A")
- * @param {string} turno — "MANHA" | "TARDE" | "INTEGRAL"
+ * Login via PIN — troca PIN por token de sessão.
+ * Turma e turno vêm sempre da resposta do backend (nunca de config local).
+ * @param {string} pin — 4 dígitos
  * @returns {{ token, perfil, turma, turno }}
  */
-export async function login(pin, turma, turno) {
+export async function login(pin) {
   const data = await req('POST', '/api/operacao/auth/', {
     pin,
     perfil: 'ALUNO_REP',
   })
   sessionStorage.setItem('operacao_token', data.token)
   sessionStorage.setItem('operacao_sessao', JSON.stringify({
-    turma: data.turma || turma,
-    turno: data.turno || turno,
+    turma: data.turma,
+    turno: data.turno,
     perfil: data.perfil,
   }))
   return data

@@ -6,7 +6,7 @@ adotamos tokens de sessão simples gerados no login via PIN.
 
 Fluxo:
   1. POST /api/operacao/auth/  { pin, perfil }
-     → valida o PIN contra a configuração em settings
+     → valida o PIN contra os registros de PinAcesso no banco
      → retorna { token, turma, turno, perfil }  (token é um UUID de sessão)
   2. Cada request subseqüente inclui   X-Operacao-Token: <token>
   3. O decorador `requer_perfil_operacao` valida o token e o perfil.
@@ -75,25 +75,27 @@ def invalidar_token(token: str) -> None:
 
 
 # --------------------------------------------------------------------------
-# Leitura dos PINs configurados em settings
+# Leitura dos PINs no banco (Turma / PinAcesso)
 # --------------------------------------------------------------------------
 
 def _pins_alunos() -> dict[str, dict]:
-    """
-    Retorna mapa { pin: { turma, turno } } a partir de
-    settings.OPERACAO_PINS_ALUNOS = [
-        { "pin": "1234", "turma": "6A", "turno": "MANHA" },
-        ...
-    ]
-    """
+    """Retorna mapa { pin: { turma, turno } } a partir de PinAcesso ativos."""
+    from core.models import PinAcesso
+
     return {
-        str(p["pin"]): {"turma": p["turma"], "turno": p.get("turno", "MANHA")}
-        for p in getattr(settings, "OPERACAO_PINS_ALUNOS", [])
+        p.pin: {"turma": p.turma.nome, "turno": p.turma.turno}
+        for p in PinAcesso.objects.filter(
+            papel=PinAcesso.ALUNO_REP, ativo=True
+        ).select_related("turma")
     }
 
 
-def _pin_cozinha() -> str:
-    return str(getattr(settings, "OPERACAO_PIN_COZINHA", ""))
+def _pin_valido_cozinha(pin: str) -> bool:
+    from core.models import PinAcesso
+
+    return PinAcesso.objects.filter(
+        papel=PinAcesso.COZINHA, ativo=True, pin=pin
+    ).exists()
 
 
 # --------------------------------------------------------------------------
@@ -113,7 +115,7 @@ def autenticar_pin(perfil: str, pin: str) -> dict | None:
         return {"perfil": PERFIL_ALUNO, **dados}
 
     if perfil == PERFIL_COZINHA:
-        if not _pin_cozinha() or pin != _pin_cozinha():
+        if not _pin_valido_cozinha(pin):
             return None
         return {"perfil": PERFIL_COZINHA, "turma": "", "turno": ""}
 

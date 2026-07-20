@@ -3,6 +3,7 @@ import { produtosApi, movimentacoesApi } from "../../api"
 import { UNIDADES, PERIODICIDADES } from "../../api/units"
 import Modal from "../../components/ui/Modal"
 import { useToast } from "../../components/ui/Toast"
+import { getConfig } from "../../lib/config"
 
 const VAZIO = {
   nome: "", numero_nota_fiscal: "", grupo: "", fornecedor: "",
@@ -24,6 +25,7 @@ function Campo({ label, hint, children, full }) {
 
 export default function ProductFormModal({ open, produto, grupos, fornecedores = [], onClose, onSaved }) {
   const editando = Boolean(produto)
+  const { mostrarPreco } = getConfig()
   const [form, setForm] = useState(VAZIO)
   const [erros, setErros] = useState({})
   const [salvando, setSalvando] = useState(false)
@@ -189,9 +191,11 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
           <input type="date" className="field" value={form.validade} onChange={set("validade")} />
         </Campo>
 
-        <Campo label="Preço unitário" hint="R$ · opcional">
-          <input type="number" step="0.01" min="0" className="field" value={form.preco} onChange={set("preco")} placeholder="0,00" />
-        </Campo>
+        {mostrarPreco && (
+          <Campo label="Preço unitário" hint="R$ · opcional">
+            <input type="number" step="0.01" min="0" className="field" value={form.preco} onChange={set("preco")} placeholder="0,00" />
+          </Campo>
+        )}
 
         <label className="flex items-center gap-2 sm:col-span-2">
           <input type="checkbox" checked={form.perecivel} onChange={set("perecivel")} className="h-4 w-4" />

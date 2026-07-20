@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -10,12 +10,6 @@ describe('PinLogin (app-alunos)', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    vi.stubEnv('VITE_PINS', '6A:1234')
-    vi.stubEnv('VITE_TURNOS', '6A:MANHA')
-  })
-
-  afterEach(() => {
-    vi.unstubAllEnvs()
   })
 
   it('mostra o ícone School no cabeçalho, sem emoji', async () => {
@@ -31,9 +25,9 @@ describe('PinLogin (app-alunos)', () => {
     expect(screen.queryByText('🏫')).not.toBeInTheDocument()
   })
 
-  it('chama login com a turma certa ao completar os 4 dígitos do PIN', async () => {
+  it('chama login apenas com o PIN ao completar os 4 dígitos', async () => {
     const { login } = await import('./api.js')
-    login.mockResolvedValue({ token: 'abc', turma: '6A', turno: 'MANHA' })
+    login.mockResolvedValue({ token: 'abc', turma: '1º DS-A', turno: 'INTEGRAL' })
     const { default: PinLogin } = await import('./PinLogin.jsx')
 
     render(
@@ -46,6 +40,24 @@ describe('PinLogin (app-alunos)', () => {
       fireEvent.click(screen.getByRole('button', { name: digito }))
     })
 
-    expect(login).toHaveBeenCalledWith('1234', '6A', 'MANHA')
+    expect(login).toHaveBeenCalledWith('1234')
+  })
+
+  it('mostra erro do backend sem travar a interface quando o PIN não é reconhecido', async () => {
+    const { login } = await import('./api.js')
+    login.mockRejectedValue(new Error('PIN inválido.'))
+    const { default: PinLogin } = await import('./PinLogin.jsx')
+
+    render(
+      <MemoryRouter>
+        <PinLogin />
+      </MemoryRouter>
+    )
+
+    ;['0', '0', '0', '0'].forEach((digito) => {
+      fireEvent.click(screen.getByRole('button', { name: digito }))
+    })
+
+    expect(await screen.findByText('PIN inválido.')).toBeInTheDocument()
   })
 })

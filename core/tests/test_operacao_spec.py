@@ -13,25 +13,17 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient, APITestCase
 
 from core.models import (
-    Categoria, FatorConsumo, FrequenciaDiaria, Grupo, Movimentacao, Produto,
+    Categoria, FatorConsumo, FrequenciaDiaria, Grupo, Movimentacao, PinAcesso,
+    Produto, Turma,
 )
 from core.operacao import baixa_de_producao, gerar_plano_do_dia
 from core.operacao_auth import PERFIL_ALUNO, PERFIL_COZINHA, criar_token
 from core.services import calcular_previsao_producao
-
-
-# ---------------------------------------------------------------------------
-# Configuração de PINs para os testes
-# ---------------------------------------------------------------------------
-PINS_TESTE = [
-    {"pin": "0001", "turma": "6A", "turno": "MANHA"},
-]
-PIN_COZINHA_TESTE = "0099"
 
 
 # ---------------------------------------------------------------------------
@@ -344,11 +336,18 @@ class TestEndpointOperacaoRejeitaTokenAdmin(APITestCase):
 # Testes de login por PIN
 # ---------------------------------------------------------------------------
 
-@override_settings(
-    OPERACAO_PINS_ALUNOS=PINS_TESTE,
-    OPERACAO_PIN_COZINHA=PIN_COZINHA_TESTE,
-)
 class TestLoginPorPin(APITestCase):
+    def setUp(self):
+        # Nomes "Teste" para não colidir com as 12 turmas reais semeadas
+        # pela migração core.0014_seed_turmas.
+        self.turma = Turma.objects.create(nome="1º DS-A (Teste)", curso=Turma.DS, ano=1)
+        self.turma_b = Turma.objects.create(nome="1º DS-B (Teste)", curso=Turma.DS, ano=1)
+        PinAcesso.objects.create(papel=PinAcesso.ALUNO_REP, turma=self.turma, pin="0001")
+        PinAcesso.objects.create(papel=PinAcesso.ALUNO_REP, turma=self.turma, pin="0002")
+        PinAcesso.objects.create(papel=PinAcesso.COZINHA, pin="0099")
+        PinAcesso.objects.create(
+            papel=PinAcesso.ALUNO_REP, turma=self.turma_b, pin="0003", ativo=False
+        )
 
     def test_login_aluno_pin_valido(self):
         resp = self.client.post("/api/operacao/auth/", {
@@ -356,8 +355,8 @@ class TestLoginPorPin(APITestCase):
         }, format="json")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertIn("token", resp.data)
-        self.assertEqual(resp.data["turma"], "6A")
-        self.assertEqual(resp.data["turno"], "MANHA")
+        self.assertEqual(resp.data["turma"], "1º DS-A (Teste)")
+        self.assertEqual(resp.data["turno"], "INTEGRAL")
 
     def test_login_cozinha_pin_valido(self):
         resp = self.client.post("/api/operacao/auth/", {
@@ -372,19 +371,43 @@ class TestLoginPorPin(APITestCase):
         }, format="json")
         self.assertEqual(resp.status_code, 401, resp.content)
 
+    def test_login_pin_inativo_retorna_401(self):
+        resp = self.client.post("/api/operacao/auth/", {
+            "pin": "0003", "perfil": "ALUNO_REP",
+        }, format="json")
+        self.assertEqual(resp.status_code, 401, resp.content)
+
+    def test_dois_pins_da_mesma_turma_autenticam_com_mesmo_nome(self):
+        r1 = self.client.post("/api/operacao/auth/", {
+            "pin": "0001", "perfil": "ALUNO_REP",
+        }, format="json")
+        r2 = self.client.post("/api/operacao/auth/", {
+            "pin": "0002", "perfil": "ALUNO_REP",
+        }, format="json")
+        self.assertEqual(r1.data["turma"], r2.data["turma"])
+
+        # Regressão: o segundo aluno da mesma turma que tentar registrar
+        # a contagem do mesmo turno/dia deve receber 409, não um novo registro.
+        c1 = APIClient()
+        c1.credentials(HTTP_X_OPERACAO_TOKEN=r1.data["token"])
+        c2 = APIClient()
+        c2.credentials(HTTP_X_OPERACAO_TOKEN=r2.data["token"])
+
+        resp1 = c1.post("/api/operacao/contagem/", {"quantidade_alunos": 30}, format="json")
+        resp2 = c2.post("/api/operacao/contagem/", {"quantidade_alunos": 31}, format="json")
+        self.assertEqual(resp1.status_code, 201, resp1.content)
+        self.assertEqual(resp2.status_code, 409, resp2.content)
+
     def test_logout_invalida_token(self):
-        # Login
         r_login = self.client.post("/api/operacao/auth/", {
             "pin": "0001", "perfil": "ALUNO_REP",
         }, format="json")
         token = r_login.data["token"]
 
-        # Logout
         c = APIClient()
         c.credentials(HTTP_X_OPERACAO_TOKEN=token)
         c.delete("/api/operacao/auth/logout/")
 
-        # Tentar usar o token invalidado
         resp = c.post("/api/operacao/contagem/", {"quantidade_alunos": 30}, format="json")
         self.assertEqual(resp.status_code, 401, resp.content)
 

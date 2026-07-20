@@ -36,7 +36,7 @@ describe('api.js — retry de rede', () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     global.fetch = fetchMock
 
-    await expect(login('1234', '6A', 'MANHA')).rejects.toThrow('Failed to fetch')
+    await expect(login('1234')).rejects.toThrow('Failed to fetch')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
