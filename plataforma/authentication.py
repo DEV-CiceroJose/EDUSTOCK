@@ -24,3 +24,6 @@ class TokenAcessoAuthentication(BaseAuthentication):
             raise AuthenticationFailed("Token expirado.")
 
         return (token.user, token)
+
+    def authenticate_header(self, request):
+        return self.keyword

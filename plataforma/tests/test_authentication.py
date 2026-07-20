@@ -46,3 +46,6 @@ class TokenAcessoAuthenticationTest(TestCase):
         )
         with self.assertRaises(AuthenticationFailed):
             self.auth.authenticate(request)
+
+    def test_authenticate_header_retorna_keyword(self):
+        self.assertEqual(self.auth.authenticate_header(None), "Token")
