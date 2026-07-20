@@ -28,7 +28,7 @@ class Perfil(models.Model):
     OPERADOR = "OPERADOR"
     PAPEL_CHOICES = [(ADMIN, "Administrador"), (OPERADOR, "Operador")]
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil_plataforma")
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil")
     matricula = models.CharField(max_length=50, unique=True, null=True, blank=True)
     papel = models.CharField(max_length=10, choices=PAPEL_CHOICES, default=OPERADOR)
 
