@@ -22,6 +22,7 @@ import Sidebar from './layouts/Sidebar'
 import Header from './layouts/Header'
 import AlertasPage from './pages/AlertasPage'
 import AlertTicker from './features/alertas/AlertTicker'
+import { salvarSessao } from './lib/auth'
 
 // Mock react-router-dom's useNavigate for navigation tests
 const mockNavigate = vi.fn()
@@ -57,6 +58,7 @@ vi.mock('./hooks/useDashboardData', () => ({
 
 describe('Preservation Property Tests - Existing Correct Behaviors', () => {
   beforeEach(() => {
+    sessionStorage.clear()
     mockNavigate.mockClear()
   })
 
@@ -68,6 +70,14 @@ describe('Preservation Property Tests - Existing Correct Behaviors', () => {
    * exactly as it does on unfixed code (preservation of existing navigation behavior).
    */
   describe('Sidebar Navigation Preservation', () => {
+    beforeEach(() => {
+      salvarSessao({
+        token: 'test-token',
+        papel: 'ADMIN',
+        modulos_ativos: ['inventario', 'movimentacoes', 'fornecedores', 'alertas', 'relatorios', 'merenda'],
+      })
+    })
+
     const navigationItems = [
       { label: 'Inventário', expectedRoute: '/inventario' },
       { label: 'Movimentações', expectedRoute: '/movimentacoes' },
@@ -464,6 +474,14 @@ describe('Preservation Property Tests - Existing Correct Behaviors', () => {
    * hidden exactly as the original implementation, preserving mobile/tablet behavior.
    */
   describe('Sidebar Responsive Behavior Preservation', () => {
+    beforeEach(() => {
+      salvarSessao({
+        token: 'test-token',
+        papel: 'ADMIN',
+        modulos_ativos: ['inventario', 'movimentacoes', 'fornecedores', 'alertas', 'relatorios', 'merenda'],
+      })
+    })
+
     it('should preserve sidebar hidden state on small/medium screens', () => {
       const { container } = render(
         <BrowserRouter>
