@@ -38,6 +38,8 @@ export default function NewUserModal({ open, onClose, onCreated }) {
       }
       onCreated(data)
       onClose()
+    } catch {
+      setErro("Falha na conexão. Tente novamente.")
     } finally {
       setSalvando(false)
     }

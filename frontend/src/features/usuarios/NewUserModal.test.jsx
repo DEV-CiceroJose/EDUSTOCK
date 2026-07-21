@@ -52,4 +52,16 @@ describe("NewUserModal", () => {
     await waitFor(() => expect(screen.getByText("user with this username already exists.")).toBeInTheDocument())
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it("mostra erro genérico e mantém o modal aberto quando a chamada de rede falha", async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    global.fetch = vi.fn().mockRejectedValue(new Error("network error"))
+    render(<NewUserModal open onClose={onClose} onCreated={vi.fn()} />)
+    await user.type(screen.getByLabelText(/^usuário$/i), "maria")
+    await user.type(screen.getByLabelText(/senha/i), "senha-boa-123")
+    await user.click(screen.getByRole("button", { name: /criar usuário/i }))
+    await waitFor(() => expect(screen.getByText("Falha na conexão. Tente novamente.")).toBeInTheDocument())
+    expect(onClose).not.toHaveBeenCalled()
+  })
 })
