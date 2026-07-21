@@ -7,7 +7,7 @@ import { ToastProvider } from "../components/ui/Toast"
 describe("AdminModulosPage", () => {
   beforeEach(() => {
     sessionStorage.clear()
-    salvarSessao({ token: "abc", papel: "ADMIN", modulos_ativos: ["inventario"] })
+    salvarSessao({ token: "abc", papel: "ADMIN", is_staff: true, modulos_ativos: ["inventario"] })
   })
   afterEach(() => vi.restoreAllMocks())
 

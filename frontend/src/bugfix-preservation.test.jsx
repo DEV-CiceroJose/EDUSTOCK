@@ -74,6 +74,7 @@ describe('Preservation Property Tests - Existing Correct Behaviors', () => {
       salvarSessao({
         token: 'test-token',
         papel: 'ADMIN',
+        is_staff: true,
         modulos_ativos: ['inventario', 'movimentacoes', 'fornecedores', 'alertas', 'relatorios', 'merenda'],
       })
     })
@@ -478,6 +479,7 @@ describe('Preservation Property Tests - Existing Correct Behaviors', () => {
       salvarSessao({
         token: 'test-token',
         papel: 'ADMIN',
+        is_staff: true,
         modulos_ativos: ['inventario', 'movimentacoes', 'fornecedores', 'alertas', 'relatorios', 'merenda'],
       })
     })
