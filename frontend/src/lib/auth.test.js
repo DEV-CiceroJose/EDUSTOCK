@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest"
 import {
   salvarSessao, limparSessao, getToken, getPapel,
   getModulosAtivos, estaAutenticado, ehAdmin,
+  getUsername, getNome, atualizarNome,
 } from "./auth"
 
 describe("auth", () => {
@@ -31,5 +32,20 @@ describe("auth", () => {
 
   it("getModulosAtivos retorna array vazio sem sessão", () => {
     expect(getModulosAtivos()).toEqual([])
+  })
+
+  it("salva e recupera username e nome", () => {
+    salvarSessao({ token: "abc-123", papel: "OPERADOR", is_staff: false, username: "joao", nome: "João Silva", modulos_ativos: [] })
+    expect(getUsername()).toBe("joao")
+    expect(getNome()).toBe("João Silva")
+  })
+
+  it("atualizarNome troca só o nome, sem afetar o resto da sessão", () => {
+    salvarSessao({ token: "abc-123", papel: "ADMIN", is_staff: true, username: "joao", nome: "João", modulos_ativos: ["inventario"] })
+    atualizarNome("João Pereira")
+    expect(getNome()).toBe("João Pereira")
+    expect(getUsername()).toBe("joao")
+    expect(getToken()).toBe("abc-123")
+    expect(ehAdmin()).toBe(true)
   })
 })

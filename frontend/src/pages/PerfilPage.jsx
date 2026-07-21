@@ -1,22 +1,51 @@
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { getToken, limparSessao } from "../lib/auth"
+import { getToken, getUsername, getNome, atualizarNome, limparSessao } from "../lib/auth"
+import { useToast } from "../components/ui/Toast"
+
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
 export default function PerfilPage() {
   const navigate = useNavigate()
+  const toast = useToast()
+  const [nome, setNome] = useState(getNome() || "")
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState("")
 
-  // Read environment variables with defaults
-  const userName = import.meta.env.VITE_USER_NAME || "Usuário Dev"
-  const userEmail = import.meta.env.VITE_USER_EMAIL || "dev@edustock.local"
+  const avatarLetter = (nome || "?").charAt(0).toUpperCase()
 
-  // Get first letter of name for avatar
-  const avatarLetter = userName.charAt(0).toUpperCase()
+  async function salvarNome(ev) {
+    ev.preventDefault()
+    const valor = nome.trim()
+    if (!valor || valor === getNome()) return
+    setErro("")
+    setSalvando(true)
+    try {
+      const resp = await fetch(`${BASE}/auth/me/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
+        body: JSON.stringify({ nome: valor }),
+      })
+      const data = await resp.json()
+      if (!resp.ok) {
+        setErro(data.detail || "Não foi possível salvar o nome.")
+        return
+      }
+      atualizarNome(data.nome)
+      setNome(data.nome)
+      toast("Nome atualizado")
+    } catch {
+      setErro("Falha na conexão. Tente novamente.")
+    } finally {
+      setSalvando(false)
+    }
+  }
 
   const handleLogout = async () => {
     const token = getToken()
     if (token) {
       try {
-        const base = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
-        await fetch(`${base}/auth/logout/`, {
+        await fetch(`${BASE}/auth/logout/`, {
           method: "POST",
           headers: { Authorization: `Token ${token}` },
         })
@@ -25,10 +54,7 @@ export default function PerfilPage() {
       }
     }
 
-    // Limpa a sessão real (token/papel/módulos_ativos)
     limparSessao()
-
-    // Navigate to login
     navigate("/login")
   }
 
@@ -42,58 +68,38 @@ export default function PerfilPage() {
       </div>
 
       <div className="rounded-2xl border border-line bg-surface p-6">
-        {/* Avatar Section */}
         <div className="mb-6 flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-surface text-2xl font-bold text-brand">
             {avatarLetter}
           </div>
           <div className="flex-1">
-            <h3 className="font-display text-xl font-bold">{userName}</h3>
-            <p className="text-sm text-ink-faint">{userEmail}</p>
+            <p className="text-sm text-ink-faint">
+              Editando o perfil de <strong className="text-ink">{getUsername()}</strong>
+            </p>
           </div>
         </div>
 
-        {/* Dev Mode Badge */}
-        <div className="mb-6">
-          <div className="inline-flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-              className="h-4 w-4"
+        <form onSubmit={salvarNome} className="mb-6 space-y-4">
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-ink-faint">Nome</span>
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              className="field"
+            />
+          </label>
+          {erro && <p className="text-sm text-out">{erro}</p>}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={!nome.trim() || nome.trim() === getNome() || salvando}
+              className="btn btn-brand disabled:opacity-50"
             >
-              <path
-                fillRule="evenodd"
-                d="M6.701 2.25c.577-1 2.02-1 2.598 0l5.196 9a1.5 1.5 0 0 1-1.299 2.25H2.804a1.5 1.5 0 0 1-1.3-2.25l5.197-9ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 1 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Modo Desenvolvimento
+              {salvando ? "Salvando…" : "Salvar"}
+            </button>
           </div>
-        </div>
+        </form>
 
-        {/* User Information (Read-only) */}
-        <div className="mb-6 space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink-faint">
-              Nome
-            </label>
-            <div className="rounded-lg border border-line bg-background px-4 py-3 text-ink">
-              {userName}
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink-faint">
-              Email
-            </label>
-            <div className="rounded-lg border border-line bg-background px-4 py-3 text-ink">
-              {userEmail}
-            </div>
-          </div>
-        </div>
-
-        {/* Logout Button */}
         <div className="flex justify-end border-t border-line pt-6">
           <button
             onClick={handleLogout}
