@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { useDashboardData } from "../hooks/useDashboardData"
 import { movimentacoesApi, categoriasApi, produtosApi } from "../api"
@@ -9,9 +9,12 @@ import ProductFormModal from "../features/inventario/ProductFormModal"
 import DetailsModal from "../features/inventario/DetailsModal"
 import ConfirmDialog from "../components/ui/ConfirmDialog"
 import { useToast } from "../components/ui/Toast"
+import { useLocation, useNavigate } from "react-router-dom"
 
 export default function InventarioPage() {
   const { produtos, categorias, grupos, fornecedores, loading, carregar, counts, visiveis, search } = useDashboardData()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [cat, setCat] = useState({ tipo: "all" })
   const [addOpen, setAddOpen] = useState(false)
   const [editProduto, setEditProduto] = useState(null)
@@ -19,6 +22,13 @@ export default function InventarioPage() {
   const [aExcluir, setAExcluir] = useState(null)
   const [busyId, setBusyId] = useState(null)
   const toast = useToast(); const produtosFiltrados = visiveis(cat)
+
+  useEffect(() => {
+    if (location.state?.openAdd) {
+      setAddOpen(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state, location.pathname, navigate])
 
   const ajustar = async (produto, delta) => {
     setBusyId(produto.id)
