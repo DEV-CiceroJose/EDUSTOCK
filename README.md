@@ -203,14 +203,7 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 ## 👥 Autores
 
-- **Seu Nome** - Desenvolvimento inicial
+- **Cicero José** - Desenvolvimento inicial
+- **Anderson Vieira** - Modelo base do Django
 
-## 🙏 Agradecimentos
-
-- Django e React communities
-- Render.com pela hospedagem gratuita
-- Todos que contribuíram com feedback e sugestões
-
----
-
-**Feito com ❤️ para facilitar a gestão escolar**
+**Feito para facilitar a gestão escolar**
