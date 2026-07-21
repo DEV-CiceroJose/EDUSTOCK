@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { render, screen, cleanup } from "@testing-library/react"
+import { render, screen, cleanup, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import InventarioPage from "./InventarioPage"
 
 afterEach(cleanup)
+
+vi.mock("../api", () => ({
+  categoriasApi: { create: vi.fn().mockResolvedValue({ id: 99, name: "Higiene" }) },
+  produtosApi: {},
+  movimentacoesApi: {},
+}))
 
 vi.mock("../hooks/useDashboardData", () => ({
   useDashboardData: () => ({
@@ -36,5 +43,22 @@ describe("InventarioPage — abertura do modal via navegação do header", () =>
       </MemoryRouter>
     )
     expect(screen.queryByText("Adicionar novo item")).not.toBeInTheDocument()
+  })
+})
+
+describe("InventarioPage — criação de categoria", () => {
+  it("abre o modal de nova categoria e cria via categoriasApi", async () => {
+    const user = userEvent.setup()
+    const { categoriasApi } = await import("../api")
+    render(
+      <MemoryRouter initialEntries={["/inventario"]}>
+        <InventarioPage />
+      </MemoryRouter>
+    )
+    await user.click(screen.getByText("Nova categoria"))
+    expect(screen.getByRole("heading", { name: "Nova categoria" })).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/nome da categoria/i), "Higiene")
+    await user.click(screen.getByRole("button", { name: /criar categoria/i }))
+    await waitFor(() => expect(categoriasApi.create).toHaveBeenCalledWith({ name: "Higiene" }))
   })
 })
