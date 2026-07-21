@@ -16,6 +16,6 @@ class Command(BaseCommand):
         password = options["password"]
         if User.objects.filter(username=username).exists():
             raise CommandError(f"Usuário '{username}' já existe.")
-        user = User.objects.create_user(username=username, password=password)
+        user = User.objects.create_user(username=username, password=password, is_staff=True)
         Perfil.objects.create(user=user, papel=Perfil.ADMIN)
         self.stdout.write(self.style.SUCCESS(f"Administrador '{username}' criado com sucesso."))

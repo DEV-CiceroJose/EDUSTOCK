@@ -14,6 +14,7 @@ class CriarAdminCommandTest(TestCase):
         call_command("criar_admin", "admin", "senha-boa-123", stdout=out)
         user = User.objects.get(username="admin")
         self.assertEqual(user.perfil.papel, Perfil.ADMIN)
+        self.assertTrue(user.is_staff)
         self.assertIn("criado com sucesso", out.getvalue())
 
     def test_erro_se_usuario_ja_existe(self):

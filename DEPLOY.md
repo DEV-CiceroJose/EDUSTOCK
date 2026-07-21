@@ -157,17 +157,19 @@ São **dois** acessos distintos, para duas finalidades diferentes — crie os do
 
 **a) Admin do painel React (dashboard `edustock-frontend`)** — necessário para
 fazer login no dashboard e usar a tela de Módulos (`/admin/modulos`) e a gestão
-de usuários. O sistema de autorização do painel usa o papel `ADMIN` do modelo
-`Perfil` (conceito próprio, separado do superusuário do Django):
+de usuários. O acesso a essas telas é controlado pela flag `is_staff` do
+Django — a mesma flag que o Django Admin sempre usou:
 
 ```bash
 python manage.py criar_admin <usuario> <senha-forte>
 ```
 
-> ⚠️ **Não use `createsuperuser` para isso.** Um superusuário do Django que
-> faça login no painel React recebe o papel padrão `OPERADOR` e **não** consegue
-> abrir a tela de Módulos nem gerenciar usuários. É `criar_admin` que cria o
-> `Perfil` com papel `ADMIN`.
+> ℹ️ **`criar_admin` já libera os dois acessos.** Além de marcar o usuário
+> com `is_staff=True` (o que também libera o painel React), o comando cria o
+> `Perfil` com papel `ADMIN`, usado em outras checagens da plataforma. Se você
+> não precisa desse `Perfil`, `python manage.py createsuperuser` continua
+> sendo uma alternativa válida — ele também define `is_staff=True` — mas não
+> cria o `Perfil` correspondente.
 
 **b) Superusuário do Django Admin (`/admin/`)** — necessário para acessar o
 Django Admin, onde se cadastram as Turmas e os PINs de acesso
@@ -177,8 +179,9 @@ Django Admin, onde se cadastram as Turmas e os PINs de acesso
 python manage.py createsuperuser
 ```
 
-Podem ser a mesma pessoa (crie os dois com o mesmo usuário/senha, se preferir),
-mas são registros e mecanismos independentes.
+Como `criar_admin` já concede `is_staff=True`, ele sozinho é suficiente para
+os dois acessos (a) e (b). Use `createsuperuser` em vez dele apenas se
+preferir não ter o `Perfil`/papel `ADMIN` associado ao usuário.
 
 ### 2. Atualizar CORS no Backend
 
