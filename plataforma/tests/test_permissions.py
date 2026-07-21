@@ -32,22 +32,22 @@ class EhAdminTest(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
 
-    def test_permite_para_papel_admin(self):
-        user = User.objects.create_user(username="admin1", password="x")
-        Perfil.objects.create(user=user, papel=Perfil.ADMIN)
+    def test_permite_quando_is_staff(self):
+        user = User.objects.create_user(username="admin1", password="x", is_staff=True)
         request = self.factory.get("/")
         request.user = user
         self.assertTrue(EhAdmin().has_permission(request, None))
 
-    def test_bloqueia_para_papel_operador(self):
+    def test_bloqueia_quando_nao_staff(self):
         user = User.objects.create_user(username="op1", password="x")
-        Perfil.objects.create(user=user, papel=Perfil.OPERADOR)
         request = self.factory.get("/")
         request.user = user
         self.assertFalse(EhAdmin().has_permission(request, None))
 
-    def test_bloqueia_sem_perfil(self):
-        user = User.objects.create_user(username="semperfil", password="x")
+    def test_bloqueia_papel_admin_da_aplicacao_sem_is_staff(self):
+        """Perfil.papel=ADMIN sozinho não basta mais — é preciso ser is_staff."""
+        user = User.objects.create_user(username="semstaff", password="x")
+        Perfil.objects.create(user=user, papel=Perfil.ADMIN)
         request = self.factory.get("/")
         request.user = user
         self.assertFalse(EhAdmin().has_permission(request, None))

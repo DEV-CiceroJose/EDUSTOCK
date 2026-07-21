@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 
-from .models import Modulo, Perfil
+from .models import Modulo
 
 
 def RequerModuloAtivo(slug):
@@ -29,5 +29,4 @@ class EhAdmin(BasePermission):
     message = "Apenas administradores podem acessar este recurso."
 
     def has_permission(self, request, view):
-        perfil = getattr(request.user, "perfil", None)
-        return bool(perfil and perfil.papel == Perfil.ADMIN)
+        return bool(request.user and request.user.is_staff)

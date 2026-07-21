@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { useDashboardData } from "../hooks/useDashboardData"
 import { movimentacoesApi, categoriasApi, produtosApi } from "../api"
@@ -7,18 +7,30 @@ import CategoryRail from "../features/inventario/CategoryRail"
 import ProductCard from "../features/inventario/ProductCard"
 import ProductFormModal from "../features/inventario/ProductFormModal"
 import DetailsModal from "../features/inventario/DetailsModal"
+import NewCategoryModal from "../features/inventario/NewCategoryModal"
 import ConfirmDialog from "../components/ui/ConfirmDialog"
 import { useToast } from "../components/ui/Toast"
+import { useLocation, useNavigate } from "react-router-dom"
 
 export default function InventarioPage() {
   const { produtos, categorias, grupos, fornecedores, loading, carregar, counts, visiveis, search } = useDashboardData()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [cat, setCat] = useState({ tipo: "all" })
   const [addOpen, setAddOpen] = useState(false)
+  const [catModalOpen, setCatModalOpen] = useState(false)
   const [editProduto, setEditProduto] = useState(null)
   const [detalhe, setDetalhe] = useState(null)
   const [aExcluir, setAExcluir] = useState(null)
   const [busyId, setBusyId] = useState(null)
   const toast = useToast(); const produtosFiltrados = visiveis(cat)
+
+  useEffect(() => {
+    if (location.state?.openAdd) {
+      setAddOpen(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state, location.pathname, navigate])
 
   const ajustar = async (produto, delta) => {
     setBusyId(produto.id)
@@ -35,17 +47,16 @@ export default function InventarioPage() {
     setAExcluir(null); setDetalhe(null); carregar()
   }
 
-  const novaCategoria = async () => {
-    const nome = window.prompt("Nome da nova categoria:")
-    if (!nome?.trim()) return
-    await categoriasApi.create({ name: nome.trim() })
-    toast("Categoria criada"); carregar()
+  const criarCategoria = async (nome) => {
+    await categoriasApi.create({ name: nome })
+    toast("Categoria criada")
+    carregar()
   }
 
   return (
     <div className="mx-auto w-full max-w-[1500px] px-6 py-8">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <CategoryRail categorias={categorias} grupos={grupos} counts={counts} total={produtos.length} active={cat} onPick={setCat} onAddCategory={novaCategoria} />
+        <CategoryRail categorias={categorias} grupos={grupos} counts={counts} total={produtos.length} active={cat} onPick={setCat} onAddCategory={() => setCatModalOpen(true)} />
         <section>
           <div className="mb-6 flex items-end justify-between gap-4">
           <div>
@@ -62,6 +73,7 @@ export default function InventarioPage() {
       <ProductFormModal open={addOpen || !!editProduto} produto={editProduto} grupos={grupos} fornecedores={fornecedores.filter(f => f.ativo)} onClose={() => { setAddOpen(false); setEditProduto(null) }} onSaved={carregar} />
       <DetailsModal produto={detalhe} onClose={() => setDetalhe(null)} onEdit={(p) => { setDetalhe(null); setEditProduto(p) }} onDelete={setAExcluir} onAdd={(p) => ajustar(p, +1)} onRemove={(p) => ajustar(p, -1)} />
       <ConfirmDialog open={!!aExcluir} title="Excluir item" message={aExcluir ? `Remover "${aExcluir.nome}" do estoque? Esta ação não pode ser desfeita.` : ""} onConfirm={excluir} onCancel={() => setAExcluir(null)} />
+      <NewCategoryModal open={catModalOpen} onClose={() => setCatModalOpen(false)} onCreate={criarCategoria} />
     </div>
   )
 }
