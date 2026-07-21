@@ -38,6 +38,7 @@ class LoginView(APIView):
         return Response({
             "token": str(token.token),
             "papel": perfil.papel,
+            "is_staff": user.is_staff,
             "modulos_ativos": modulos_ativos,
         })
 
