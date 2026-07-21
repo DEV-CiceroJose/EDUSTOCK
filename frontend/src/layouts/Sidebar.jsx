@@ -13,6 +13,7 @@ const navItems = [
   { to: "/perfil", label: "Perfil", icon: "home", section: "Sistema", modulo: null },
   { to: "/configuracoes", label: "Configurações", icon: "gear", section: "Sistema", modulo: null },
   { to: "/admin/modulos", label: "Módulos", icon: "gear", section: "Sistema", modulo: null, somenteAdmin: true },
+  { to: "/admin/usuarios", label: "Usuários", icon: "users", section: "Sistema", modulo: null, somenteAdmin: true },
 ]
 
 export default function Sidebar() {

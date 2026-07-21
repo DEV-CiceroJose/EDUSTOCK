@@ -1,0 +1,84 @@
+import { useEffect, useState } from "react"
+import { getToken, ehAdmin } from "../lib/auth"
+import { useToast } from "../components/ui/Toast"
+import { Icon } from "../lib/icons.jsx"
+import NewUserModal from "../features/usuarios/NewUserModal"
+
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
+const PAPEIS = [
+  { value: "OPERADOR", label: "Operador" },
+  { value: "ADMIN", label: "Administrador" },
+]
+
+export default function AdminUsuariosPage() {
+  const [usuarios, setUsuarios] = useState([])
+  const [carregando, setCarregando] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const toast = useToast()
+
+  useEffect(() => {
+    if (ehAdmin()) carregar()
+  }, [])
+
+  async function carregar() {
+    setCarregando(true)
+    const resp = await fetch(`${BASE}/usuarios/`, {
+      headers: { Authorization: `Token ${getToken()}` },
+    })
+    const data = await resp.json()
+    setUsuarios(data)
+    setCarregando(false)
+  }
+
+  async function trocarPapel(usuario, novoPapel) {
+    const anterior = usuario.papel
+    setUsuarios((lista) => lista.map((u) => (u.id === usuario.id ? { ...u, papel: novoPapel } : u)))
+    const resp = await fetch(`${BASE}/usuarios/${usuario.id}/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
+      body: JSON.stringify({ papel: novoPapel }),
+    })
+    if (!resp.ok) {
+      setUsuarios((lista) => lista.map((u) => (u.id === usuario.id ? { ...u, papel: anterior } : u)))
+      toast("Não foi possível alterar o papel.", "danger")
+    }
+  }
+
+  function aoCriar(novoUsuario) {
+    setUsuarios((lista) => [...lista, novoUsuario].sort((a, b) => a.username.localeCompare(b.username)))
+    toast("Usuário criado")
+  }
+
+  if (!ehAdmin()) {
+    return <p className="p-6 text-ink-soft">Apenas administradores acessam esta página.</p>
+  }
+  if (carregando) return <p className="p-6 text-ink-soft">Carregando usuários…</p>
+
+  return (
+    <div className="p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="font-display text-xl font-bold">Usuários</h1>
+        <button onClick={() => setModalOpen(true)} className="btn btn-brand">
+          {Icon.plus(16)} Novo usuário
+        </button>
+      </div>
+      <div className="flex flex-col gap-2">
+        {usuarios.map((u) => (
+          <div key={u.id} className="card flex items-center justify-between p-4">
+            <p className="font-semibold">{u.username}</p>
+            <select
+              value={u.papel}
+              onChange={(e) => trocarPapel(u, e.target.value)}
+              className="field w-auto"
+            >
+              {PAPEIS.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+      <NewUserModal open={modalOpen} onClose={() => setModalOpen(false)} onCreated={aoCriar} />
+    </div>
+  )
+}
