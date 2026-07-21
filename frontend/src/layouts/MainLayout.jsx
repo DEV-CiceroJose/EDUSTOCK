@@ -9,7 +9,7 @@ export default function MainLayout() {
   const navigate = useNavigate()
   
   const handleAddItem = () => {
-    navigate('/inventario')
+    navigate('/inventario', { state: { openAdd: true } })
   }
   
   const handleReport = () => {

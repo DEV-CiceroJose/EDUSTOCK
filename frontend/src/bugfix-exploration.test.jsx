@@ -108,7 +108,7 @@ describe('Bug Condition Exploration Tests', () => {
     
     // This assertion will FAIL on unfixed code (handleAddItem is empty)
     // After fix, handleAddItem will call navigate('/inventario')
-    expect(mockNavigate).toHaveBeenCalledWith('/inventario')
+    expect(mockNavigate).toHaveBeenCalledWith('/inventario', { state: { openAdd: true } })
   })
 
   /**
