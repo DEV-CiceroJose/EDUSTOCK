@@ -26,7 +26,20 @@ class LoginViewTest(APITestCase):
         self.assertIn("token", resp.data)
         self.assertEqual(resp.data["papel"], Perfil.OPERADOR)
         self.assertFalse(resp.data["is_staff"])
+        self.assertEqual(resp.data["username"], "joao")
+        self.assertEqual(resp.data["nome"], "joao")
         self.assertEqual(resp.data["modulos_ativos"], ["inventario"])
+
+    def test_login_retorna_first_name_como_nome_quando_definido(self):
+        self.user.first_name = "João Silva"
+        self.user.save(update_fields=["first_name"])
+        resp = self.client.post(
+            "/api/auth/login/",
+            {"username": "joao", "password": "senha-boa-123"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["nome"], "João Silva")
 
     def test_login_retorna_is_staff_true_para_usuario_staff(self):
         User.objects.create_user(username="root", password="senha-boa-123", is_staff=True)
@@ -159,3 +172,32 @@ class UsuarioViewSetTest(APITestCase):
         self.assertEqual(joao.perfil.papel, "OPERADOR")
         # sem senha usável — não pode autenticar por senha, mas a conta existe
         self.assertFalse(joao.has_usable_password())
+
+
+class MeuPerfilViewTest(APITestCase):
+    def _autenticar(self, user):
+        token = TokenAcesso.objects.create(
+            user=user, expira_em=timezone.now() + timedelta(hours=1)
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.token}")
+
+    def test_atualiza_o_proprio_nome(self):
+        user = User.objects.create_user(username="maria", password="x")
+        self._autenticar(user)
+        resp = self.client.patch("/api/auth/me/", {"nome": "Maria Souza"}, format="json")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["nome"], "Maria Souza")
+        user.refresh_from_db()
+        self.assertEqual(user.first_name, "Maria Souza")
+
+    def test_nome_vazio_retorna_400_e_nao_altera_first_name(self):
+        user = User.objects.create_user(username="maria", password="x", first_name="Original")
+        self._autenticar(user)
+        resp = self.client.patch("/api/auth/me/", {"nome": "   "}, format="json")
+        self.assertEqual(resp.status_code, 400)
+        user.refresh_from_db()
+        self.assertEqual(user.first_name, "Original")
+
+    def test_sem_autenticacao_retorna_401(self):
+        resp = self.client.patch("/api/auth/me/", {"nome": "Maria"}, format="json")
+        self.assertEqual(resp.status_code, 401)

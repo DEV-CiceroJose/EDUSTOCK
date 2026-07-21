@@ -39,6 +39,8 @@ class LoginView(APIView):
             "token": str(token.token),
             "papel": perfil.papel,
             "is_staff": user.is_staff,
+            "username": user.username,
+            "nome": user.first_name or user.username,
             "modulos_ativos": modulos_ativos,
         })
 
@@ -51,6 +53,19 @@ class LogoutView(APIView):
         if isinstance(request.auth, TokenAcesso):
             request.auth.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MeuPerfilView(APIView):
+    authentication_classes = [TokenAcessoAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        nome = str(request.data.get("nome", "")).strip()
+        if not nome:
+            return Response({"detail": "Nome não pode ser vazio."}, status=status.HTTP_400_BAD_REQUEST)
+        request.user.first_name = nome
+        request.user.save(update_fields=["first_name"])
+        return Response({"nome": nome})
 
 
 class ModuloViewSet(viewsets.ModelViewSet):
