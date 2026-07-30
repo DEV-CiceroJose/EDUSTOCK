@@ -1,12 +1,18 @@
 from datetime import datetime
+import hashlib
+import logging
 
+from django.conf import settings
+from django.core.cache import cache
 from django.db import IntegrityError
 from django.db.models import Sum
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.throttling import BaseThrottle
 
+from plataforma.authentication import TokenAcessoAuthentication
 from plataforma.permissions import RequerModuloAtivo
 
 from .models import FrequenciaDiaria
@@ -17,6 +23,40 @@ from .operacao_auth import (
     requer_perfil_operacao,
 )
 from .services import calcular_previsao_producao, calcular_resumo_dia, total_frequencia
+
+
+logger = logging.getLogger(__name__)
+
+
+def _identificador_cliente(request):
+    return BaseThrottle().get_ident(request)
+
+
+def _chave_tentativas_pin(request):
+    identificador = _identificador_cliente(request)
+    digest = hashlib.sha256(identificador.encode("utf-8")).hexdigest()
+    return f"operacao:pin-login-falhas:{digest}"
+
+
+def _login_pin_bloqueado(request):
+    limite = settings.PIN_LOGIN_MAX_TENTATIVAS
+    return int(cache.get(_chave_tentativas_pin(request), 0)) >= limite
+
+
+def _registrar_falha_pin(request):
+    chave = _chave_tentativas_pin(request)
+    janela = settings.PIN_LOGIN_JANELA_SEGUNDOS
+    if cache.add(chave, 1, timeout=janela):
+        return 1
+    try:
+        return cache.incr(chave)
+    except ValueError:
+        cache.set(chave, 1, timeout=janela)
+        return 1
+
+
+def _limpar_falhas_pin(request):
+    cache.delete(_chave_tentativas_pin(request))
 
 
 def _parse_date(value, default_today=False):
@@ -61,6 +101,18 @@ class OperacaoLoginView(APIView):
     permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
 
     def post(self, request):
+        if _login_pin_bloqueado(request):
+            return Response(
+                {
+                    "detail": (
+                        "Muitas tentativas de acesso. "
+                        "Aguarde alguns minutos antes de tentar novamente."
+                    )
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"Retry-After": str(settings.PIN_LOGIN_JANELA_SEGUNDOS)},
+            )
+
         pin = str(request.data.get("pin", "")).strip()
         perfil = str(request.data.get("perfil", "")).strip().upper()
 
@@ -72,11 +124,21 @@ class OperacaoLoginView(APIView):
 
         dados = autenticar_pin(perfil, pin)
         if not dados:
+            tentativas = _registrar_falha_pin(request)
+            logger.warning(
+                "Falha de autenticação por PIN",
+                extra={
+                    "client_ip": _identificador_cliente(request),
+                    "perfil_operacao": perfil,
+                    "tentativas_na_janela": tentativas,
+                },
+            )
             return Response(
                 {"detail": "PIN inválido."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        _limpar_falhas_pin(request)
         token = criar_token(
             perfil=dados["perfil"],
             turma=dados.get("turma", ""),
@@ -208,12 +270,12 @@ class ContagemView(APIView):
 
 
 # --------------------------------------------------------------------------
-# Resumo geral (sem proteção de perfil — usado pelo dashboard admin)
+# Resumo geral — usado pelo dashboard autenticado
 # --------------------------------------------------------------------------
 
 class ResumoFrequenciaView(APIView):
-    authentication_classes = []  # ver comentário em OperacaoLoginView
-    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
+    authentication_classes = [TokenAcessoAuthentication]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("merenda")]
 
     def get(self, request):
         data, err = _parse_date(request.query_params.get("data"), default_today=True)

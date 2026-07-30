@@ -1,5 +1,48 @@
 from django.contrib import admin
+from django import forms
 from .models import Categoria, PinAcesso, Produto, Turma
+
+
+class PinAcessoForm(forms.ModelForm):
+    novo_pin = forms.CharField(
+        label="PIN",
+        min_length=4,
+        max_length=4,
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        help_text="Informe 4 dígitos. Por segurança, o PIN atual não é exibido.",
+    )
+
+    class Meta:
+        model = PinAcesso
+        fields = ("papel", "turma", "novo_pin", "titular", "ativo")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["novo_pin"].required = not bool(self.instance.pk)
+
+    def clean_novo_pin(self):
+        pin = (self.cleaned_data.get("novo_pin") or "").strip()
+        if not pin and self.instance.pk:
+            return ""
+        if not (len(pin) == 4 and pin.isdigit()):
+            raise forms.ValidationError("PIN deve ter exatamente 4 dígitos.")
+        fingerprint = PinAcesso.gerar_fingerprint(pin)
+        if PinAcesso.objects.exclude(pk=self.instance.pk).filter(
+            pin_fingerprint=fingerprint
+        ).exists():
+            raise forms.ValidationError("Este PIN já está em uso.")
+        return pin
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        novo_pin = self.cleaned_data.get("novo_pin")
+        if novo_pin:
+            obj.definir_pin(novo_pin)
+        if commit:
+            obj.save()
+            self.save_m2m()
+        return obj
 
 
 # 🔹 Categoria
@@ -75,8 +118,9 @@ class ProdutoAdmin(admin.ModelAdmin):
 # 🔹 PinAcesso Inline
 class PinAcessoInline(admin.TabularInline):
     model = PinAcesso
+    form = PinAcessoForm
     extra = 3
-    fields = ("pin", "titular", "ativo")
+    fields = ("novo_pin", "titular", "ativo")
 
 
 # 🔹 Turma
@@ -91,6 +135,11 @@ class TurmaAdmin(admin.ModelAdmin):
 # 🔹 PinAcesso
 @admin.register(PinAcesso)
 class PinAcessoAdmin(admin.ModelAdmin):
-    list_display = ("pin", "papel", "turma", "titular", "ativo")
+    form = PinAcessoForm
+    list_display = ("identificacao", "papel", "turma", "titular", "ativo")
     list_filter = ("papel", "ativo")
-    search_fields = ("pin", "titular", "turma__nome")
+    search_fields = ("titular", "turma__nome")
+
+    @admin.display(description="Acesso")
+    def identificacao(self, obj):
+        return str(obj)

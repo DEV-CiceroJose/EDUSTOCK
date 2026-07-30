@@ -1,8 +1,11 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
+from django.contrib.auth.hashers import check_password, identify_hasher, make_password
+from django.utils.crypto import salted_hmac
 from django.utils import timezone
 
 
@@ -299,9 +302,13 @@ class PinAcesso(models.Model):
         Turma, on_delete=models.CASCADE, null=True, blank=True, related_name="pins"
     )
     pin = models.CharField(
-        max_length=4,
+        max_length=128,
+        editable=False,
+    )
+    pin_fingerprint = models.CharField(
+        max_length=64,
         unique=True,
-        validators=[RegexValidator(r"^\d{4}$", "PIN deve ter exatamente 4 dígitos.")],
+        editable=False,
     )
     titular = models.CharField(
         "Nome de quem escolheu o PIN", max_length=100, blank=True, default=""
@@ -325,10 +332,56 @@ class PinAcesso(models.Model):
 
     def __str__(self):
         alvo = self.turma.nome if self.turma else "Cozinha"
-        return f"{alvo} — {self.pin}"
+        return f"{alvo} — PIN protegido"
+
+    @staticmethod
+    def _pin_em_formato_hash(valor):
+        try:
+            identify_hasher(valor)
+            return True
+        except (TypeError, ValueError):
+            return False
+
+    def definir_pin(self, pin):
+        pin = str(pin).strip()
+        RegexValidator(
+            r"^\d{4}$", "PIN deve ter exatamente 4 dígitos."
+        )(pin)
+        self.pin_fingerprint = self.gerar_fingerprint(pin)
+        self.pin = make_password(pin)
+
+    @staticmethod
+    def gerar_fingerprint(pin):
+        return salted_hmac(
+            "core.PinAcesso.pin",
+            str(pin),
+            secret=settings.PIN_LOOKUP_SECRET,
+            algorithm="sha256",
+        ).hexdigest()
+
+    def confere_pin(self, pin):
+        return bool(self.pin and check_password(str(pin), self.pin))
+
+    def save(self, *args, **kwargs):
+        if not self._pin_em_formato_hash(self.pin):
+            pin_aberto = str(self.pin).strip()
+            RegexValidator(
+                r"^\d{4}$", "PIN deve ter exatamente 4 dígitos."
+            )(pin_aberto)
+            fingerprint = self.gerar_fingerprint(pin_aberto)
+            if type(self).objects.exclude(pk=self.pk).filter(
+                pin_fingerprint=fingerprint
+            ).exists():
+                raise ValidationError({"pin": "Este PIN já está em uso."})
+            self.definir_pin(pin_aberto)
+        super().save(*args, **kwargs)
 
     def clean(self):
         super().clean()
+        if self.pin and not self._pin_em_formato_hash(self.pin):
+            RegexValidator(
+                r"^\d{4}$", "PIN deve ter exatamente 4 dígitos."
+            )(str(self.pin).strip())
         if self.papel == self.ALUNO_REP and self.turma_id is None:
             raise ValidationError(
                 "Representante de turma exige uma turma selecionada."
@@ -337,4 +390,17 @@ class PinAcesso(models.Model):
             raise ValidationError(
                 "PIN de cozinha não deve ter turma vinculada."
             )
+
+
+class CacheEntry(models.Model):
+    """Tabela interna usada pelo backend DatabaseCache do Django."""
+
+    cache_key = models.CharField(max_length=255, primary_key=True)
+    value = models.TextField()
+    expires = models.DateTimeField(db_index=True)
+
+    class Meta:
+        db_table = "edustock_cache"
+        verbose_name = "Entrada interna de cache"
+        verbose_name_plural = "Entradas internas de cache"
 

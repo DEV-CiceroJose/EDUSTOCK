@@ -81,10 +81,18 @@ Se preferir criar serviço por serviço:
    PYTHON_VERSION = 3.11.0
    DATABASE_URL = [Cole aqui a Internal Database URL do PostgreSQL]
    SECRET_KEY = [Gere uma chave aleatória segura]
+   PIN_LOOKUP_SECRET = [Gere outra chave aleatória segura]
+   APP_ENV = production
+   TRUSTED_PROXY_COUNT = 1
    DJANGO_SETTINGS_MODULE = easystock.settings
    DEBUG = False
    ALLOWED_HOSTS = .onrender.com
    ```
+
+   O `PIN_LOOKUP_SECRET` deve permanecer estável: ele é usado para localizar
+   PINs protegidos sem armazená-los em texto puro. Se houver Redis disponível,
+   configure também `REDIS_URL`; sem ele, o backend usa o PostgreSQL como cache
+   compartilhado para sessões operacionais e limitação de tentativas.
 
 5. Clique em **"Create Web Service"**
 

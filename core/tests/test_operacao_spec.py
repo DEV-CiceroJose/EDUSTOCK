@@ -371,6 +371,23 @@ class TestLoginPorPin(APITestCase):
         }, format="json")
         self.assertEqual(resp.status_code, 401, resp.content)
 
+    def test_rate_limit_bloqueia_sexta_tentativa_invalida(self):
+        for tentativa in range(5):
+            resp = self.client.post(
+                "/api/operacao/auth/",
+                {"pin": f"8{tentativa:03d}", "perfil": "ALUNO_REP"},
+                format="json",
+            )
+            self.assertEqual(resp.status_code, 401, resp.content)
+
+        bloqueado = self.client.post(
+            "/api/operacao/auth/",
+            {"pin": "8999", "perfil": "ALUNO_REP"},
+            format="json",
+        )
+        self.assertEqual(bloqueado.status_code, 429, bloqueado.content)
+        self.assertIn("Retry-After", bloqueado.headers)
+
     def test_login_pin_inativo_retorna_401(self):
         resp = self.client.post("/api/operacao/auth/", {
             "pin": "0003", "perfil": "ALUNO_REP",

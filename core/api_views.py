@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
-from plataforma.permissions import RequerModuloAtivo
+from plataforma.permissions import LeituraOuAdmin, RequerModuloAtivo
 from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
 from .serializers import (
     ProdutoSerializer, CategoriaSerializer, GrupoSerializer,
@@ -58,13 +58,13 @@ class PrestacaoContasView(APIView):
 
 
 class CategoriaViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
     queryset = Categoria.objects.all().order_by("name")
     serializer_class = CategoriaSerializer
 
 
 class ProdutoViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
     serializer_class = ProdutoSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["nome"]
@@ -94,13 +94,13 @@ class ProdutoViewSet(viewsets.ModelViewSet):
 
 
 class GrupoViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
     queryset = Grupo.objects.select_related("categoria").all()
     serializer_class = GrupoSerializer
 
 
 class BemPermanenteViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
     queryset = BemPermanente.objects.all()
     serializer_class = BemPermanenteSerializer
 
@@ -114,7 +114,7 @@ class BemPermanenteViewSet(viewsets.ModelViewSet):
 
 
 class FornecedorViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("fornecedores")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("fornecedores"), LeituraOuAdmin]
     serializer_class = FornecedorSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["nome", "documento"]

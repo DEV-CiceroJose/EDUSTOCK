@@ -206,3 +206,71 @@ class ProdutoQuantidadeReadOnlyTest(AutenticadoAPITestCase):
         self.assertEqual(resp.status_code, 200, resp.content)
         p.refresh_from_db()
         self.assertEqual(p.quantidade, Decimal("10.000"))  # inalterado
+
+
+class OperadorAutorizacaoApiTest(AutenticadoAPITestCase):
+    def setUp(self):
+        super().setUp()
+        from datetime import timedelta
+        from django.contrib.auth.models import User
+        from django.utils import timezone
+        from rest_framework.test import APIClient
+        from plataforma.models import Perfil, TokenAcesso
+
+        operador = User.objects.create_user(username="operador-api", password="x")
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        token = TokenAcesso.objects.create(
+            user=operador,
+            expira_em=timezone.now() + timedelta(hours=1),
+        )
+        self.operador_client = APIClient()
+        self.operador_client.credentials(
+            HTTP_AUTHORIZATION=f"Token {token.token}"
+        )
+
+        self.cat = Categoria.objects.create(name="Alimentos")
+        self.grupo = Grupo.objects.create(nome="Geral", categoria=self.cat)
+        self.produto = Produto.objects.create(
+            nome="Arroz", grupo=self.grupo, quantidade=10, unidade="KG"
+        )
+
+    def test_operador_consulta_mas_nao_cria_cadastro_mestre(self):
+        self.assertEqual(
+            self.operador_client.get("/api/produtos/").status_code,
+            200,
+        )
+        bloqueado = self.operador_client.post(
+            "/api/produtos/",
+            {
+                "nome": "Feijão",
+                "grupo": self.grupo.id,
+                "unidade": "KG",
+            },
+            format="json",
+        )
+        self.assertEqual(bloqueado.status_code, 403, bloqueado.content)
+
+    def test_operador_nao_altera_nem_exclui_cadastro_mestre(self):
+        patch = self.operador_client.patch(
+            f"/api/produtos/{self.produto.id}/",
+            {"nome": "Arroz alterado"},
+            format="json",
+        )
+        delete = self.operador_client.delete(
+            f"/api/produtos/{self.produto.id}/"
+        )
+        self.assertEqual(patch.status_code, 403, patch.content)
+        self.assertEqual(delete.status_code, 403, delete.content)
+
+    def test_operador_pode_registrar_movimentacao_diaria(self):
+        resposta = self.operador_client.post(
+            "/api/movimentacoes/",
+            {
+                "produto": self.produto.id,
+                "tipo": "SAIDA",
+                "quantidade": "2",
+                "motivo": "consumo",
+            },
+            format="json",
+        )
+        self.assertEqual(resposta.status_code, 201, resposta.content)

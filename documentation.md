@@ -82,7 +82,7 @@ O **EduStock** é um sistema digital de gestão de estoque para escolas pública
 │                                                                      │
 │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐    │
 │  │  services.py │  │   alerts.py  │  │  operacao_auth.py      │    │
-│  │  movim. ATM  │  │  validade +  │  │  tokens PIN em memória │    │
+│  │  movim. ATM  │  │  validade +  │  │  tokens PIN em cache   │    │
 │  │  select_for  │  │  estoque     │  │  TTL 12h               │    │
 │  │  _update()   │  │              │  │                        │    │
 │  └──────────────┘  └──────────────┘  └────────────────────────┘    │
@@ -101,7 +101,7 @@ O **EduStock** é um sistema digital de gestão de estoque para escolas pública
 
 ### Isolamento de segurança
 
-- Os endpoints `/api/operacao/*` (exceto `/resumo/`) rejeitam tokens de admin Django com **HTTP 403**.
+- Os endpoints operacionais protegidos por PIN rejeitam tokens do dashboard com **HTTP 403**. O endpoint `/resumo/` exige o token administrativo da plataforma.
 - O app-alunos e o app-cozinha não têm acesso a preços, fornecedores ou relatórios financeiros.
 - Os três apps não compartilham código, estado ou autenticação entre si.
 
@@ -128,7 +128,7 @@ easystock/
 │   ├── api_views.py             # ViewSets administrativos
 │   ├── models.py                # todos os modelos de dados
 │   ├── operacao.py              # lógica de plano e baixa de produção
-│   ├── operacao_auth.py         # autenticação por PIN (tokens em memória)
+│   ├── operacao_auth.py         # autenticação por PIN (tokens em cache)
 │   ├── operacao_views.py        # views dos endpoints /api/operacao/*
 │   ├── relatorios.py
 │   ├── serializers.py
@@ -490,7 +490,8 @@ Prefixo: `/api/`
 
 Prefixo: `/api/operacao/`
 
-Todos exigem o header `X-Operacao-Token` (exceto `/auth/` e `/resumo/`).
+Os endpoints dos apps exigem `X-Operacao-Token`; `/auth/` recebe o PIN e
+`/resumo/` exige `Authorization: Token <token-do-dashboard>`.
 Tokens de admin Django são rejeitados com **HTTP 403**.
 
 | Método | Endpoint | Perfil | Descrição |
@@ -499,7 +500,7 @@ Tokens de admin Django são rejeitados com **HTTP 403**.
 | DELETE | `/api/operacao/auth/logout/` | qualquer | Invalida token |
 | POST | `/api/operacao/contagem/` | ALUNO_REP | Registra frequência da turma |
 | GET | `/api/operacao/contagem/` | ALUNO_REP, COZINHA | Consulta total do dia/turno |
-| GET | `/api/operacao/resumo/` | — (público) | Resumo do dia para o dashboard admin |
+| GET | `/api/operacao/resumo/` | Token do dashboard | Resumo do dia para o dashboard admin |
 | GET | `/api/operacao/plano-do-dia/` | COZINHA | Ordem de produção calculada |
 | POST | `/api/operacao/baixa-de-producao/` | COZINHA | Registra saídas de estoque |
 
@@ -568,20 +569,20 @@ Body:   { "data": "2026-06-07", "turno": "MANHA" }
 
 ### 5.4 Autenticação por PIN (`operacao_auth.py`)
 
-Os **PINs** são registros no banco (modelos `Turma`/`PinAcesso`, geridos via
-Django Admin — ver seção 4.5); os **tokens de sessão** gerados após o login
-é que ficam em um dict Python em memória, sem depender de sessões Django.
+Os **PINs** são registros protegidos por hash no banco (modelos
+`Turma`/`PinAcesso`, geridos via Django Admin — ver seção 4.5); os
+**tokens de sessão** gerados após o login ficam no cache compartilhado do
+Django, sem depender de sessões de navegador.
 
 **Fluxo:**
 1. `POST /api/operacao/auth/` com PIN + perfil.
-2. Backend valida o PIN consultando `PinAcesso` no banco: para
-   `perfil=ALUNO_REP`, busca `PinAcesso.objects.filter(papel=ALUNO_REP, ativo=True)`
-   e resolve a `turma`/`turno` a partir do relacionamento `PinAcesso.turma`;
-   para `perfil=COZINHA`, verifica se existe um `PinAcesso` ativo com
-   `papel=COZINHA` e aquele PIN (sem turma). Nenhum PIN é hardcoded em
+2. Backend calcula a impressão digital protegida do valor recebido, localiza
+   o registro ativo e confirma o hash do PIN. Para `perfil=ALUNO_REP`, resolve
+   a `turma`/`turno` a partir do relacionamento `PinAcesso.turma`; para
+   `perfil=COZINHA`, valida o registro sem turma. Nenhum PIN é hardcoded em
    `settings.py` nem embutido no bundle JS de nenhum app — o servidor é a
    única fonte de verdade.
-3. Gera um token UUID e armazena em `_SESSOES` com TTL.
+3. Gera um token UUID e armazena no cache compartilhado com TTL.
 4. Retorna o token para o app, que o salva em `sessionStorage`.
 5. Cada request subsequente inclui `X-Operacao-Token: <token>`.
 6. O decorador `@requer_perfil_operacao(PERFIL_ALUNO)` / `@requer_perfil_operacao(PERFIL_COZINHA)` valida e injeta `request.sessao_operacao`.
@@ -600,7 +601,9 @@ def post(self, request):
     ...
 ```
 
-> **Nota de produção:** Os tokens ficam em memória do processo Django. Reiniciar o servidor invalida todas as sessões ativas. Para alta disponibilidade, substitua `_SESSOES` por um cache Redis.
+> **Nota de produção:** Os tokens usam o cache compartilhado do Django. Redis
+> é preferido quando `REDIS_URL` está configurada; caso contrário, o sistema
+> usa a tabela `edustock_cache` no banco de dados.
 
 ---
 
@@ -958,8 +961,8 @@ Para o Módulo E funcionar com dados reais, configure `FatorConsumo` para os pro
 
 - **Solicitações de reposição** — aba "sol" já existe no frontend (placeholder); lógica de pedidos baseada em consumo médio.
 - **UI de Bens Permanentes** — backend e API prontos, falta tela de listagem/edição.
-- **Autenticação do painel admin** — modelo `Perfil` existe; falta tela de login/logout e controle de permissões por perfil.
-- **Tokens de operação em cache distribuído** — substituir o dict em memória por Redis para suporte a múltiplos workers.
+- **Auditoria de ações administrativas** — registrar alterações críticas com usuário, data e objeto afetado.
+- **Redis dedicado** — opcionalmente substituir o cache de banco por Redis para reduzir carga no PostgreSQL.
 
 ### Fora de escopo (confirmado)
 
