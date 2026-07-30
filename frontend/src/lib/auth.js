@@ -44,6 +44,10 @@ export function ehAdmin() {
   return sessionStorage.getItem(IS_STAFF_KEY) === "true"
 }
 
+export function podeGerenciarCadastros() {
+  return ehAdmin() || getPapel() === "ADMIN"
+}
+
 export function getUsername() {
   return sessionStorage.getItem(USERNAME_KEY)
 }

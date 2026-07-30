@@ -18,6 +18,7 @@ import MainLayout from './layouts/MainLayout'
 import Sidebar from './layouts/Sidebar'
 import AlertasPage from './pages/AlertasPage'
 import AlertTicker from './features/alertas/AlertTicker'
+import { salvarSessao } from './lib/auth'
 
 // Mock react-router-dom's useNavigate
 const mockNavigate = vi.fn()
@@ -43,6 +44,13 @@ vi.mock('./hooks/useDashboardData', () => ({
 describe('Bug Condition Exploration Tests', () => {
   beforeEach(() => {
     mockNavigate.mockClear()
+    sessionStorage.clear()
+    salvarSessao({
+      token: 'test-token',
+      papel: 'ADMIN',
+      is_staff: true,
+      modulos_ativos: ['inventario', 'merenda'],
+    })
   })
 
   /**

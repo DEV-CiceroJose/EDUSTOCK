@@ -104,7 +104,7 @@ cd frontend
 npm install
 
 # Criar arquivo .env
-echo "VITE_API_BASE=" > .env
+echo "VITE_API_URL=http://localhost:8000/api" > .env
 
 npm run dev
 ```

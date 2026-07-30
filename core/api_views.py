@@ -32,11 +32,27 @@ class AlertasView(APIView):
     def get(self, request):
         tipo = request.query_params.get("tipo")
         urgencia = request.query_params.get("urgencia")
+        dias_validade = request.query_params.get("dias_validade", "30")
         if tipo and tipo not in ("validade", "estoque"):
             return Response({"detail": "tipo inválido"}, status=status.HTTP_400_BAD_REQUEST)
         if urgencia and urgencia not in ("critico", "alerta"):
             return Response({"detail": "urgencia inválida"}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(coletar_alertas(tipo=tipo, urgencia=urgencia))
+        try:
+            dias_validade = int(dias_validade)
+            if not 1 <= dias_validade <= 365:
+                raise ValueError
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "dias_validade deve ser um inteiro entre 1 e 365."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            coletar_alertas(
+                tipo=tipo,
+                urgencia=urgencia,
+                dias_alerta=dias_validade,
+            )
+        )
 
 
 class PrestacaoContasView(APIView):

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { produtosApi, categoriasApi, gruposApi, fornecedoresApi, movimentacoesApi, alertasApi } from "../api"
+import { getConfig } from "../lib/config"
 
 const ALERTAS_VAZIO = { resumo: {}, validade: [], estoque_critico: [] }
 
@@ -69,7 +70,7 @@ export function useDashboardData() {
         gruposApi.list(),
         fornecedoresApi.list(),
         movimentacoesApi.list(),
-        alertasApi.list(),
+        alertasApi.list({ dias_validade: getConfig().validityAlertDays }),
       ])
       setProdutos(p)
       setCategorias(c)

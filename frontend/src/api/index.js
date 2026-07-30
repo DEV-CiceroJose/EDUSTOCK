@@ -1,7 +1,8 @@
 import { mockProdutos, mockGrupos, mockCategorias, mockFornecedores, mockMovimentacoes, mockEntradas, mockAlertas, mockRelatorios, mockOperacao } from "./mock"
 import { httpProdutos, httpGrupos, httpCategorias, httpBensPermanentes, httpFornecedores, httpMovimentacoes, httpEntradas, httpAlertas, httpRelatorios, httpOperacao } from "./http"
+import { getConfig } from "../lib/config"
 
-const USE_MOCK = String(import.meta.env.VITE_USE_MOCK ?? "true") !== "false"
+const USE_MOCK = getConfig().useMock
 
 export const produtosApi = USE_MOCK ? mockProdutos : httpProdutos
 export const gruposApi = USE_MOCK ? mockGrupos : httpGrupos

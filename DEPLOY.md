@@ -111,7 +111,7 @@ Aguarde o build (5-10 minutos). A URL será algo como:
 
 4. **Environment Variables**:
    ```
-   VITE_API_BASE = https://edustock-backend.onrender.com
+   VITE_API_URL = https://edustock-backend.onrender.com/api
    ```
 
 5. Clique em **"Create Static Site"**
@@ -240,7 +240,8 @@ A Render detectará o push e fará o redeploy automaticamente!
 - Verifique se o DATABASE_URL está correto
 
 ### Frontend mostra erro de API
-- Confirme que VITE_API_BASE aponta para o backend correto
+- No dashboard administrativo, confirme que `VITE_API_URL` aponta para o backend com o sufixo `/api`
+- Nos apps Cozinha e Alunos, confirme que `VITE_API_BASE` aponta para o backend correto
 - Verifique CORS no backend
 - Aguarde o backend "acordar" (pode levar ~30s)
 

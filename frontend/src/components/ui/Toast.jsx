@@ -18,7 +18,12 @@ export function ToastProvider({ children }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div className="fixed bottom-20 right-5 z-[10000] flex flex-col gap-2">
+      <div
+        className="fixed bottom-20 right-5 z-[10000] flex flex-col gap-2"
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+      >
         <AnimatePresence>
           {items.map((t) => (
             <motion.div

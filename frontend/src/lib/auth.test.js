@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import {
   salvarSessao, limparSessao, getToken, getPapel,
-  getModulosAtivos, estaAutenticado, ehAdmin,
+  getModulosAtivos, estaAutenticado, ehAdmin, podeGerenciarCadastros,
   getUsername, getNome, atualizarNome,
 } from "./auth"
 
@@ -20,6 +20,12 @@ describe("auth", () => {
   it("ehAdmin depende de is_staff, não do papel da aplicação", () => {
     salvarSessao({ token: "abc-123", papel: "ADMIN", is_staff: false, modulos_ativos: [] })
     expect(ehAdmin()).toBe(false)
+    expect(podeGerenciarCadastros()).toBe(true)
+  })
+
+  it("operador nao pode gerenciar cadastros", () => {
+    salvarSessao({ token: "abc-123", papel: "OPERADOR", is_staff: false, modulos_ativos: [] })
+    expect(podeGerenciarCadastros()).toBe(false)
   })
 
   it("limparSessao remove tudo", () => {

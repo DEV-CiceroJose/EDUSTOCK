@@ -3,6 +3,8 @@
    Hierarquia: Categoria -> Grupo -> Produto. Persiste em localStorage.
 ------------------------------------------------------------------ */
 
+import { getConfig } from "../lib/config"
+
 const KEY = "easystock:db:v4"
 const delay = (ms = 220) => new Promise((r) => setTimeout(r, ms))
 
@@ -316,8 +318,6 @@ export const mockCategorias = {
 }
 
 const CRITICO_DIAS = 7
-const ALERTA_DIAS = 30
-
 function diasAteValidade(iso, hoje = new Date()) {
   const h = new Date(hoje)
   h.setHours(0, 0, 0, 0)
@@ -353,7 +353,8 @@ function motivoEstoque(quantidade, unidade) {
   return `Saldo: ${qtdFmt} ${label}`
 }
 
-function coletarAlertasMock(produtos, { tipo, urgencia } = {}) {
+export function coletarAlertasMock(produtos, { tipo, urgencia, dias_validade } = {}) {
+  const alertaDias = Number(dias_validade ?? getConfig().validityAlertDays)
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
 
@@ -364,7 +365,7 @@ function coletarAlertasMock(produtos, { tipo, urgencia } = {}) {
     for (const p of produtos) {
       if (!p.validade) continue
       const dias = diasAteValidade(p.validade, hoje)
-      if (dias > ALERTA_DIAS) continue
+      if (dias > alertaDias) continue
       const item = {
         produto_id: p.id,
         nome: p.nome,

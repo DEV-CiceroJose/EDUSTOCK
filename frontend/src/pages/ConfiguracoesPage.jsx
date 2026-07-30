@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { getConfig, setConfig as persistConfig } from "../lib/config"
 
 const DENSITY_OPTIONS = [
@@ -9,12 +9,6 @@ const DENSITY_OPTIONS = [
 
 export default function ConfiguracoesPage() {
   const [config, setConfig] = useState(() => getConfig())
-
-  // Load existing preferences on mount
-  useEffect(() => {
-    const currentConfig = getConfig()
-    setConfig(currentConfig)
-  }, [])
 
   // Persist config using helper function
   const updateConfig = (updates) => {
@@ -35,7 +29,7 @@ export default function ConfiguracoesPage() {
   const handleValidityDaysChange = (e) => {
     const value = parseInt(e.target.value, 10)
     // Validate positive integer
-    if (!isNaN(value) && value > 0) {
+    if (!isNaN(value) && value > 0 && value <= 365) {
       updateConfig({ validityAlertDays: value })
     }
   }
@@ -106,6 +100,7 @@ export default function ConfiguracoesPage() {
               id="validity-days"
               type="number"
               min="1"
+              max="365"
               value={config.validityAlertDays}
               onChange={handleValidityDaysChange}
               className="w-full max-w-xs rounded-lg border border-line bg-[#f4f1e7] px-4 py-2 text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"

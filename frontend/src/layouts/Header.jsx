@@ -1,12 +1,27 @@
 import { Icon } from "../lib/icons.jsx"
 import { Link } from "react-router-dom"
 
-export default function Header({ search, setSearch, onAddItem, onReport }) {
+export default function Header({
+  search,
+  setSearch,
+  onAddItem,
+  onReport,
+  onMenu,
+  menuOpen = false,
+  canManage = true,
+}) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur-md">
       <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
         {/* Marca */}
-        <button className="grid h-10 w-10 place-items-center rounded-xl text-ink-soft hover:bg-surface-2 lg:hidden" aria-label="Menu">
+        <button
+          type="button"
+          onClick={onMenu}
+          className="grid h-10 w-10 place-items-center rounded-xl text-ink-soft hover:bg-surface-2 lg:hidden"
+          aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+          aria-expanded={menuOpen}
+          aria-controls="mobile-navigation"
+        >
           {Icon.menu(22)}
         </button>
         <div className="flex items-center gap-2.5">
@@ -36,9 +51,11 @@ export default function Header({ search, setSearch, onAddItem, onReport }) {
 
         {/* Ações */}
         <div className="ml-auto flex items-center gap-2 md:ml-0">
-          <button onClick={onAddItem} className="btn btn-brand">
-            {Icon.plus(18)} <span className="hidden sm:inline">Adicionar Item</span>
-          </button>
+          {canManage && (
+            <button onClick={onAddItem} className="btn btn-brand">
+              {Icon.plus(18)} <span className="hidden sm:inline">Adicionar Item</span>
+            </button>
+          )}
           <button onClick={onReport} className="btn btn-ghost">
             {Icon.report(18)} <span className="hidden lg:inline">Relatório</span>
           </button>

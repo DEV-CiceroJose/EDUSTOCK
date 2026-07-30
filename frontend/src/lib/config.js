@@ -4,6 +4,7 @@
  */
 
 const STORAGE_KEY = "edustock:config";
+export const CONFIG_CHANGED_EVENT = "edustock:config-changed";
 
 /**
  * Default configuration values
@@ -109,6 +110,11 @@ export function setConfig(updates) {
   // Persist to localStorage
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent(CONFIG_CHANGED_EVENT, { detail: merged })
+      );
+    }
   } catch (error) {
     console.error("Error saving config to localStorage:", error);
     throw error;

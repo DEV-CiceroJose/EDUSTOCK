@@ -14,7 +14,7 @@ function Linha({ label, children }) {
   )
 }
 
-export default function DetailsModal({ produto, onClose, onEdit, onDelete, onAdd, onRemove }) {
+export default function DetailsModal({ produto, onClose, onEdit, onDelete, onAdd, onRemove, canManage = true }) {
   if (!produto) return null
   const mostrarPreco = getModulosAtivos().includes("financeiro")
   const st = categoryStyle(produto.categoria_nome)
@@ -78,16 +78,20 @@ export default function DetailsModal({ produto, onClose, onEdit, onDelete, onAdd
         >
           {Icon.minus(16)} Retirar
         </button>
-        <button onClick={() => onEdit(produto)} className="btn btn-brand">
-          {Icon.edit(16)} Editar
-        </button>
-        <button 
-          onClick={() => onDelete(produto)} 
-          className="btn px-3" 
-          style={{ background: "var(--color-out-tint)", color: "var(--color-out)" }}
-        >
-          {Icon.trash(16)} Excluir
-        </button>
+        {canManage && (
+          <>
+            <button onClick={() => onEdit(produto)} className="btn btn-brand">
+              {Icon.edit(16)} Editar
+            </button>
+            <button
+              onClick={() => onDelete(produto)}
+              className="btn px-3"
+              style={{ background: "var(--color-out-tint)", color: "var(--color-out)" }}
+            >
+              {Icon.trash(16)} Excluir
+            </button>
+          </>
+        )}
       </div>
     </Modal>
   )

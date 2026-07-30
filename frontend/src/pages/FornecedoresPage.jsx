@@ -2,11 +2,13 @@ import { useState } from "react"
 import { useDashboardData } from "../hooks/useDashboardData"
 import FornecedoresView from "../features/fornecedores/FornecedoresView"
 import FornecedorFormModal from "../features/fornecedores/FornecedorFormModal"
+import { podeGerenciarCadastros } from "../lib/auth"
 
 export default function FornecedoresPage() {
   const { fornecedores, loading, carregar } = useDashboardData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editFornecedor, setEditFornecedor] = useState(null)
+  const canManage = podeGerenciarCadastros()
 
   const handleNew = () => {
     setEditFornecedor(null)
@@ -43,14 +45,15 @@ export default function FornecedoresPage() {
         onNew={handleNew}
         onEdit={handleEdit}
         onChanged={carregar}
+        canManage={canManage}
       />
       
-      <FornecedorFormModal
+      {canManage && <FornecedorFormModal
         open={modalOpen}
         fornecedor={editFornecedor}
         onClose={handleClose}
         onSaved={handleSaved}
-      />
+      />}
     </div>
   )
 }

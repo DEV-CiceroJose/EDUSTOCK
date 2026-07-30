@@ -1,6 +1,18 @@
 from django.contrib import admin
 from django import forms
-from .models import Categoria, PinAcesso, Produto, Turma
+from .models import (
+    BemPermanente,
+    Categoria,
+    Entrada,
+    FatorConsumo,
+    Fornecedor,
+    FrequenciaDiaria,
+    Grupo,
+    Movimentacao,
+    PinAcesso,
+    Produto,
+    Turma,
+)
 
 
 class PinAcessoForm(forms.ModelForm):
@@ -51,6 +63,14 @@ class CategoriaAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
     search_fields = ('name',)
     ordering = ('name',)
+
+
+@admin.register(Grupo)
+class GrupoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "categoria")
+    list_filter = ("categoria",)
+    search_fields = ("nome", "categoria__name")
+    ordering = ("categoria__name", "nome")
 
 
 # 🔹 Produto
@@ -113,6 +133,109 @@ class ProdutoAdmin(admin.ModelAdmin):
             obj.criado_por = request.user
         obj.atualizado_por = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(Fornecedor)
+class FornecedorAdmin(admin.ModelAdmin):
+    list_display = (
+        "nome",
+        "documento",
+        "telefone",
+        "emite_nota_fiscal",
+        "aceita_fiado",
+        "ativo",
+    )
+    list_filter = ("ativo", "emite_nota_fiscal", "aceita_fiado")
+    search_fields = ("nome", "documento", "email", "telefone")
+    ordering = ("nome",)
+
+
+@admin.register(BemPermanente)
+class BemPermanenteAdmin(admin.ModelAdmin):
+    list_display = (
+        "nome",
+        "numero_patrimonio",
+        "localizacao",
+        "responsavel",
+        "estado_conservacao",
+    )
+    list_filter = ("estado_conservacao", "localizacao")
+    search_fields = ("nome", "numero_patrimonio", "responsavel", "localizacao")
+    readonly_fields = ("criado_por", "atualizado_por", "criado_em", "atualizado_em")
+
+    def save_model(self, request, obj, form, change):
+        if not obj.criado_por:
+            obj.criado_por = request.user
+        obj.atualizado_por = request.user
+        super().save_model(request, obj, form, change)
+
+
+class RegistroEstoqueSomenteLeituraAdmin(admin.ModelAdmin):
+    """Ledger financeiro/estoque deve ser consultado, nunca editado no admin."""
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Entrada)
+class EntradaAdmin(RegistroEstoqueSomenteLeituraAdmin):
+    list_display = (
+        "id",
+        "data",
+        "fornecedor",
+        "numero_nota_fiscal",
+        "total",
+        "criado_por",
+    )
+    list_filter = ("data", "fornecedor")
+    search_fields = ("numero_nota_fiscal", "fornecedor__nome")
+    date_hierarchy = "data"
+
+
+@admin.register(Movimentacao)
+class MovimentacaoAdmin(RegistroEstoqueSomenteLeituraAdmin):
+    list_display = (
+        "id",
+        "data",
+        "tipo",
+        "produto",
+        "quantidade",
+        "preco_unitario",
+        "motivo",
+        "criado_por",
+    )
+    list_filter = ("tipo", "data", "produto__grupo__categoria")
+    search_fields = ("produto__nome", "motivo", "entrada__numero_nota_fiscal")
+    date_hierarchy = "data"
+
+
+@admin.register(FrequenciaDiaria)
+class FrequenciaDiariaAdmin(admin.ModelAdmin):
+    list_display = (
+        "data",
+        "turno",
+        "turma",
+        "quantidade_alunos",
+        "registrado_por_turma",
+        "registrado_por",
+    )
+    list_filter = ("turno", "data")
+    search_fields = ("turma", "registrado_por_turma")
+    date_hierarchy = "data"
+
+
+@admin.register(FatorConsumo)
+class FatorConsumoAdmin(admin.ModelAdmin):
+    list_display = ("produto", "gramas_por_aluno", "ativo")
+    list_filter = ("ativo", "produto__grupo__categoria")
+    search_fields = ("produto__nome",)
+    autocomplete_fields = ("produto",)
 
 
 # 🔹 PinAcesso Inline

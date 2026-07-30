@@ -36,9 +36,9 @@ def _base_qs():
     return Produto.objects.select_related("grupo", "grupo__categoria", "fornecedor")
 
 
-def queryset_validade(hoje=None):
+def queryset_validade(hoje=None, dias_alerta=ALERTA_DIAS):
     hoje = hoje or timezone.localdate()
-    limite = hoje + timedelta(days=ALERTA_DIAS)
+    limite = hoje + timedelta(days=dias_alerta)
     return _base_qs().filter(validade__isnull=False, validade__lte=limite)
 
 
@@ -94,14 +94,14 @@ def _serializar_estoque(produto):
     }
 
 
-def coletar_alertas(*, tipo=None, urgencia=None, hoje=None):
+def coletar_alertas(*, tipo=None, urgencia=None, hoje=None, dias_alerta=ALERTA_DIAS):
     hoje = hoje or timezone.localdate()
 
     validade_items = []
     estoque_items = []
 
     if tipo in (None, "validade"):
-        for p in queryset_validade(hoje):
+        for p in queryset_validade(hoje, dias_alerta=dias_alerta):
             item = _serializar_validade(p, hoje)
             if urgencia is None or item["urgencia"] == urgencia:
                 validade_items.append(item)
