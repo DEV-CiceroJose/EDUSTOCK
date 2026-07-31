@@ -87,44 +87,18 @@ class PrestacaoContasTest(TestCase):
         self.assertEqual(len(result["fornecedores"][0]["documentos"]), 2)
         self.assertEqual(result["fornecedores"][0]["total_fornecedor"], "20.00")
 
-    def test_legado_por_criado_em(self):
-        Produto.objects.create(
-            nome="Legado", grupo=self.grupo_alim, unidade="UN",
-            numero_nota_fiscal="NF-LEG", fornecedor=self.forn,
-            quantidade=Decimal("5"), preco=Decimal("4.00"),
-        )
-        result = gerar_prestacao_contas(inicio=self.inicio, fim=self.fim)
-        self.assertEqual(len(result["fornecedores"]), 1)
-        doc = result["fornecedores"][0]["documentos"][0]
-        self.assertTrue(doc["legado"])
-        self.assertEqual(doc["total"], "20.00")
-
-    def test_legado_fora_periodo_ignorado(self):
-        p = Produto.objects.create(
-            nome="Legado", grupo=self.grupo_alim, unidade="UN",
-            numero_nota_fiscal="NF-LEG", fornecedor=self.forn,
-            quantidade=Decimal("5"), preco=Decimal("4.00"),
-        )
-        Produto.objects.filter(pk=p.pk).update(
-            criado_em=timezone.now() - timedelta(days=120),
-        )
-        futuro = self.hoje + timedelta(days=30)
-        result = gerar_prestacao_contas(
-            inicio=futuro.replace(day=1),
-            fim=futuro,
-        )
-        self.assertEqual(result["fornecedores"], [])
-
-    def test_fallback_nf_legado_no_item(self):
-        p = self._criar_produto("Arroz", self.grupo_alim, quantidade=0, numero_nota_fiscal="NF-PROD")
+    def test_relatorio_usa_apenas_documentos_de_entrada(self):
+        p = self._criar_produto("Arroz", self.grupo_alim, quantidade=0)
         registrar_entrada(
-            fornecedor=self.forn, numero_nota_fiscal="", data=self.hoje, observacao="",
+            fornecedor=self.forn, numero_nota_fiscal="NF-ATUAL", data=self.hoje, observacao="",
             itens=[{"produto": p, "quantidade": Decimal("1"), "preco_unitario": Decimal("10.00")}],
             user=None,
         )
         result = gerar_prestacao_contas(inicio=self.inicio, fim=self.fim)
-        item = result["fornecedores"][0]["documentos"][0]["itens"][0]
-        self.assertEqual(item["numero_nota_fiscal_legado"], "NF-PROD")
+        documento = result["fornecedores"][0]["documentos"][0]
+        self.assertEqual(documento["numero_nota_fiscal"], "NF-ATUAL")
+        self.assertNotIn("legado", documento)
+        self.assertNotIn("numero_nota_fiscal_legado", documento["itens"][0])
 
 
 class PrestacaoContasApiTest(AutenticadoAPITestCase):

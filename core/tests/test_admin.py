@@ -4,6 +4,7 @@ from django.test import TestCase
 from core.models import (
     BemPermanente,
     Categoria,
+    ConfiguracaoAlertas,
     Entrada,
     FatorConsumo,
     Fornecedor,
@@ -30,6 +31,7 @@ class CoreAdminRegistrationTest(TestCase):
             FatorConsumo,
             Turma,
             PinAcesso,
+            ConfiguracaoAlertas,
         )
         for modelo in modelos:
             with self.subTest(modelo=modelo.__name__):

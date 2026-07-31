@@ -41,9 +41,9 @@ export default function DetailsModal({ produto, onClose, onEdit, onDelete, onAdd
         </Linha>
         {mostrarPreco && (
           <>
-            <Linha label="Preço unitário">{brl(produto.preco)}</Linha>
+            <Linha label="Último preço de entrada">{brl(produto.ultimo_preco)}</Linha>
             <Linha label="Valor em estoque">
-              {produto.preco ? brl(Number(produto.preco) * Number(produto.quantidade)) : "—"}
+              {produto.ultimo_preco ? brl(Number(produto.ultimo_preco) * Number(produto.quantidade)) : "—"}
             </Linha>
           </>
         )}
@@ -54,9 +54,6 @@ export default function DetailsModal({ produto, onClose, onEdit, onDelete, onAdd
             </span>
           ) : "Sem validade"}
         </Linha>
-        {produto.numero_nota_fiscal && (
-          <Linha label="NF (legado)">{produto.numero_nota_fiscal}</Linha>
-        )}
         <Linha label="Estoque mínimo">{qtd(produto.estoque_minimo)} {unidadeLabel(produto.unidade).toLowerCase()}</Linha>
         <Linha label="Periodicidade">{produto.periodicidade ?? "—"}</Linha>
         <Linha label="Fornecedor">{produto.fornecedor_nome || "—"}</Linha>

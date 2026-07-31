@@ -8,11 +8,25 @@ import {
   produtosApi,
 } from "../api"
 import { getConfig } from "../lib/config"
+import type { Alertas, Categoria, Fornecedor, Grupo, Id, Movimentacao, Produto } from "../api/types"
 
-const ALERTAS_VAZIO = { resumo: {}, validade: [], estoque_critico: [] }
+const ALERTAS_VAZIO: Alertas = { resumo: {}, validade: [], estoque_critico: [] }
 
-function flattenAlertas(alertas) {
-  const mapUrgencia = (urgencia) => (urgencia === "critico" ? "out" : "low")
+export type DashboardAlert = {
+  id: string
+  code: "out" | "low"
+  label: string
+  produtoId: Id
+}
+
+export type DashboardFilter =
+  | { tipo: "all" }
+  | { tipo: "cat"; id: Id }
+  | { tipo: "grupo"; id: Id }
+
+function flattenAlertas(alertas: Alertas): DashboardAlert[] {
+  const mapUrgencia = (urgencia: "critico" | "alerta"): "out" | "low" =>
+    urgencia === "critico" ? "out" : "low"
   return [
     ...(alertas.validade ?? []).map((alerta) => ({
       id: `v${alerta.produto_id}`,
@@ -30,15 +44,15 @@ function flattenAlertas(alertas) {
 }
 
 export function useDashboardData() {
-  const [produtos, setProdutos] = useState([])
-  const [categorias, setCategorias] = useState([])
-  const [grupos, setGrupos] = useState([])
-  const [fornecedores, setFornecedores] = useState([])
-  const [movimentacoes, setMovimentacoes] = useState([])
-  const [alertas, setAlertas] = useState(ALERTAS_VAZIO)
+  const [produtos, setProdutos] = useState<Produto[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [grupos, setGrupos] = useState<Grupo[]>([])
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
+  const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
+  const [alertas, setAlertas] = useState<Alertas>(ALERTAS_VAZIO)
   const [loadingProdutos, setLoadingProdutos] = useState(true)
   const [loadingBase, setLoadingBase] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<unknown>(null)
   const [revision, setRevision] = useState(0)
   const [search, setSearch] = useState("")
   const [termo, setTermo] = useState("")
@@ -66,7 +80,7 @@ export function useDashboardData() {
       gruposApi.list(),
       fornecedoresApi.list(),
       movimentacoesApi.list(),
-      alertasApi.list({ dias_validade: getConfig().validityAlertDays }),
+      alertasApi.list({ dias_validade: (getConfig() as { validityAlertDays: number }).validityAlertDays }),
     ])
       .then(([categoriasData, gruposData, fornecedoresData, movimentacoesData, alertasData]) => {
         if (!active) return
@@ -101,8 +115,8 @@ export function useDashboardData() {
   }, [revision, termo])
 
   const counts = useMemo(() => {
-    const cat = {}
-    const grupo = {}
+    const cat: Record<Id, number> = {}
+    const grupo: Record<Id, number> = {}
     for (const produto of produtos) {
       if (produto.categoria != null) {
         cat[produto.categoria] = (cat[produto.categoria] || 0) + 1
@@ -112,7 +126,7 @@ export function useDashboardData() {
     return { cat, grupo }
   }, [produtos])
 
-  const visiveis = useMemo(() => (filtro) => {
+  const visiveis = useMemo(() => (filtro?: DashboardFilter) => {
     if (!filtro || filtro.tipo === "all") return produtos
     if (filtro.tipo === "cat") {
       return produtos.filter((produto) => produto.categoria === filtro.id)
@@ -128,7 +142,7 @@ export function useDashboardData() {
   const resumo = useMemo(() => {
     let valor = 0
     for (const produto of produtos) {
-      if (produto.preco) valor += Number(produto.preco) * Number(produto.quantidade)
+      if (produto.ultimo_preco) valor += Number(produto.ultimo_preco) * Number(produto.quantidade)
     }
     return {
       valor,

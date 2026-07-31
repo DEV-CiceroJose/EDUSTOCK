@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import OuterRef, Subquery
 from plataforma.permissions import LeituraOuAdmin, RequerModuloAtivo
 from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
 from .serializers import (
@@ -32,15 +33,16 @@ class AlertasView(APIView):
     def get(self, request):
         tipo = request.query_params.get("tipo")
         urgencia = request.query_params.get("urgencia")
-        dias_validade = request.query_params.get("dias_validade", "30")
+        dias_validade = request.query_params.get("dias_validade")
         if tipo and tipo not in ("validade", "estoque"):
             return Response({"detail": "tipo inválido"}, status=status.HTTP_400_BAD_REQUEST)
         if urgencia and urgencia not in ("critico", "alerta"):
             return Response({"detail": "urgencia inválida"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            dias_validade = int(dias_validade)
-            if not 1 <= dias_validade <= 365:
-                raise ValueError
+            if dias_validade is not None:
+                dias_validade = int(dias_validade)
+                if not 1 <= dias_validade <= 365:
+                    raise ValueError
         except (TypeError, ValueError):
             return Response(
                 {"detail": "dias_validade deve ser um inteiro entre 1 e 365."},
@@ -86,9 +88,18 @@ class ProdutoViewSet(viewsets.ModelViewSet):
     search_fields = ["nome"]
 
     def get_queryset(self):
+        ultimo_preco = (
+            Movimentacao.objects.filter(
+                produto_id=OuterRef("pk"),
+                tipo=Movimentacao.ENTRADA,
+                preco_unitario__isnull=False,
+            )
+            .order_by("-data", "-id")
+            .values("preco_unitario")[:1]
+        )
         qs = Produto.objects.select_related(
             "grupo__categoria", "fornecedor", "criado_por", "atualizado_por"
-        ).all()
+        ).annotate(ultimo_preco=Subquery(ultimo_preco))
         grupo = self.request.query_params.get("grupo")
         categoria = self.request.query_params.get("categoria")
         fornecedor = self.request.query_params.get("fornecedor")

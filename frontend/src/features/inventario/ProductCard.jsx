@@ -80,9 +80,6 @@ export default function ProductCard({ produto, index = 0, onDetails }) {
           </span>
         )}
       </div>
-      {produto.numero_nota_fiscal && (
-        <div className="mt-1 font-mono text-[0.6rem] text-ink-faint">NF {produto.numero_nota_fiscal}</div>
-      )}
     </motion.div>
   )
 }

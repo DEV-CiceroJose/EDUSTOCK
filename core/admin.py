@@ -3,6 +3,7 @@ from django import forms
 from .models import (
     BemPermanente,
     Categoria,
+    ConfiguracaoAlertas,
     Entrada,
     FatorConsumo,
     Fornecedor,
@@ -80,12 +81,10 @@ class ProdutoAdmin(admin.ModelAdmin):
     # 📋 Colunas exibidas na lista
     list_display = (
         'nome',
-        'numero_nota_fiscal',
         'grupo',
         'quantidade',
         'unidade',
         'validade',
-        'preco',
         'criado_por',
         'atualizado_por',
         'atualizado_em'
@@ -94,7 +93,6 @@ class ProdutoAdmin(admin.ModelAdmin):
     # 🔍 Filtros laterais
     list_filter = (
         'grupo',
-        'numero_nota_fiscal',
         'unidade',
         'validade',
         'criado_em',
@@ -117,10 +115,10 @@ class ProdutoAdmin(admin.ModelAdmin):
     # 🧩 Organização dos campos no formulário
     fieldsets = (
         ('Informações do Produto', {
-            'fields': ('nome', 'numero_nota_fiscal', 'grupo', 'quantidade', 'unidade')
+            'fields': ('nome', 'grupo', 'fornecedor', 'quantidade', 'unidade')
         }),
         ('Detalhes', {
-            'fields': ('validade', 'preco')
+            'fields': ('estoque_minimo', 'perecivel', 'periodicidade', 'validade')
         }),
         ('Auditoria', {
             'fields': ('criado_por', 'atualizado_por', 'criado_em', 'atualizado_em')
@@ -266,3 +264,19 @@ class PinAcessoAdmin(admin.ModelAdmin):
     @admin.display(description="Acesso")
     def identificacao(self, obj):
         return str(obj)
+
+
+@admin.register(ConfiguracaoAlertas)
+class ConfiguracaoAlertasAdmin(admin.ModelAdmin):
+    fieldsets = (
+        ("Validade", {"fields": ("critico_dias", "alerta_dias")}),
+        ("Estoque", {"fields": ("estoque_percentual",)}),
+        ("Auditoria", {"fields": ("atualizado_em",)}),
+    )
+    readonly_fields = ("atualizado_em",)
+
+    def has_add_permission(self, request):
+        return not ConfiguracaoAlertas.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

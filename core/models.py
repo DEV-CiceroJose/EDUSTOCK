@@ -54,9 +54,6 @@ class Produto(models.Model):
     ]
 
     nome = models.CharField("Nome", max_length=200)
-    numero_nota_fiscal = models.CharField(
-        "Número da Nota Fiscal", max_length=12, null=True, blank=True
-    )
     grupo = models.ForeignKey("Grupo", on_delete=models.PROTECT, related_name="produtos")
     fornecedor = models.ForeignKey(
         "Fornecedor", on_delete=models.PROTECT, null=True, blank=True, related_name="produtos"
@@ -71,8 +68,6 @@ class Produto(models.Model):
         max_length=8, choices=PERIODICIDADE_CHOICES, default="EVENTUAL"
     )
     validade = models.DateField("Validade", null=True, blank=True, db_index=True)
-    preco = models.DecimalField("Preço", max_digits=10, decimal_places=2, null=True, blank=True)
-
     criado_por = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="produtos_criados"
     )
@@ -390,6 +385,55 @@ class PinAcesso(models.Model):
             raise ValidationError(
                 "PIN de cozinha não deve ter turma vinculada."
             )
+
+
+class ConfiguracaoAlertas(models.Model):
+    """Parâmetros globais editáveis pela administração da escola."""
+
+    critico_dias = models.PositiveSmallIntegerField(
+        "Prazo crítico de validade (dias)",
+        default=7,
+        help_text="Produtos com menos dias que este valor são classificados como críticos.",
+    )
+    alerta_dias = models.PositiveSmallIntegerField(
+        "Antecedência padrão de validade (dias)",
+        default=30,
+        help_text="Janela padrão usada para listar produtos próximos do vencimento.",
+    )
+    estoque_percentual = models.PositiveSmallIntegerField(
+        "Limiar de estoque baixo (%)",
+        default=20,
+        help_text="Percentual do estoque mínimo abaixo do qual o produto gera alerta.",
+    )
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuração de alertas"
+        verbose_name_plural = "Configuração de alertas"
+
+    def __str__(self):
+        return "Parâmetros globais de alertas"
+
+    def clean(self):
+        super().clean()
+        if self.critico_dias >= self.alerta_dias:
+            raise ValidationError(
+                {"critico_dias": "O prazo crítico deve ser menor que a antecedência padrão."}
+            )
+        if not 1 <= self.estoque_percentual <= 100:
+            raise ValidationError(
+                {"estoque_percentual": "Informe um percentual entre 1 e 100."}
+            )
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def carregar(cls):
+        configuracao, _ = cls.objects.get_or_create(pk=1)
+        return configuracao
 
 
 class CacheEntry(models.Model):

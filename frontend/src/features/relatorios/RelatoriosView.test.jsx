@@ -13,8 +13,8 @@ const { DADOS } = vi.hoisted(() => ({
     fornecedores: [{
       fornecedor_id: 1, fornecedor_nome: "Mercadinho do Zé", documento: "", total_fornecedor: "100.00",
       documentos: [{
-        entrada_id: 1, numero_nota_fiscal: "NF-001", data: "2026-07-10", total: "100.00", legado: false,
-        itens: [{ produto_nome: "Arroz", quantidade: "10", preco_unitario: "10.00", subtotal: "100.00", numero_nota_fiscal_legado: null }],
+        entrada_id: 1, numero_nota_fiscal: "NF-001", data: "2026-07-10", total: "100.00",
+        itens: [{ produto_nome: "Arroz", quantidade: "10", preco_unitario: "10.00", subtotal: "100.00" }],
       }],
     }],
   },

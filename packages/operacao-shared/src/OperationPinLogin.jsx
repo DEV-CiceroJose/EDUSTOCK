@@ -70,7 +70,7 @@ export default function OperationPinLogin({
 
       <div className="grid w-full gap-3" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         {TECLAS.map((key, index) => {
-          if (key === "") return <div key={index} />
+          if (key === "") return <div key={`empty-${index}`} />
           if (key === "back") {
             return (
               <button
