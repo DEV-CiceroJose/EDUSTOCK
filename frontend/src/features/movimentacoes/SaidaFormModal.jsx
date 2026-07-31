@@ -1,18 +1,19 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { movimentacoesApi } from "../../api"
 import { MOTIVOS_SAIDA } from "../../api/units"
 import Modal from "../../components/ui/Modal"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 
 export default function SaidaFormModal({ open, produtos, onClose, onSaved }) {
+  if (!open) return null
+  return <SaidaForm produtos={produtos} onClose={onClose} onSaved={onSaved} />
+}
+
+function SaidaForm({ produtos, onClose, onSaved }) {
   const [form, setForm] = useState({ produto: "", quantidade: "", motivo: "consumo" })
   const [erro, setErro] = useState("")
   const [salvando, setSalvando] = useState(false)
   const toast = useToast()
-
-  useEffect(() => {
-    if (open) { setForm({ produto: "", quantidade: "", motivo: "consumo" }); setErro("") }
-  }, [open])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const saldo = useMemo(() => {
@@ -40,7 +41,7 @@ export default function SaidaFormModal({ open, produtos, onClose, onSaved }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Registrar saída" subtitle="Consumo, perda ou ajuste" maxW="max-w-md">
+    <Modal open onClose={onClose} title="Registrar saída" subtitle="Consumo, perda ou ajuste" maxW="max-w-md">
       <form onSubmit={submit} className="space-y-4">
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Produto</span>

@@ -1,14 +1,33 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { produtosApi, movimentacoesApi } from "../../api"
 import { UNIDADES, PERIODICIDADES } from "../../api/units"
 import Modal from "../../components/ui/Modal"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 import { getModulosAtivos } from "../../lib/auth"
 
 const VAZIO = {
   nome: "", numero_nota_fiscal: "", grupo: "", fornecedor: "",
   quantidade: "", unidade: "UN", estoque_minimo: "",
   perecivel: false, periodicidade: "EVENTUAL", validade: "", preco: "",
+}
+
+function criarFormInicial(produto, grupos) {
+  if (!produto) {
+    return { ...VAZIO, grupo: grupos[0] ? String(grupos[0].id) : "" }
+  }
+  return {
+    nome: produto.nome ?? "",
+    numero_nota_fiscal: produto.numero_nota_fiscal ?? "",
+    grupo: String(produto.grupo ?? ""),
+    fornecedor: String(produto.fornecedor ?? ""),
+    quantidade: String(produto.quantidade ?? ""),
+    unidade: produto.unidade ?? "UN",
+    estoque_minimo: String(produto.estoque_minimo ?? ""),
+    perecivel: Boolean(produto.perecivel),
+    periodicidade: produto.periodicidade ?? "EVENTUAL",
+    validade: produto.validade ?? "",
+    preco: produto.preco ?? "",
+  }
 }
 
 function Campo({ label, hint, children, full }) {
@@ -24,9 +43,23 @@ function Campo({ label, hint, children, full }) {
 }
 
 export default function ProductFormModal({ open, produto, grupos, fornecedores = [], onClose, onSaved }) {
+  if (!open) return null
+  return (
+    <ProductForm
+      key={produto?.id ?? "novo"}
+      produto={produto}
+      grupos={grupos}
+      fornecedores={fornecedores}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  )
+}
+
+function ProductForm({ produto, grupos, fornecedores, onClose, onSaved }) {
   const editando = Boolean(produto)
   const mostrarPreco = getModulosAtivos().includes("financeiro")
-  const [form, setForm] = useState(VAZIO)
+  const [form, setForm] = useState(() => criarFormInicial(produto, grupos))
   const [erros, setErros] = useState({})
   const [salvando, setSalvando] = useState(false)
   const toast = useToast()
@@ -52,28 +85,6 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
     return lista
   }, [fornecedores, produto])
 
-  useEffect(() => {
-    if (!open) return
-    if (produto) {
-      setForm({
-        nome: produto.nome ?? "",
-        numero_nota_fiscal: produto.numero_nota_fiscal ?? "",
-        grupo: String(produto.grupo ?? ""),
-        fornecedor: String(produto.fornecedor ?? ""),
-        quantidade: String(produto.quantidade ?? ""),
-        unidade: produto.unidade ?? "UN",
-        estoque_minimo: String(produto.estoque_minimo ?? ""),
-        perecivel: Boolean(produto.perecivel),
-        periodicidade: produto.periodicidade ?? "EVENTUAL",
-        validade: produto.validade ?? "",
-        preco: produto.preco ?? "",
-      })
-    } else {
-      setForm({ ...VAZIO, grupo: grupos[0] ? String(grupos[0].id) : "" })
-    }
-    setErros({})
-  }, [open, produto, grupos])
-
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }))
 
@@ -92,7 +103,8 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
     if (!validar()) return
     setSalvando(true)
     try {
-      const { numero_nota_fiscal, ...campos } = form
+      const campos = { ...form }
+      delete campos.numero_nota_fiscal
       const payload = { ...campos, fornecedor: form.fornecedor || null }
       if (editando) {
         await produtosApi.update(produto.id, payload)
@@ -118,7 +130,7 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       title={editando ? "Editar item" : "Adicionar novo item"}
       subtitle={editando ? produto?.nome : "Cadastre um produto no estoque"}

@@ -1,16 +1,14 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Modal from "../../components/ui/Modal"
 
 export default function NewCategoryModal({ open, onClose, onCreate }) {
+  if (!open) return null
+  return <NewCategoryForm onClose={onClose} onCreate={onCreate} />
+}
+
+function NewCategoryForm({ onClose, onCreate }) {
   const [nome, setNome] = useState("")
   const [salvando, setSalvando] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setNome("")
-      setSalvando(false)
-    }
-  }, [open])
 
   async function submit(ev) {
     ev.preventDefault()
@@ -26,7 +24,7 @@ export default function NewCategoryModal({ open, onClose, onCreate }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Nova categoria" subtitle="Organize os itens do estoque" maxW="max-w-sm">
+    <Modal open onClose={onClose} title="Nova categoria" subtitle="Organize os itens do estoque" maxW="max-w-sm">
       <form onSubmit={submit} className="flex flex-col gap-4">
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Nome da categoria</span>

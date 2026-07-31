@@ -50,6 +50,8 @@ EduStock/
 │   └── src/
 ├── app-cozinha/          # Interface para cozinha (React)
 │   └── src/
+├── packages/
+│   └── operacao-shared/  # PIN, cliente HTTP e tokens usados pelos mini-apps
 ├── easystock/            # Configurações Django
 │   ├── settings.py
 │   └── urls.py

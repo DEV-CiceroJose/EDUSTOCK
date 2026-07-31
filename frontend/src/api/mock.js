@@ -125,7 +125,8 @@ export const mockProdutos = {
     const db = load()
     const i = db.produtos.findIndex((x) => x.id === Number(id))
     if (i === -1) throw new Error("Produto não encontrado")
-    const { quantidade, ...semSaldo } = normalize(data)
+    const semSaldo = normalize(data)
+    delete semSaldo.quantidade
     db.produtos[i] = { ...db.produtos[i], ...semSaldo }
     save(db)
     return expand(db.produtos[i], db)
@@ -488,7 +489,6 @@ function gerarPrestacaoContasMock(db, inicio, fim) {
     if (produtoTemEntrada(db, p.id)) continue
     const criado = (p.criado_em || new Date().toISOString()).slice(0, 10)
     if (criado < inicio || criado > fim) continue
-    const exp = expand(p, db)
     const fid = p.fornecedor ?? null
     if (!porFornecedor.has(fid)) {
       const forn = fid ? db.fornecedores.find((f) => f.id === fid) : null

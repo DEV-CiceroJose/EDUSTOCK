@@ -3,7 +3,7 @@ import { motion } from "motion/react"
 import { fornecedoresApi } from "../../api"
 import { Icon } from "../../lib/icons.jsx"
 import ConfirmDialog from "../../components/ui/ConfirmDialog"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 
 const CHIPS = [
   { key: "todos", label: "Todos" },

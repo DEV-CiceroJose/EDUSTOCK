@@ -1,25 +1,20 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import Modal from "../../components/ui/Modal"
 import { getToken } from "../../lib/auth"
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
 export default function NewUserModal({ open, onClose, onCreated }) {
+  if (!open) return null
+  return <NewUserForm onClose={onClose} onCreated={onCreated} />
+}
+
+function NewUserForm({ onClose, onCreated }) {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [papel, setPapel] = useState("OPERADOR")
   const [erro, setErro] = useState("")
   const [salvando, setSalvando] = useState(false)
-
-  useEffect(() => {
-    if (open) {
-      setUsername("")
-      setPassword("")
-      setPapel("OPERADOR")
-      setErro("")
-      setSalvando(false)
-    }
-  }, [open])
 
   async function submit(ev) {
     ev.preventDefault()
@@ -46,7 +41,7 @@ export default function NewUserModal({ open, onClose, onCreated }) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Novo usuário" subtitle="Cadastre um acesso à plataforma" maxW="max-w-sm">
+    <Modal open onClose={onClose} title="Novo usuário" subtitle="Cadastre um acesso à plataforma" maxW="max-w-sm">
       <form onSubmit={submit} className="flex flex-col gap-4">
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Usuário</span>

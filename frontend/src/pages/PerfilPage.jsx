@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { getToken, getUsername, getNome, atualizarNome, limparSessao } from "../lib/auth"
-import { useToast } from "../components/ui/Toast"
+import { useToast } from "../components/ui/useToast"
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 

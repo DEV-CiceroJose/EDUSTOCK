@@ -171,7 +171,7 @@ if IS_PRODUCTION:
 # API REST + Frontend React (EasyStock)
 # ------------------------------------------------------------------
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": None,
+    "DEFAULT_PAGINATION_CLASS": "plataforma.pagination.EduStockPagination",
     "NUM_PROXIES": int(
         os.environ.get("TRUSTED_PROXY_COUNT", "1" if IS_PRODUCTION else "0")
     ),

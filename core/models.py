@@ -70,7 +70,7 @@ class Produto(models.Model):
     periodicidade = models.CharField(
         max_length=8, choices=PERIODICIDADE_CHOICES, default="EVENTUAL"
     )
-    validade = models.DateField("Validade", null=True, blank=True)
+    validade = models.DateField("Validade", null=True, blank=True, db_index=True)
     preco = models.DecimalField("Preço", max_digits=10, decimal_places=2, null=True, blank=True)
 
     criado_por = models.ForeignKey(
@@ -188,14 +188,14 @@ class Movimentacao(models.Model):
     TIPO_CHOICES = [(ENTRADA, "Entrada"), (SAIDA, "Saída")]
 
     produto = models.ForeignKey("Produto", on_delete=models.PROTECT, related_name="movimentacoes")
-    tipo = models.CharField(max_length=7, choices=TIPO_CHOICES)
+    tipo = models.CharField(max_length=7, choices=TIPO_CHOICES, db_index=True)
     quantidade = models.DecimalField(max_digits=10, decimal_places=3)
     preco_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     entrada = models.ForeignKey(
         Entrada, on_delete=models.CASCADE, null=True, blank=True, related_name="itens"
     )
     motivo = models.CharField(max_length=120, blank=True)
-    data = models.DateField(default=timezone.localdate)
+    data = models.DateField(default=timezone.localdate, db_index=True)
     criado_por = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="movimentacoes_criadas"
     )

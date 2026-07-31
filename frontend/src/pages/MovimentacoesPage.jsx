@@ -3,9 +3,10 @@ import { useDashboardData } from "../hooks/useDashboardData"
 import MovimentacoesView from "../features/movimentacoes/MovimentacoesView"
 import EntradaFormModal from "../features/movimentacoes/EntradaFormModal"
 import SaidaFormModal from "../features/movimentacoes/SaidaFormModal"
+import DataLoadError from "../components/ui/DataLoadError"
 
 export default function MovimentacoesPage() {
-  const { movimentacoes, produtos, fornecedores, loading, carregar } = useDashboardData()
+  const { movimentacoes, produtos, fornecedores, loading, error, carregar } = useDashboardData()
   const [entradaOpen, setEntradaOpen] = useState(false)
   const [saidaOpen, setSaidaOpen] = useState(false)
 
@@ -19,6 +20,7 @@ export default function MovimentacoesPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] px-6 py-8">
+      <DataLoadError error={error} onRetry={carregar} />
       <MovimentacoesView
         movimentacoes={movimentacoes}
         onNovaEntrada={() => setEntradaOpen(true)}

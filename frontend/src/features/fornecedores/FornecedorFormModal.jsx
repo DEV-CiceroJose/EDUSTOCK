@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { fornecedoresApi } from "../../api"
 import Modal from "../../components/ui/Modal"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 
 const VAZIO = {
   nome: "", documento: "", endereco: "", telefone: "", email: "",
@@ -21,17 +21,23 @@ function Campo({ label, hint, children, full }) {
 }
 
 export default function FornecedorFormModal({ open, fornecedor, onClose, onSaved }) {
+  if (!open) return null
+  return (
+    <FornecedorFormContent
+      key={fornecedor?.id ?? "novo"}
+      fornecedor={fornecedor}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  )
+}
+
+function FornecedorFormContent({ fornecedor, onClose, onSaved }) {
   const editando = Boolean(fornecedor)
-  const [form, setForm] = useState(VAZIO)
+  const [form, setForm] = useState(() => fornecedor ? { ...VAZIO, ...fornecedor } : VAZIO)
   const [erro, setErro] = useState("")
   const [salvando, setSalvando] = useState(false)
   const toast = useToast()
-
-  useEffect(() => {
-    if (!open) return
-    setForm(fornecedor ? { ...VAZIO, ...fornecedor } : VAZIO)
-    setErro("")
-  }, [open, fornecedor])
 
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }))
@@ -59,7 +65,7 @@ export default function FornecedorFormModal({ open, fornecedor, onClose, onSaved
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       title={editando ? "Editar fornecedor" : "Novo fornecedor"}
       subtitle={editando ? fornecedor?.nome : "Cadastre um fornecedor"}

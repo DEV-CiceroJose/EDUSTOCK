@@ -1,50 +1,10 @@
 @import "tailwindcss";
+@import "../../packages/operacao-shared/src/design-tokens.css";
 
 /* ============================================================
    GESTOR ESCOLAR — Dashboard de Estoque & Refeitório
    Estética: sálvia + creme, soft-UI moderno, cantos suaves
    ============================================================ */
-
-@theme {
-  /* Superfícies */
-  --color-canvas: #f3efe4;
-  --color-surface: #fbf9f3;
-  --color-surface-2: #f1ece0;
-  --color-line: #e4ddcc;
-
-  /* Marca (verde-sálvia profundo) */
-  --color-brand: #214d3f;
-  --color-brand-700: #1a3e33;
-  --color-brand-500: #2f7a5b;
-  --color-brand-300: #6aa98c;
-  --color-brand-tint: #e7efe8;
-
-  /* Acento quente (cozinha / CTA) */
-  --color-accent: #e07a3e;
-  --color-accent-tint: #fbe9d9;
-
-  /* Texto */
-  --color-ink: #20281f;
-  --color-ink-soft: #5d685a;
-  --color-ink-faint: #8b9388;
-
-  /* Status */
-  --color-ok: #2f8f5b;
-  --color-ok-tint: #e1f1e6;
-  --color-low: #c98a16;
-  --color-low-tint: #fbeecd;
-  --color-out: #c14444;
-  --color-out-tint: #fbe2e0;
-
-  /* Tipografia */
-  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
-  --font-body: "Hanken Grotesk", system-ui, sans-serif;
-  --font-mono: "Space Mono", ui-monospace, monospace;
-
-  /* Sombras suaves */
-  --shadow-soft: 0 1px 2px rgba(33, 40, 31, 0.05), 0 8px 24px -12px rgba(33, 40, 31, 0.18);
-  --shadow-pop: 0 2px 6px rgba(33, 40, 31, 0.08), 0 18px 40px -16px rgba(33, 40, 31, 0.28);
-}
 
 * { -webkit-tap-highlight-color: transparent; }
 

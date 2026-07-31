@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { getToken, ehAdmin } from "../lib/auth"
-import { useToast } from "../components/ui/Toast"
+import { useToast } from "../components/ui/useToast"
 import { Icon } from "../lib/icons.jsx"
 import NewUserModal from "../features/usuarios/NewUserModal"
 
@@ -17,18 +17,20 @@ export default function AdminUsuariosPage() {
   const toast = useToast()
 
   useEffect(() => {
-    if (ehAdmin()) carregar()
-  }, [])
-
-  async function carregar() {
-    setCarregando(true)
-    const resp = await fetch(`${BASE}/usuarios/`, {
+    if (!ehAdmin()) return undefined
+    let active = true
+    fetch(`${BASE}/usuarios/?page_size=500`, {
       headers: { Authorization: `Token ${getToken()}` },
     })
-    const data = await resp.json()
-    setUsuarios(data)
-    setCarregando(false)
-  }
+      .then((response) => response.json())
+      .then((data) => {
+        if (active) setUsuarios(Array.isArray(data) ? data : (data.results ?? []))
+      })
+      .finally(() => {
+        if (active) setCarregando(false)
+      })
+    return () => { active = false }
+  }, [])
 
   async function trocarPapel(usuario, novoPapel) {
     const anterior = usuario.papel

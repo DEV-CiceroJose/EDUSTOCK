@@ -17,7 +17,6 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
-from core import views
 
 
 urlpatterns = [
@@ -30,12 +29,6 @@ urlpatterns = [
     path("api/", include("core.api_urls")),
 
      # 📦 Produtos
-    path('produtos/', views.lista_produtos, name='lista_produtos'),
-    path('produtos/novo/', views.criar_produto, name='criar_produto'),
-    path('produtos/<int:id>/editar/', views.editar_produto, name='editar_produto'),
-    path('produtos/<int:id>/deletar/', views.deletar_produto, name='deletar_produto'),
 
     # 🗂️ Categorias
-    path('categorias/', views.lista_categorias, name='lista_categorias'),
-    path('categorias/nova/', views.criar_categoria, name='criar_categoria'),
 ]

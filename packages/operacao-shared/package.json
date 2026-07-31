@@ -1,0 +1,13 @@
+{
+  "name": "@edustock/operacao-shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./design-tokens.css": "./src/design-tokens.css"
+  },
+  "peerDependencies": {
+    "react": ">=19"
+  }
+}

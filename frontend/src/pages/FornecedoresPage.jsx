@@ -3,9 +3,10 @@ import { useDashboardData } from "../hooks/useDashboardData"
 import FornecedoresView from "../features/fornecedores/FornecedoresView"
 import FornecedorFormModal from "../features/fornecedores/FornecedorFormModal"
 import { podeGerenciarCadastros } from "../lib/auth"
+import DataLoadError from "../components/ui/DataLoadError"
 
 export default function FornecedoresPage() {
-  const { fornecedores, loading, carregar } = useDashboardData()
+  const { fornecedores, loading, error, carregar } = useDashboardData()
   const [modalOpen, setModalOpen] = useState(false)
   const [editFornecedor, setEditFornecedor] = useState(null)
   const canManage = podeGerenciarCadastros()
@@ -40,6 +41,7 @@ export default function FornecedoresPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] px-6 py-8">
+      <DataLoadError error={error} onRetry={carregar} />
       <FornecedoresView
         fornecedores={fornecedores}
         onNew={handleNew}

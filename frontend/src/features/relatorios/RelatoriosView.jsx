@@ -12,7 +12,7 @@ import {
 } from "../../lib/export"
 import { gerarPdfPrestacaoContas } from "../../lib/prestacaoPdf"
 import { Icon } from "../../lib/icons.jsx"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 import { getModulosAtivos } from "../../lib/auth"
 
 const CHIPS = [
