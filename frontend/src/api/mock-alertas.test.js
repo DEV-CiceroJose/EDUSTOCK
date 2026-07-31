@@ -45,4 +45,19 @@ describe("alertas mock configuráveis", () => {
     )
     expect(resultado.validade).toHaveLength(1)
   })
+
+  it("alerta quando o saldo estÃ¡ no ou abaixo do estoque mÃ­nimo", () => {
+    const resultado = coletarAlertasMock([
+      { ...produto, quantidade: 6, estoque_minimo: 10 },
+    ])
+    expect(resultado.estoque_critico).toHaveLength(1)
+    expect(resultado.estoque_critico[0].urgencia).toBe("alerta")
+  })
+
+  it("mantÃ©m fora do alerta o saldo acima do estoque mÃ­nimo", () => {
+    const resultado = coletarAlertasMock([
+      { ...produto, quantidade: 11, estoque_minimo: 10 },
+    ])
+    expect(resultado.estoque_critico).toEqual([])
+  })
 })

@@ -34,13 +34,13 @@ class AlertHelpersTest(TestCase):
         self.assertTrue(critico)
         self.assertEqual(urg, "critico")
 
-    def test_is_estoque_critico_abaixo_20_porcento(self):
-        critico, urg = is_estoque_critico(1, 10)
+    def test_is_estoque_critico_no_ou_abaixo_do_minimo(self):
+        critico, urg = is_estoque_critico(6, 10)
         self.assertTrue(critico)
         self.assertEqual(urg, "alerta")
 
-    def test_is_estoque_critico_acima_20_porcento_nao_alerta(self):
-        critico, urg = is_estoque_critico(3, 10)
+    def test_is_estoque_critico_acima_do_minimo_nao_alerta(self):
+        critico, urg = is_estoque_critico(11, 10)
         self.assertFalse(critico)
         self.assertIsNone(urg)
 
@@ -122,14 +122,14 @@ class ColetarAlertasTest(TestCase):
         self.assertEqual(item["urgencia"], "critico")
         self.assertEqual(item["motivo"], "Esgotado")
 
-    def test_estoque_abaixo_20_porcento_incluido(self):
-        self._criar("Farinha", quantidade=Decimal("1"), estoque_minimo=Decimal("10"))
+    def test_estoque_no_minimo_incluido(self):
+        self._criar("Farinha", quantidade=Decimal("6"), estoque_minimo=Decimal("10"))
         result = coletar_alertas(hoje=self.hoje)
         self.assertEqual(len(result["estoque_critico"]), 1)
         self.assertEqual(result["estoque_critico"][0]["urgencia"], "alerta")
 
-    def test_estoque_30_porcento_nao_incluido(self):
-        self._criar("Óleo", quantidade=Decimal("3"), estoque_minimo=Decimal("10"))
+    def test_estoque_acima_do_minimo_nao_incluido(self):
+        self._criar("Óleo", quantidade=Decimal("11"), estoque_minimo=Decimal("10"))
         result = coletar_alertas(hoje=self.hoje)
         self.assertEqual(result["estoque_critico"], [])
 

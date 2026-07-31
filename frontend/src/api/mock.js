@@ -336,7 +336,7 @@ function isEstoqueCritico(quantidade, estoqueMinimo) {
   const q = Number(quantidade)
   const m = Number(estoqueMinimo) || 0
   if (q <= 0) return { critico: true, urgencia: "critico" }
-  if (m > 0 && q < m * 0.2) return { critico: true, urgencia: "alerta" }
+  if (m > 0 && q <= m) return { critico: true, urgencia: "alerta" }
   return { critico: false, urgencia: null }
 }
 

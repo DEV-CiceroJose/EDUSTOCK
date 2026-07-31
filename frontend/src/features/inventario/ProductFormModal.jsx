@@ -39,7 +39,7 @@ function Campo({ label, hint, children, full }) {
   )
 }
 
-export default function ProductFormModal({ open, produto, grupos, fornecedores = [], onClose, onSaved }) {
+export default function ProductFormModal({ open, produto, grupos, fornecedores = [], onClose, onSaved, onCreateGroup }) {
   if (!open) return null
   return (
     <ProductForm
@@ -49,11 +49,12 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
       fornecedores={fornecedores}
       onClose={onClose}
       onSaved={onSaved}
+      onCreateGroup={onCreateGroup}
     />
   )
 }
 
-function ProductForm({ produto, grupos, fornecedores, onClose, onSaved }) {
+function ProductForm({ produto, grupos, fornecedores, onClose, onSaved, onCreateGroup }) {
   const editando = Boolean(produto)
   const [form, setForm] = useState(() => criarFormInicial(produto, grupos))
   const [erros, setErros] = useState({})
@@ -137,7 +138,7 @@ function ProductForm({ produto, grupos, fornecedores, onClose, onSaved }) {
         </Campo>
 
         <Campo label="Grupo">
-          <select className="field" value={form.grupo} onChange={set("grupo")}>
+          <select className="field" value={form.grupo} onChange={set("grupo")} disabled={!grupos.length}>
             <option value="">— selecione —</option>
             {porCategoria.map(([cat, gs]) => (
               <optgroup key={cat} label={cat}>
@@ -147,6 +148,14 @@ function ProductForm({ produto, grupos, fornecedores, onClose, onSaved }) {
               </optgroup>
             ))}
           </select>
+          {!grupos.length && onCreateGroup && (
+            <div className="mt-2 rounded-lg border border-dashed border-line bg-surface-2 px-3 py-2 text-xs text-ink-soft">
+              <p>Crie um grupo antes de cadastrar o primeiro item.</p>
+              <button type="button" onClick={onCreateGroup} className="mt-2 font-semibold text-brand hover:underline">
+                Criar primeiro grupo
+              </button>
+            </div>
+          )}
           {erros.grupo && <p className="mt-1 text-xs text-out">{erros.grupo}</p>}
         </Campo>
 

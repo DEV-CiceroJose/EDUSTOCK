@@ -10,4 +10,10 @@ describe("ProductFormModal — preço pertence às entradas", () => {
     expect(screen.queryByText(/Preço unitário/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Nota fiscal/i)).not.toBeInTheDocument()
   })
+
+  it("orienta a criar um grupo quando o cadastro ainda esta vazio", () => {
+    render(<ProductFormModal open produto={null} grupos={[]} onClose={vi.fn()} onSaved={vi.fn()} onCreateGroup={vi.fn()} />)
+    expect(screen.getByText(/crie um grupo antes/i)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /criar primeiro grupo/i })).toBeInTheDocument()
+  })
 })
