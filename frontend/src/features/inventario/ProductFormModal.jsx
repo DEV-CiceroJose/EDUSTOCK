@@ -1,14 +1,30 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { produtosApi, movimentacoesApi } from "../../api"
 import { UNIDADES, PERIODICIDADES } from "../../api/units"
 import Modal from "../../components/ui/Modal"
-import { useToast } from "../../components/ui/Toast"
-import { getModulosAtivos } from "../../lib/auth"
+import { useToast } from "../../components/ui/useToast"
 
 const VAZIO = {
-  nome: "", numero_nota_fiscal: "", grupo: "", fornecedor: "",
+  nome: "", grupo: "", fornecedor: "",
   quantidade: "", unidade: "UN", estoque_minimo: "",
-  perecivel: false, periodicidade: "EVENTUAL", validade: "", preco: "",
+  perecivel: false, periodicidade: "EVENTUAL", validade: "",
+}
+
+function criarFormInicial(produto, grupos) {
+  if (!produto) {
+    return { ...VAZIO, grupo: grupos[0] ? String(grupos[0].id) : "" }
+  }
+  return {
+    nome: produto.nome ?? "",
+    grupo: String(produto.grupo ?? ""),
+    fornecedor: String(produto.fornecedor ?? ""),
+    quantidade: String(produto.quantidade ?? ""),
+    unidade: produto.unidade ?? "UN",
+    estoque_minimo: String(produto.estoque_minimo ?? ""),
+    perecivel: Boolean(produto.perecivel),
+    periodicidade: produto.periodicidade ?? "EVENTUAL",
+    validade: produto.validade ?? "",
+  }
 }
 
 function Campo({ label, hint, children, full }) {
@@ -24,9 +40,22 @@ function Campo({ label, hint, children, full }) {
 }
 
 export default function ProductFormModal({ open, produto, grupos, fornecedores = [], onClose, onSaved }) {
+  if (!open) return null
+  return (
+    <ProductForm
+      key={produto?.id ?? "novo"}
+      produto={produto}
+      grupos={grupos}
+      fornecedores={fornecedores}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  )
+}
+
+function ProductForm({ produto, grupos, fornecedores, onClose, onSaved }) {
   const editando = Boolean(produto)
-  const mostrarPreco = getModulosAtivos().includes("financeiro")
-  const [form, setForm] = useState(VAZIO)
+  const [form, setForm] = useState(() => criarFormInicial(produto, grupos))
   const [erros, setErros] = useState({})
   const [salvando, setSalvando] = useState(false)
   const toast = useToast()
@@ -52,28 +81,6 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
     return lista
   }, [fornecedores, produto])
 
-  useEffect(() => {
-    if (!open) return
-    if (produto) {
-      setForm({
-        nome: produto.nome ?? "",
-        numero_nota_fiscal: produto.numero_nota_fiscal ?? "",
-        grupo: String(produto.grupo ?? ""),
-        fornecedor: String(produto.fornecedor ?? ""),
-        quantidade: String(produto.quantidade ?? ""),
-        unidade: produto.unidade ?? "UN",
-        estoque_minimo: String(produto.estoque_minimo ?? ""),
-        perecivel: Boolean(produto.perecivel),
-        periodicidade: produto.periodicidade ?? "EVENTUAL",
-        validade: produto.validade ?? "",
-        preco: produto.preco ?? "",
-      })
-    } else {
-      setForm({ ...VAZIO, grupo: grupos[0] ? String(grupos[0].id) : "" })
-    }
-    setErros({})
-  }, [open, produto, grupos])
-
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }))
 
@@ -92,8 +99,7 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
     if (!validar()) return
     setSalvando(true)
     try {
-      const { numero_nota_fiscal, ...campos } = form
-      const payload = { ...campos, fornecedor: form.fornecedor || null }
+      const payload = { ...form, fornecedor: form.fornecedor || null }
       if (editando) {
         await produtosApi.update(produto.id, payload)
         toast("Item atualizado")
@@ -118,7 +124,7 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
 
   return (
     <Modal
-      open={open}
+      open
       onClose={onClose}
       title={editando ? "Editar item" : "Adicionar novo item"}
       subtitle={editando ? produto?.nome : "Cadastre um produto no estoque"}
@@ -190,12 +196,6 @@ export default function ProductFormModal({ open, produto, grupos, fornecedores =
         <Campo label="Validade" hint="opcional">
           <input type="date" className="field" value={form.validade} onChange={set("validade")} />
         </Campo>
-
-        {mostrarPreco && (
-          <Campo label="Preço unitário" hint="R$ · opcional">
-            <input type="number" step="0.01" min="0" className="field" value={form.preco} onChange={set("preco")} placeholder="0,00" />
-          </Campo>
-        )}
 
         <label className="flex items-center gap-2 sm:col-span-2">
           <input type="checkbox" checked={form.perecivel} onChange={set("perecivel")} className="h-4 w-4" />

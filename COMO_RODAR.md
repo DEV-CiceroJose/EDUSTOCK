@@ -44,7 +44,7 @@ Backend em: http://127.0.0.1:8000/
 ```bash
 cd frontend
 npm install
-echo "VITE_API_BASE=" > .env
+echo "VITE_API_URL=http://localhost:8000/api" > .env
 npm run dev
 ```
 Em: http://localhost:5173/

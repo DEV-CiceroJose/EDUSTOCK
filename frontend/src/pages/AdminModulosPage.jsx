@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { getToken, ehAdmin } from "../lib/auth"
-import { useToast } from "../components/ui/Toast"
+import { useToast } from "../components/ui/useToast"
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
@@ -15,11 +15,11 @@ export default function AdminModulosPage() {
 
   async function carregar() {
     setCarregando(true)
-    const resp = await fetch(`${BASE}/modulos/`, {
+    const resp = await fetch(`${BASE}/modulos/?page_size=500`, {
       headers: { Authorization: `Token ${getToken()}` },
     })
     const data = await resp.json()
-    setModulos(data)
+    setModulos(Array.isArray(data) ? data : (data.results ?? []))
     setCarregando(false)
   }
 

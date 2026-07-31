@@ -2,13 +2,13 @@ import { useState } from "react"
 import { useDashboardData } from "../hooks/useDashboardData"
 import ContagemView from "../features/merenda/ContagemView"
 import ContagemWidget from "../features/merenda/ContagemWidget"
-import KitchenPanel from "../features/merenda/KitchenPanel"
 import KitchenProductionView from "../features/merenda/KitchenProductionView"
+import DataLoadError from "../components/ui/DataLoadError"
 
 const VIEWS = ["contagem", "producao"]
 
 export default function MerendaPage() {
-  const { produtos, loading, carregar } = useDashboardData()
+  const { produtos, loading, error, carregar } = useDashboardData()
   const [view, setView] = useState("contagem")
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -31,6 +31,7 @@ export default function MerendaPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] px-6 py-8">
+      <DataLoadError error={error} onRetry={carregar} />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold leading-tight">Merenda Escolar</h1>
@@ -54,10 +55,7 @@ export default function MerendaPage() {
       {view === "contagem" ? (
         <div className="grid gap-6 lg:grid-cols-2">
           <ContagemView onRegistrado={handleRegistrado} />
-          <div className="space-y-6">
-            <ContagemWidget refreshKey={refreshKey} />
-            <KitchenPanel />
-          </div>
+          <ContagemWidget refreshKey={refreshKey} />
         </div>
       ) : (
         <KitchenProductionView onBaixaConcluida={handleRegistrado} />

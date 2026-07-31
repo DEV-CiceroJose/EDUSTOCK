@@ -13,7 +13,7 @@ class GrupoApiTest(AutenticadoAPITestCase):
 
         resp = self.client.get("/api/grupos/")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(len(resp.data["results"]), 1)
 
 
 class ProdutoApiTest(AutenticadoAPITestCase):
@@ -42,7 +42,7 @@ class ProdutoApiTest(AutenticadoAPITestCase):
 
         resp = self.client.get(f"/api/produtos/?categoria={self.cat.id}")
         self.assertEqual(resp.status_code, 200)
-        nomes = [p["nome"] for p in resp.data]
+        nomes = [p["nome"] for p in resp.data["results"]]
         self.assertEqual(nomes, ["Arroz"])
 
 
@@ -57,7 +57,7 @@ class BemPermanenteApiTest(AutenticadoAPITestCase):
         bem_id = resp.data["id"]
 
         resp = self.client.get("/api/bens-permanentes/")
-        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(len(resp.data["results"]), 1)
 
         resp = self.client.delete(f"/api/bens-permanentes/{bem_id}/")
         self.assertEqual(resp.status_code, 204)
@@ -80,22 +80,25 @@ class FornecedorApiTest(AutenticadoAPITestCase):
 
         # lista todos
         resp = self.client.get("/api/fornecedores/")
-        self.assertEqual(len(resp.data), 2)
+        self.assertEqual(len(resp.data["results"]), 2)
 
         # filtro aceita_fiado=true
         resp = self.client.get("/api/fornecedores/?aceita_fiado=true")
-        nomes = [f["nome"] for f in resp.data]
+        nomes = [f["nome"] for f in resp.data["results"]]
         self.assertEqual(nomes, ["Seu Zé (fiado)"])
 
         # filtro ativo=false
         resp = self.client.get("/api/fornecedores/?ativo=false")
-        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(len(resp.data["results"]), 1)
 
     def test_busca_por_nome(self):
         self.client.post("/api/fornecedores/", {"nome": "Papelaria Central"}, format="json")
         self.client.post("/api/fornecedores/", {"nome": "Distribuidora Sul"}, format="json")
         resp = self.client.get("/api/fornecedores/?search=papel")
-        self.assertEqual([f["nome"] for f in resp.data], ["Papelaria Central"])
+        self.assertEqual(
+            [f["nome"] for f in resp.data["results"]],
+            ["Papelaria Central"],
+        )
 
 
 class ProdutoFornecedorApiTest(AutenticadoAPITestCase):
@@ -151,12 +154,12 @@ class MovimentacaoApiTest(AutenticadoAPITestCase):
         self.client.post("/api/movimentacoes/", {"produto": self.p.id, "tipo": "SAIDA", "quantidade": "1"}, format="json")
         self.client.post("/api/movimentacoes/", {"produto": self.p.id, "tipo": "ENTRADA", "quantidade": "1"}, format="json")
         resp = self.client.get("/api/movimentacoes/?tipo=SAIDA")
-        self.assertEqual(len(resp.data), 1)
-        self.assertEqual(resp.data[0]["tipo"], "SAIDA")
+        self.assertEqual(len(resp.data["results"]), 1)
+        self.assertEqual(resp.data["results"][0]["tipo"], "SAIDA")
 
     def test_append_only(self):
         self.client.post("/api/movimentacoes/", {"produto": self.p.id, "tipo": "ENTRADA", "quantidade": "1"}, format="json")
-        mid = self.client.get("/api/movimentacoes/").data[0]["id"]
+        mid = self.client.get("/api/movimentacoes/").data["results"][0]["id"]
         self.assertEqual(self.client.delete(f"/api/movimentacoes/{mid}/").status_code, 405)
         self.assertEqual(self.client.patch(f"/api/movimentacoes/{mid}/", {"quantidade": "2"}, format="json").status_code, 405)
 
@@ -189,7 +192,7 @@ class EntradaApiTest(AutenticadoAPITestCase):
         self.client.post("/api/entradas/", {
             "itens": [{"produto": self.p1.id, "quantidade": "1"}],
         }, format="json")
-        eid = self.client.get("/api/entradas/").data[0]["id"]
+        eid = self.client.get("/api/entradas/").data["results"][0]["id"]
         self.assertEqual(self.client.delete(f"/api/entradas/{eid}/").status_code, 405)
 
 
@@ -206,3 +209,71 @@ class ProdutoQuantidadeReadOnlyTest(AutenticadoAPITestCase):
         self.assertEqual(resp.status_code, 200, resp.content)
         p.refresh_from_db()
         self.assertEqual(p.quantidade, Decimal("10.000"))  # inalterado
+
+
+class OperadorAutorizacaoApiTest(AutenticadoAPITestCase):
+    def setUp(self):
+        super().setUp()
+        from datetime import timedelta
+        from django.contrib.auth.models import User
+        from django.utils import timezone
+        from rest_framework.test import APIClient
+        from plataforma.models import Perfil, TokenAcesso
+
+        operador = User.objects.create_user(username="operador-api", password="x")
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        token = TokenAcesso.objects.create(
+            user=operador,
+            expira_em=timezone.now() + timedelta(hours=1),
+        )
+        self.operador_client = APIClient()
+        self.operador_client.credentials(
+            HTTP_AUTHORIZATION=f"Token {token.token}"
+        )
+
+        self.cat = Categoria.objects.create(name="Alimentos")
+        self.grupo = Grupo.objects.create(nome="Geral", categoria=self.cat)
+        self.produto = Produto.objects.create(
+            nome="Arroz", grupo=self.grupo, quantidade=10, unidade="KG"
+        )
+
+    def test_operador_consulta_mas_nao_cria_cadastro_mestre(self):
+        self.assertEqual(
+            self.operador_client.get("/api/produtos/").status_code,
+            200,
+        )
+        bloqueado = self.operador_client.post(
+            "/api/produtos/",
+            {
+                "nome": "Feijão",
+                "grupo": self.grupo.id,
+                "unidade": "KG",
+            },
+            format="json",
+        )
+        self.assertEqual(bloqueado.status_code, 403, bloqueado.content)
+
+    def test_operador_nao_altera_nem_exclui_cadastro_mestre(self):
+        patch = self.operador_client.patch(
+            f"/api/produtos/{self.produto.id}/",
+            {"nome": "Arroz alterado"},
+            format="json",
+        )
+        delete = self.operador_client.delete(
+            f"/api/produtos/{self.produto.id}/"
+        )
+        self.assertEqual(patch.status_code, 403, patch.content)
+        self.assertEqual(delete.status_code, 403, delete.content)
+
+    def test_operador_pode_registrar_movimentacao_diaria(self):
+        resposta = self.operador_client.post(
+            "/api/movimentacoes/",
+            {
+                "produto": self.produto.id,
+                "tipo": "SAIDA",
+                "quantidade": "2",
+                "motivo": "consumo",
+            },
+            format="json",
+        )
+        self.assertEqual(resposta.status_code, 201, resposta.content)

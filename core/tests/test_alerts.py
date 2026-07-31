@@ -11,7 +11,7 @@ from core.alerts import (
     is_estoque_critico,
     urgencia_validade,
 )
-from core.models import Categoria, Grupo, Produto
+from core.models import Categoria, ConfiguracaoAlertas, Grupo, Produto
 from core.tests.utils import AutenticadoAPITestCase
 
 
@@ -84,6 +84,30 @@ class ColetarAlertasTest(TestCase):
         self._criar("Arroz", validade=self.hoje + timedelta(days=45))
         result = coletar_alertas(hoje=self.hoje)
         self.assertEqual(result["validade"], [])
+
+    def test_prazo_de_validade_configuravel(self):
+        self._criar("Arroz", validade=self.hoje + timedelta(days=45))
+        result = coletar_alertas(hoje=self.hoje, dias_alerta=60)
+        self.assertEqual([item["nome"] for item in result["validade"]], ["Arroz"])
+
+    def test_parametros_globais_podem_ser_alterados_pelo_admin(self):
+        configuracao = ConfiguracaoAlertas.carregar()
+        configuracao.critico_dias = 12
+        configuracao.alerta_dias = 60
+        configuracao.estoque_percentual = 40
+        configuracao.save()
+        self._criar(
+            "Leite",
+            validade=self.hoje + timedelta(days=10),
+            quantidade=Decimal("3"),
+            estoque_minimo=Decimal("10"),
+        )
+
+        result = coletar_alertas(hoje=self.hoje)
+
+        self.assertEqual(result["validade"][0]["urgencia"], "critico")
+        self.assertEqual(result["estoque_critico"][0]["urgencia"], "alerta")
+        self.assertEqual(result["configuracao"]["alerta_dias"], 60)
 
     def test_validade_null_nao_incluido(self):
         self._criar("Sal", validade=None)
@@ -164,6 +188,7 @@ class AlertasApiTest(AutenticadoAPITestCase):
         self.assertIn("resumo", resp.data)
         self.assertIn("validade", resp.data)
         self.assertIn("estoque_critico", resp.data)
+        self.assertEqual(resp.data["configuracao"]["estoque_percentual"], 20)
 
     def test_get_alertas_tipo_validade(self):
         resp = self.client.get("/api/alertas/?tipo=validade")
@@ -193,3 +218,20 @@ class AlertasApiTest(AutenticadoAPITestCase):
     def test_get_alertas_urgencia_invalida(self):
         resp = self.client.get("/api/alertas/?urgencia=foo")
         self.assertEqual(resp.status_code, 400)
+
+    def test_get_alertas_respeita_dias_validade(self):
+        Produto.objects.create(
+            nome="Macarrão",
+            grupo=Grupo.objects.get(nome="Geral"),
+            unidade="KG",
+            validade=self.hoje + timedelta(days=45),
+        )
+        resp = self.client.get("/api/alertas/?dias_validade=60")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("Macarrão", [item["nome"] for item in resp.data["validade"]])
+
+    def test_get_alertas_rejeita_dias_validade_invalidos(self):
+        for valor in ("0", "366", "abc"):
+            with self.subTest(valor=valor):
+                resp = self.client.get(f"/api/alertas/?dias_validade={valor}")
+                self.assertEqual(resp.status_code, 400)

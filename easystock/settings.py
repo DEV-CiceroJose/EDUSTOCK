@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -21,11 +22,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', "django-insecure-$ara9&n@l3x^ey=o$k51e6q5+je!p6304nk4ks@39ts4px_938")
+APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
+IS_PRODUCTION = APP_ENV == "production"
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+# Produção deve falhar cedo se a chave não estiver configurada. A chave abaixo
+# existe apenas para desenvolvimento/testes locais e nunca deve ser usada em deploy.
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if IS_PRODUCTION:
+        raise ImproperlyConfigured("SECRET_KEY é obrigatória quando APP_ENV=production.")
+    SECRET_KEY = "django-insecure-edustock-development-only"
+
+# Seguro por padrão: desenvolvimento com debug precisa ser habilitado explicitamente.
+DEBUG = os.environ.get("DEBUG", "False").strip().lower() in ("1", "true", "yes")
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
@@ -143,12 +152,29 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+if IS_PRODUCTION:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "3600"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = (
+        os.environ.get("SECURE_HSTS_PRELOAD", "False").strip().lower()
+        in ("1", "true", "yes")
+    )
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+
 
 # ------------------------------------------------------------------
 # API REST + Frontend React (EasyStock)
 # ------------------------------------------------------------------
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": None,
+    "DEFAULT_PAGINATION_CLASS": "plataforma.pagination.EduStockPagination",
+    "NUM_PROXIES": int(
+        os.environ.get("TRUSTED_PROXY_COUNT", "1" if IS_PRODUCTION else "0")
+    ),
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "plataforma.authentication.TokenAcessoAuthentication",
     ],
@@ -201,3 +227,30 @@ OPERACAO_TOKEN_TTL_HORAS = 12
 # Autenticação da plataforma (dashboard admin)
 # ------------------------------------------------------------------
 LOGIN_TOKEN_TTL_HORAS = int(os.environ.get('LOGIN_TOKEN_TTL_HORAS', 12))
+
+# Sessões operacionais e rate limit precisam ser compartilhados entre workers.
+# Redis é preferido; o cache de banco mantém o comportamento correto sem exigir
+# um serviço adicional no primeiro deploy.
+REDIS_URL = os.environ.get("REDIS_URL", "").strip()
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+            "KEY_PREFIX": "edustock",
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "edustock_cache",
+            "KEY_PREFIX": "edustock",
+            "TIMEOUT": 300,
+        }
+    }
+
+PIN_LOGIN_MAX_TENTATIVAS = int(os.environ.get("PIN_LOGIN_MAX_TENTATIVAS", "5"))
+PIN_LOGIN_JANELA_SEGUNDOS = int(os.environ.get("PIN_LOGIN_JANELA_SEGUNDOS", "300"))
+PIN_LOOKUP_SECRET = os.environ.get("PIN_LOOKUP_SECRET", SECRET_KEY)

@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from django.db import IntegrityError, transaction
 from django.test import TestCase
-from core.models import Categoria, Grupo, Produto, BemPermanente
+from core.models import Categoria, ConfiguracaoAlertas, Grupo, Produto, BemPermanente
 
 
 class GrupoModelTest(TestCase):
@@ -129,3 +129,28 @@ class MovimentacaoModelTest(TestCase):
         Movimentacao.objects.create(produto=p, tipo=Movimentacao.SAIDA, quantidade=1)
         with self.assertRaises(ProtectedError):
             p.delete()
+
+
+class ConfiguracaoAlertasModelTest(TestCase):
+    def test_configuracao_e_singleton(self):
+        from django.core.exceptions import ValidationError
+
+        configuracao = ConfiguracaoAlertas.carregar()
+        configuracao.alerta_dias = 45
+        configuracao.save()
+
+        outra = ConfiguracaoAlertas(critico_dias=5, alerta_dias=20)
+        with self.assertRaises(ValidationError):
+            outra.save()
+
+        self.assertEqual(ConfiguracaoAlertas.objects.count(), 1)
+        self.assertEqual(ConfiguracaoAlertas.carregar().alerta_dias, 45)
+
+    def test_prazo_critico_deve_ser_menor_que_alerta(self):
+        from django.core.exceptions import ValidationError
+
+        configuracao = ConfiguracaoAlertas(
+            critico_dias=30, alerta_dias=20, estoque_percentual=20
+        )
+        with self.assertRaises(ValidationError):
+            configuracao.save()

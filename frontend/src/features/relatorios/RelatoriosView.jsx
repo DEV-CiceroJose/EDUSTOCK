@@ -10,9 +10,8 @@ import {
   periodoTrimestre,
   prestacaoContasToCsv,
 } from "../../lib/export"
-import { gerarPdfPrestacaoContas } from "../../lib/prestacaoPdf"
 import { Icon } from "../../lib/icons.jsx"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 import { getModulosAtivos } from "../../lib/auth"
 
 const CHIPS = [
@@ -71,9 +70,10 @@ export default function RelatoriosView() {
     toast("CSV exportado")
   }
 
-  function exportarPdf() {
+  async function exportarPdf() {
     if (!dados) return
     try {
+      const { gerarPdfPrestacaoContas } = await import("../../lib/prestacaoPdf")
       gerarPdfPrestacaoContas(dados)
       toast("PDF exportado")
     } catch (err) {
@@ -227,11 +227,6 @@ export default function RelatoriosView() {
                       {mostrarPreco && (
                         <span className="font-semibold text-brand">{brl(doc.total)}</span>
                       )}
-                      {doc.legado && (
-                        <span className="rounded-full bg-low-tint px-2 py-0.5 text-[0.66rem] font-bold uppercase text-low">
-                          Legado
-                        </span>
-                      )}
                     </div>
                     <div className="mt-3 overflow-x-auto">
                       <table className="w-full min-w-[480px] text-left text-sm">
@@ -252,11 +247,6 @@ export default function RelatoriosView() {
                             <tr key={j} className="border-b border-line/60">
                               <td className="py-2 pr-3 font-medium">
                                 {it.produto_nome}
-                                {it.numero_nota_fiscal_legado && (
-                                  <span className="ml-1 font-mono text-[0.65rem] text-ink-faint">
-                                    NF leg. {it.numero_nota_fiscal_legado}
-                                  </span>
-                                )}
                               </td>
                               <td className="py-2 pr-3">{it.quantidade}</td>
                               {mostrarPreco && (

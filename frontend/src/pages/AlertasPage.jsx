@@ -3,9 +3,10 @@ import { useDashboardData } from "../hooks/useDashboardData"
 import AlertasView from "../features/alertas/AlertasView"
 import AlertTicker from "../features/alertas/AlertTicker"
 import DetailsModal from "../features/inventario/DetailsModal"
+import DataLoadError from "../components/ui/DataLoadError"
 
 export default function AlertasPage() {
-  const { alertas, alerts, loading, carregar, produtos } = useDashboardData()
+  const { alertas, alerts, loading, error, carregar, produtos } = useDashboardData()
   const [detalhe, setDetalhe] = useState(null)
 
   const handlePickAlerta = (produtoId) => {
@@ -30,6 +31,7 @@ export default function AlertasPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1500px] overflow-x-hidden px-6 py-8">
+      <DataLoadError error={error} onRetry={carregar} />
       <AlertasView alertas={alertas} onPick={handlePickAlerta} />
       <AlertTicker alerts={alerts} onPick={handlePickTickerAlert} />
       <DetailsModal

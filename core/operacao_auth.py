@@ -11,28 +11,27 @@ Fluxo:
   2. Cada request subseqüente inclui   X-Operacao-Token: <token>
   3. O decorador `requer_perfil_operacao` valida o token e o perfil.
 
-Tokens ficam em memória (dict) — reiniciar o servidor invalida todos.
-Em produção seria cache distribuído (Redis), mas para o escopo do projeto
-isso é adequado.
+Tokens ficam no cache compartilhado configurado pelo Django. Redis é
+preferido em produção; o backend de banco também suporta múltiplos workers.
 
 IMPORTANTE: tokens de admin Django são rejeitados com HTTP 403 nestes endpoints.
 """
 
 import uuid
-from datetime import datetime, timedelta
+import hashlib
 from functools import wraps
 
 from django.conf import settings
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.response import Response
 
 # --------------------------------------------------------------------------
-# Armazenamento em memória das sessões de operação
+# Armazenamento compartilhado das sessões de operação
 # --------------------------------------------------------------------------
-# { token_str: { perfil, turma, turno, criado_em } }
-_SESSOES: dict[str, dict] = {}
-
 TOKEN_TTL_HORAS = getattr(settings, "OPERACAO_TOKEN_TTL_HORAS", 12)
+TOKEN_TTL_SEGUNDOS = int(TOKEN_TTL_HORAS * 60 * 60)
+CHAVE_SESSAO_PREFIXO = "operacao:sessao:"
 
 PERFIL_ALUNO = "ALUNO_REP"
 PERFIL_COZINHA = "COZINHA"
@@ -43,59 +42,60 @@ PERFIS_VALIDOS = {PERFIL_ALUNO, PERFIL_COZINHA}
 # Helpers
 # --------------------------------------------------------------------------
 
-def _sessao_expirada(sessao: dict) -> bool:
-    limite = sessao["criado_em"] + timedelta(hours=TOKEN_TTL_HORAS)
-    return datetime.utcnow() > limite
+def _chave_sessao(token: str) -> str:
+    digest = hashlib.sha256(str(token).encode("utf-8")).hexdigest()
+    return f"{CHAVE_SESSAO_PREFIXO}{digest}"
 
 
 def criar_token(perfil: str, turma: str = "", turno: str = "") -> str:
     token = str(uuid.uuid4())
-    _SESSOES[token] = {
+    cache.set(_chave_sessao(token), {
         "perfil": perfil,
         "turma": turma,
         "turno": turno,
-        "criado_em": datetime.utcnow(),
-    }
+    }, timeout=TOKEN_TTL_SEGUNDOS)
     return token
 
 
 def validar_token(token: str) -> dict | None:
     """Retorna o dict da sessão ou None se inválido/expirado."""
-    sessao = _SESSOES.get(token)
-    if not sessao:
-        return None
-    if _sessao_expirada(sessao):
-        del _SESSOES[token]
-        return None
-    return sessao
+    return cache.get(_chave_sessao(token))
 
 
 def invalidar_token(token: str) -> None:
-    _SESSOES.pop(token, None)
+    cache.delete(_chave_sessao(token))
 
 
 # --------------------------------------------------------------------------
 # Leitura dos PINs no banco (Turma / PinAcesso)
 # --------------------------------------------------------------------------
 
-def _pins_alunos() -> dict[str, dict]:
-    """Retorna mapa { pin: { turma, turno } } a partir de PinAcesso ativos."""
+def _dados_pin_aluno(pin: str) -> dict | None:
+    """Localiza um PIN ativo sem expor nem manter o segredo em texto puro."""
     from core.models import PinAcesso
 
+    pin_acesso = PinAcesso.objects.filter(
+        papel=PinAcesso.ALUNO_REP,
+        ativo=True,
+        pin_fingerprint=PinAcesso.gerar_fingerprint(pin),
+    ).select_related("turma").first()
+    if not pin_acesso or not pin_acesso.confere_pin(pin):
+        return None
     return {
-        p.pin: {"turma": p.turma.nome, "turno": p.turma.turno}
-        for p in PinAcesso.objects.filter(
-            papel=PinAcesso.ALUNO_REP, ativo=True
-        ).select_related("turma")
+        "turma": pin_acesso.turma.nome,
+        "turno": pin_acesso.turma.turno,
     }
 
 
 def _pin_valido_cozinha(pin: str) -> bool:
     from core.models import PinAcesso
 
-    return PinAcesso.objects.filter(
-        papel=PinAcesso.COZINHA, ativo=True, pin=pin
-    ).exists()
+    pin_acesso = PinAcesso.objects.filter(
+        papel=PinAcesso.COZINHA,
+        ativo=True,
+        pin_fingerprint=PinAcesso.gerar_fingerprint(pin),
+    ).only("pin").first()
+    return bool(pin_acesso and pin_acesso.confere_pin(pin))
 
 
 # --------------------------------------------------------------------------
@@ -108,8 +108,7 @@ def autenticar_pin(perfil: str, pin: str) -> dict | None:
     Retorna dict com dados da sessão ou None se inválido.
     """
     if perfil == PERFIL_ALUNO:
-        mapa = _pins_alunos()
-        dados = mapa.get(pin)
+        dados = _dados_pin_aluno(pin)
         if not dados:
             return None
         return {"perfil": PERFIL_ALUNO, **dados}
@@ -136,7 +135,7 @@ def requer_perfil_operacao(*perfis):
     Regras:
     - Se o request tiver um usuário Django autenticado (token admin), rejeita
       com 403 — mantém o isolamento entre painel admin e apps de operação.
-    - Lê o header X-Operacao-Token, valida na memória de sessões.
+    - Lê o header X-Operacao-Token e valida no cache compartilhado.
     - Se o perfil da sessão não estiver entre os `perfis` permitidos, rejeita.
     """
     perfis_permitidos = set(perfis) if perfis else PERFIS_VALIDOS

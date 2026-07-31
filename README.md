@@ -23,10 +23,10 @@ EduStock é uma plataforma integrada para gerenciamento de:
 - **SQLite** - Banco de dados (desenvolvimento)
 
 ### Frontend
-- **React 18** - Biblioteca JavaScript
+- **React 19** - Biblioteca JavaScript
 - **Vite** - Build tool e dev server
 - **React Router** - Navegação SPA
-- **Framer Motion** - Animações
+- **Motion** - Animações
 - **Tailwind CSS** - Estilização
 
 ## 📁 Estrutura do Projeto
@@ -41,7 +41,9 @@ EduStock/
 │   └── tests/             # Testes automatizados
 ├── frontend/              # Dashboard administrativo (React)
 │   ├── src/
+│   │   ├── pages/LandingPage.jsx # Página institucional pública em /
 │   │   ├── pages/        # Páginas (Inventário, Alertas, etc)
+│   │   ├── api/          # API e contratos em TypeScript progressivo
 │   │   ├── features/     # Componentes por feature
 │   │   ├── layouts/      # Layouts (Header, Sidebar)
 │   │   └── lib/          # Utilitários
@@ -50,6 +52,8 @@ EduStock/
 │   └── src/
 ├── app-cozinha/          # Interface para cozinha (React)
 │   └── src/
+├── packages/
+│   └── operacao-shared/  # PIN, cliente HTTP e tokens usados pelos mini-apps
 ├── easystock/            # Configurações Django
 │   ├── settings.py
 │   └── urls.py
@@ -104,7 +108,7 @@ cd frontend
 npm install
 
 # Criar arquivo .env
-echo "VITE_API_BASE=" > .env
+echo "VITE_API_URL=http://localhost:8000/api" > .env
 
 npm run dev
 ```
@@ -162,7 +166,15 @@ python manage.py test
 ```bash
 cd frontend
 npm test
+npm run lint
+npm run typecheck
+npm run test:e2e
 ```
+
+O endereço `/` é público e apresenta a plataforma. O dashboard permanece
+protegido nas rotas `/inventario`, `/movimentacoes`, `/alertas` e demais áreas
+administrativas. Veja [docs/IMPLEMENTACAO_FASE_4.md](docs/IMPLEMENTACAO_FASE_4.md)
+para detalhes da landing, migração de dados e testes E2E.
 
 ## 📊 Funcionalidades Principais
 

@@ -1,10 +1,20 @@
-import { describe, it, expect, vi, afterEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import InventarioPage from "./InventarioPage"
+import { salvarSessao } from "../lib/auth"
 
 afterEach(cleanup)
+beforeEach(() => {
+  sessionStorage.clear()
+  salvarSessao({
+    token: "test-token",
+    papel: "ADMIN",
+    is_staff: true,
+    modulos_ativos: ["inventario"],
+  })
+})
 
 vi.mock("../api", () => ({
   categoriasApi: { create: vi.fn().mockResolvedValue({ id: 99, name: "Higiene" }) },

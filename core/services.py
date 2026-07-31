@@ -1,5 +1,6 @@
+import logging
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -8,17 +9,39 @@ from django.utils import timezone
 
 from .models import Produto, Entrada, Movimentacao, FrequenciaDiaria
 
+logger = logging.getLogger(__name__)
+
 
 @transaction.atomic
 def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitario=None,
                            entrada=None, data=None, user=None):
-    quantidade = Decimal(str(quantidade))
+    try:
+        quantidade = Decimal(str(quantidade))
+    except (InvalidOperation, TypeError, ValueError):
+        logger.warning(
+            "Movimentação rejeitada: quantidade inválida",
+            extra={"produto_id": getattr(produto, "pk", None), "tipo": tipo},
+        )
+        raise ValidationError("A quantidade deve ser um número válido.") from None
     if quantidade <= 0:
+        logger.warning(
+            "Movimentação rejeitada: quantidade não positiva",
+            extra={"produto_id": getattr(produto, "pk", None), "tipo": tipo},
+        )
         raise ValidationError("A quantidade deve ser maior que zero.")
 
     p = Produto.objects.select_for_update().get(pk=produto.pk)
     if tipo == Movimentacao.SAIDA:
         if quantidade > p.quantidade:
+            logger.warning(
+                "Movimentação rejeitada: saldo insuficiente",
+                extra={
+                    "produto_id": p.pk,
+                    "tipo": tipo,
+                    "quantidade": str(quantidade),
+                    "saldo": str(p.quantidade),
+                },
+            )
             raise ValidationError(
                 f"Saída de {quantidade} excede o saldo atual ({p.quantidade})."
             )
@@ -38,6 +61,10 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
 def registrar_entrada(*, fornecedor=None, numero_nota_fiscal="", data=None, observacao="",
                       itens, user=None):
     if not itens:
+        logger.warning(
+            "Entrada rejeitada: nenhum item informado",
+            extra={"fornecedor_id": getattr(fornecedor, "pk", None)},
+        )
         raise ValidationError("Informe ao menos um item.")
     entrada = Entrada.objects.create(
         fornecedor=fornecedor, numero_nota_fiscal=numero_nota_fiscal,

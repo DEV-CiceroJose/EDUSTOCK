@@ -54,8 +54,8 @@ export function toCsv(rows, sep = ";") {
 export function prestacaoContasToCsv(dados) {
   const mostrarPreco = getModulosAtivos().includes("financeiro")
   const header = mostrarPreco
-    ? ["Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd", "Preço Unit.", "Subtotal", "Categoria", "Legado"]
-    : ["Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd", "Categoria", "Legado"]
+    ? ["Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd", "Preço Unit.", "Subtotal", "Categoria"]
+    : ["Fornecedor", "CNPJ", "NF", "Data", "Produto", "Qtd", "Categoria"]
   const rows = [header]
   for (const f of dados.fornecedores ?? []) {
     for (const doc of f.documentos ?? []) {
@@ -63,13 +63,13 @@ export function prestacaoContasToCsv(dados) {
         const linha = [
           f.fornecedor_nome,
           f.documento || "",
-          doc.numero_nota_fiscal || it.numero_nota_fiscal_legado || "",
+          doc.numero_nota_fiscal || "",
           dataBR(doc.data),
           it.produto_nome,
           it.quantidade,
         ]
         if (mostrarPreco) linha.push(it.preco_unitario ?? "", it.subtotal)
-        linha.push("", doc.legado ? "Sim" : "Não")
+        linha.push("")
         rows.push(linha)
       }
     }

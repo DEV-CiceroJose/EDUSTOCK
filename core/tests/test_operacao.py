@@ -125,7 +125,10 @@ class ContagemApiTest(APITestCase):
         self.assertIn("Frequência já registrada", resp.data["detail"])
 
     def test_resumo_dia(self):
+        from django.contrib.auth.models import User
         from core.operacao_auth import criar_token, PERFIL_ALUNO
+        from plataforma.models import Perfil, TokenAcesso
+
         client_7b = APIClient()
         client_7b.credentials(
             HTTP_X_OPERACAO_TOKEN=criar_token(PERFIL_ALUNO, turma="7B", turno="TARDE")
@@ -136,8 +139,20 @@ class ContagemApiTest(APITestCase):
         client_7b.post("/api/operacao/contagem/", {
             "quantidade_alunos": 20,
         }, format="json")
-        # /resumo/ não tem proteção de perfil (é usado pelo dashboard admin)
-        resp = self.client.get("/api/operacao/resumo/")
+        self.assertEqual(
+            self.client.get("/api/operacao/resumo/").status_code,
+            401,
+        )
+
+        user = User.objects.create_user(username="admin-resumo", password="x")
+        Perfil.objects.create(user=user, papel=Perfil.ADMIN)
+        token = TokenAcesso.objects.create(
+            user=user,
+            expira_em=timezone.now() + timedelta(hours=1),
+        )
+        client_admin = APIClient()
+        client_admin.credentials(HTTP_AUTHORIZATION=f"Token {token.token}")
+        resp = client_admin.get("/api/operacao/resumo/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["total_alunos"], 50)
 

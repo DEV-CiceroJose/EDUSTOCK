@@ -1,8 +1,11 @@
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
+from django.contrib.auth.hashers import check_password, identify_hasher, make_password
+from django.utils.crypto import salted_hmac
 from django.utils import timezone
 
 
@@ -51,9 +54,6 @@ class Produto(models.Model):
     ]
 
     nome = models.CharField("Nome", max_length=200)
-    numero_nota_fiscal = models.CharField(
-        "Número da Nota Fiscal", max_length=12, null=True, blank=True
-    )
     grupo = models.ForeignKey("Grupo", on_delete=models.PROTECT, related_name="produtos")
     fornecedor = models.ForeignKey(
         "Fornecedor", on_delete=models.PROTECT, null=True, blank=True, related_name="produtos"
@@ -67,9 +67,7 @@ class Produto(models.Model):
     periodicidade = models.CharField(
         max_length=8, choices=PERIODICIDADE_CHOICES, default="EVENTUAL"
     )
-    validade = models.DateField("Validade", null=True, blank=True)
-    preco = models.DecimalField("Preço", max_digits=10, decimal_places=2, null=True, blank=True)
-
+    validade = models.DateField("Validade", null=True, blank=True, db_index=True)
     criado_por = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="produtos_criados"
     )
@@ -185,14 +183,14 @@ class Movimentacao(models.Model):
     TIPO_CHOICES = [(ENTRADA, "Entrada"), (SAIDA, "Saída")]
 
     produto = models.ForeignKey("Produto", on_delete=models.PROTECT, related_name="movimentacoes")
-    tipo = models.CharField(max_length=7, choices=TIPO_CHOICES)
+    tipo = models.CharField(max_length=7, choices=TIPO_CHOICES, db_index=True)
     quantidade = models.DecimalField(max_digits=10, decimal_places=3)
     preco_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     entrada = models.ForeignKey(
         Entrada, on_delete=models.CASCADE, null=True, blank=True, related_name="itens"
     )
     motivo = models.CharField(max_length=120, blank=True)
-    data = models.DateField(default=timezone.localdate)
+    data = models.DateField(default=timezone.localdate, db_index=True)
     criado_por = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name="movimentacoes_criadas"
     )
@@ -299,9 +297,13 @@ class PinAcesso(models.Model):
         Turma, on_delete=models.CASCADE, null=True, blank=True, related_name="pins"
     )
     pin = models.CharField(
-        max_length=4,
+        max_length=128,
+        editable=False,
+    )
+    pin_fingerprint = models.CharField(
+        max_length=64,
         unique=True,
-        validators=[RegexValidator(r"^\d{4}$", "PIN deve ter exatamente 4 dígitos.")],
+        editable=False,
     )
     titular = models.CharField(
         "Nome de quem escolheu o PIN", max_length=100, blank=True, default=""
@@ -325,10 +327,56 @@ class PinAcesso(models.Model):
 
     def __str__(self):
         alvo = self.turma.nome if self.turma else "Cozinha"
-        return f"{alvo} — {self.pin}"
+        return f"{alvo} — PIN protegido"
+
+    @staticmethod
+    def _pin_em_formato_hash(valor):
+        try:
+            identify_hasher(valor)
+            return True
+        except (TypeError, ValueError):
+            return False
+
+    def definir_pin(self, pin):
+        pin = str(pin).strip()
+        RegexValidator(
+            r"^\d{4}$", "PIN deve ter exatamente 4 dígitos."
+        )(pin)
+        self.pin_fingerprint = self.gerar_fingerprint(pin)
+        self.pin = make_password(pin)
+
+    @staticmethod
+    def gerar_fingerprint(pin):
+        return salted_hmac(
+            "core.PinAcesso.pin",
+            str(pin),
+            secret=settings.PIN_LOOKUP_SECRET,
+            algorithm="sha256",
+        ).hexdigest()
+
+    def confere_pin(self, pin):
+        return bool(self.pin and check_password(str(pin), self.pin))
+
+    def save(self, *args, **kwargs):
+        if not self._pin_em_formato_hash(self.pin):
+            pin_aberto = str(self.pin).strip()
+            RegexValidator(
+                r"^\d{4}$", "PIN deve ter exatamente 4 dígitos."
+            )(pin_aberto)
+            fingerprint = self.gerar_fingerprint(pin_aberto)
+            if type(self).objects.exclude(pk=self.pk).filter(
+                pin_fingerprint=fingerprint
+            ).exists():
+                raise ValidationError({"pin": "Este PIN já está em uso."})
+            self.definir_pin(pin_aberto)
+        super().save(*args, **kwargs)
 
     def clean(self):
         super().clean()
+        if self.pin and not self._pin_em_formato_hash(self.pin):
+            RegexValidator(
+                r"^\d{4}$", "PIN deve ter exatamente 4 dígitos."
+            )(str(self.pin).strip())
         if self.papel == self.ALUNO_REP and self.turma_id is None:
             raise ValidationError(
                 "Representante de turma exige uma turma selecionada."
@@ -337,4 +385,66 @@ class PinAcesso(models.Model):
             raise ValidationError(
                 "PIN de cozinha não deve ter turma vinculada."
             )
+
+
+class ConfiguracaoAlertas(models.Model):
+    """Parâmetros globais editáveis pela administração da escola."""
+
+    critico_dias = models.PositiveSmallIntegerField(
+        "Prazo crítico de validade (dias)",
+        default=7,
+        help_text="Produtos com menos dias que este valor são classificados como críticos.",
+    )
+    alerta_dias = models.PositiveSmallIntegerField(
+        "Antecedência padrão de validade (dias)",
+        default=30,
+        help_text="Janela padrão usada para listar produtos próximos do vencimento.",
+    )
+    estoque_percentual = models.PositiveSmallIntegerField(
+        "Limiar de estoque baixo (%)",
+        default=20,
+        help_text="Percentual do estoque mínimo abaixo do qual o produto gera alerta.",
+    )
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuração de alertas"
+        verbose_name_plural = "Configuração de alertas"
+
+    def __str__(self):
+        return "Parâmetros globais de alertas"
+
+    def clean(self):
+        super().clean()
+        if self.critico_dias >= self.alerta_dias:
+            raise ValidationError(
+                {"critico_dias": "O prazo crítico deve ser menor que a antecedência padrão."}
+            )
+        if not 1 <= self.estoque_percentual <= 100:
+            raise ValidationError(
+                {"estoque_percentual": "Informe um percentual entre 1 e 100."}
+            )
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def carregar(cls):
+        configuracao, _ = cls.objects.get_or_create(pk=1)
+        return configuracao
+
+
+class CacheEntry(models.Model):
+    """Tabela interna usada pelo backend DatabaseCache do Django."""
+
+    cache_key = models.CharField(max_length=255, primary_key=True)
+    value = models.TextField()
+    expires = models.DateTimeField(db_index=True)
+
+    class Meta:
+        db_table = "edustock_cache"
+        verbose_name = "Entrada interna de cache"
+        verbose_name_plural = "Entradas internas de cache"
 

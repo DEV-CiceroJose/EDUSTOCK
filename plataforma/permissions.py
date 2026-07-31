@@ -1,4 +1,4 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import SAFE_METHODS, BasePermission
 
 from .models import Modulo
 
@@ -30,3 +30,29 @@ class EhAdmin(BasePermission):
 
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_staff)
+
+
+def usuario_admin_do_estoque(user):
+    """Admin operacional: staff Django ou papel ADMIN da plataforma."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_staff:
+        return True
+    try:
+        return user.perfil.papel == "ADMIN"
+    except AttributeError:
+        return False
+
+
+class LeituraOuAdmin(BasePermission):
+    """
+    Operadores autenticados consultam cadastros; alterações ficam restritas
+    ao administrador operacional. Movimentações usam uma permissão separada.
+    """
+
+    message = "Apenas administradores podem alterar este cadastro."
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return bool(request.user and request.user.is_authenticated)
+        return usuario_admin_do_estoque(request.user)

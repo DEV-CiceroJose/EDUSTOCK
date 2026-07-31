@@ -18,12 +18,12 @@ export default function ProductCard({ produto, index = 0, onDetails }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, delay: Math.min(index * 0.02, 0.3) }}
-      className="card flex flex-col p-3.5"
+      className="product-card card flex flex-col p-3.5"
     >
       <div className="flex gap-3">
         {/* Thumbnail */}
         <div
-          className="relative grid h-16 w-16 shrink-0 place-items-center rounded-2xl"
+          className="product-thumbnail relative grid h-16 w-16 shrink-0 place-items-center rounded-2xl"
           style={{ background: st.tint, color: st.fg }}
         >
           {st.renderIcon(26)}
@@ -80,9 +80,6 @@ export default function ProductCard({ produto, index = 0, onDetails }) {
           </span>
         )}
       </div>
-      {produto.numero_nota_fiscal && (
-        <div className="mt-1 font-mono text-[0.6rem] text-ink-faint">NF {produto.numero_nota_fiscal}</div>
-      )}
     </motion.div>
   )
 }

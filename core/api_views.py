@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
-from plataforma.permissions import RequerModuloAtivo
+from django.db.models import OuterRef, Subquery
+from plataforma.permissions import LeituraOuAdmin, RequerModuloAtivo
 from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
 from .serializers import (
     ProdutoSerializer, CategoriaSerializer, GrupoSerializer,
@@ -32,11 +33,28 @@ class AlertasView(APIView):
     def get(self, request):
         tipo = request.query_params.get("tipo")
         urgencia = request.query_params.get("urgencia")
+        dias_validade = request.query_params.get("dias_validade")
         if tipo and tipo not in ("validade", "estoque"):
             return Response({"detail": "tipo inválido"}, status=status.HTTP_400_BAD_REQUEST)
         if urgencia and urgencia not in ("critico", "alerta"):
             return Response({"detail": "urgencia inválida"}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(coletar_alertas(tipo=tipo, urgencia=urgencia))
+        try:
+            if dias_validade is not None:
+                dias_validade = int(dias_validade)
+                if not 1 <= dias_validade <= 365:
+                    raise ValueError
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "dias_validade deve ser um inteiro entre 1 e 365."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            coletar_alertas(
+                tipo=tipo,
+                urgencia=urgencia,
+                dias_alerta=dias_validade,
+            )
+        )
 
 
 class PrestacaoContasView(APIView):
@@ -58,21 +76,30 @@ class PrestacaoContasView(APIView):
 
 
 class CategoriaViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
     queryset = Categoria.objects.all().order_by("name")
     serializer_class = CategoriaSerializer
 
 
 class ProdutoViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
     serializer_class = ProdutoSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["nome"]
 
     def get_queryset(self):
+        ultimo_preco = (
+            Movimentacao.objects.filter(
+                produto_id=OuterRef("pk"),
+                tipo=Movimentacao.ENTRADA,
+                preco_unitario__isnull=False,
+            )
+            .order_by("-data", "-id")
+            .values("preco_unitario")[:1]
+        )
         qs = Produto.objects.select_related(
             "grupo__categoria", "fornecedor", "criado_por", "atualizado_por"
-        ).all()
+        ).annotate(ultimo_preco=Subquery(ultimo_preco))
         grupo = self.request.query_params.get("grupo")
         categoria = self.request.query_params.get("categoria")
         fornecedor = self.request.query_params.get("fornecedor")
@@ -94,13 +121,13 @@ class ProdutoViewSet(viewsets.ModelViewSet):
 
 
 class GrupoViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
     queryset = Grupo.objects.select_related("categoria").all()
     serializer_class = GrupoSerializer
 
 
 class BemPermanenteViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
     queryset = BemPermanente.objects.all()
     serializer_class = BemPermanenteSerializer
 
@@ -114,7 +141,7 @@ class BemPermanenteViewSet(viewsets.ModelViewSet):
 
 
 class FornecedorViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, RequerModuloAtivo("fornecedores")]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("fornecedores"), LeituraOuAdmin]
     serializer_class = FornecedorSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["nome", "documento"]

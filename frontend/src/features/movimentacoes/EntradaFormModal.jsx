@@ -1,28 +1,37 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { entradasApi } from "../../api"
 import { brl } from "../../lib/format"
 import { Icon } from "../../lib/icons.jsx"
 import Modal from "../../components/ui/Modal"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 import { getModulosAtivos } from "../../lib/auth"
 
 const linhaVazia = () => ({ produto: "", quantidade: "", preco_unitario: "" })
 
 export default function EntradaFormModal({ open, produtos, fornecedores, onClose, onSaved }) {
+  if (!open) return null
+  return (
+    <EntradaForm
+      produtos={produtos}
+      fornecedores={fornecedores}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  )
+}
+
+function EntradaForm({ produtos, fornecedores, onClose, onSaved }) {
   const mostrarPreco = getModulosAtivos().includes("financeiro")
-  const [cab, setCab] = useState({ fornecedor: "", numero_nota_fiscal: "", data: "", observacao: "" })
+  const [cab, setCab] = useState({
+    fornecedor: "",
+    numero_nota_fiscal: "",
+    data: new Date().toISOString().slice(0, 10),
+    observacao: "",
+  })
   const [linhas, setLinhas] = useState([linhaVazia()])
   const [erro, setErro] = useState("")
   const [salvando, setSalvando] = useState(false)
   const toast = useToast()
-
-  useEffect(() => {
-    if (open) {
-      setCab({ fornecedor: "", numero_nota_fiscal: "", data: new Date().toISOString().slice(0, 10), observacao: "" })
-      setLinhas([linhaVazia()])
-      setErro("")
-    }
-  }, [open])
 
   const setC = (k) => (e) => setCab((c) => ({ ...c, [k]: e.target.value }))
   const setL = (i, k) => (e) =>
@@ -65,7 +74,7 @@ export default function EntradaFormModal({ open, produtos, fornecedores, onClose
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Nova entrada" subtitle="Recebimento de itens" maxW="max-w-2xl">
+    <Modal open onClose={onClose} title="Nova entrada" subtitle="Recebimento de itens" maxW="max-w-2xl">
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className="block">

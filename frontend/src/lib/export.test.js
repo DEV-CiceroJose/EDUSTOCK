@@ -6,8 +6,8 @@ const DADOS = {
   fornecedores: [{
     fornecedor_nome: "Mercadinho do Zé", documento: "",
     documentos: [{
-      numero_nota_fiscal: "NF-001", data: "2026-07-10", legado: false,
-      itens: [{ produto_nome: "Arroz", quantidade: "10", preco_unitario: "10.00", subtotal: "100.00", numero_nota_fiscal_legado: null }],
+      numero_nota_fiscal: "NF-001", data: "2026-07-10",
+      itens: [{ produto_nome: "Arroz", quantidade: "10", preco_unitario: "10.00", subtotal: "100.00" }],
     }],
   }],
   resumo_financeiro: { por_categoria: [{ categoria_nome: "Alimentos", total: "100.00" }] },

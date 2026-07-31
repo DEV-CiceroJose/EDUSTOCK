@@ -101,7 +101,7 @@ class ModuloViewSetTest(APITestCase):
         self._autenticar(True)
         resp = self.client.get("/api/modulos/")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(len(resp.data), 2)
+        self.assertEqual(len(resp.data["results"]), 2)
 
     def test_admin_desativa_modulo_sem_dependentes(self):
         self._autenticar(True)

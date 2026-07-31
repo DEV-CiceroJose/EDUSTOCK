@@ -1,85 +1,23 @@
 /**
- * api.js — cliente HTTP do app-alunos
- *
- * Todos os pedidos vão para /api/operacao/*
- * O token de sessão é lido de sessionStorage e enviado no header
- * X-Operacao-Token (nunca no Authorization, que é do painel admin).
- *
- * Nenhuma função aqui expõe preços, fornecedores ou relatórios.
+ * Cliente de domínio do app-alunos. Transporte, autenticação do header e
+ * política de retry ficam no pacote compartilhado dos apps operacionais.
  */
 
-const BASE = import.meta.env.VITE_API_BASE ?? ''
+import { createOperacaoHttpClient } from "@edustock/operacao-shared"
 
-function token() {
-  return sessionStorage.getItem('operacao_token') ?? ''
-}
+const SESSION_KEY = "operacao_sessao"
+const http = createOperacaoHttpClient({
+  baseUrl: import.meta.env.VITE_API_BASE ?? "",
+  tokenKey: "operacao_token",
+})
 
-function esperar(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-const BACKOFF_MS = [500, 1500]
-
-/**
- * @param {string} method
- * @param {string} path
- * @param {object} [body]
- * @param {{ retry?: boolean }} [opts] — retry: reenvia até 2x em falha de rede/timeout.
- *   Nunca reenvia por causa de uma resposta HTTP de erro (4xx/5xx), só quando o
- *   fetch falha antes de obter resposta (rede caiu, timeout).
- */
-async function req(method, path, body, opts = {}) {
-  const { retry = false } = opts
-  const headers = { 'Content-Type': 'application/json' }
-  const t = token()
-  if (t) headers['X-Operacao-Token'] = t
-
-  const tentativasTotais = retry ? BACKOFF_MS.length + 1 : 1
-
-  let ultimoErroDeRede = null
-  for (let tentativa = 0; tentativa < tentativasTotais; tentativa++) {
-    if (tentativa > 0) await esperar(BACKOFF_MS[tentativa - 1])
-
-    let res
-    try {
-      res = await fetch(`${BASE}${path}`, {
-        method,
-        headers,
-        body: body != null ? JSON.stringify(body) : undefined,
-      })
-    } catch (e) {
-      ultimoErroDeRede = e
-      continue
-    }
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      const err = new Error(data.detail ?? `HTTP ${res.status}`)
-      err.status = res.status
-      err.data = data
-      throw err
-    }
-
-    if (res.status === 204) return null
-    return res.json()
-  }
-
-  throw ultimoErroDeRede
-}
-
-/**
- * Login via PIN — troca PIN por token de sessão.
- * Turma e turno vêm sempre da resposta do backend (nunca de config local).
- * @param {string} pin — 4 dígitos
- * @returns {{ token, perfil, turma, turno }}
- */
 export async function login(pin) {
-  const data = await req('POST', '/api/operacao/auth/', {
+  const data = await http.request("POST", "/api/operacao/auth/", {
     pin,
-    perfil: 'ALUNO_REP',
+    perfil: "ALUNO_REP",
   })
-  sessionStorage.setItem('operacao_token', data.token)
-  sessionStorage.setItem('operacao_sessao', JSON.stringify({
+  http.setToken(data.token)
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({
     turma: data.turma,
     turno: data.turno,
     perfil: data.perfil,
@@ -88,31 +26,25 @@ export async function login(pin) {
 }
 
 export function logout() {
-  sessionStorage.removeItem('operacao_token')
-  sessionStorage.removeItem('operacao_sessao')
+  http.clearToken()
+  sessionStorage.removeItem(SESSION_KEY)
 }
 
 export function getSessao() {
   try {
-    return JSON.parse(sessionStorage.getItem('operacao_sessao') ?? 'null')
+    return JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? "null")
   } catch {
     return null
   }
 }
 
-/**
- * Registra a frequência de hoje para a turma autenticada.
- *
- * retry: true — o backend tem constraint única em FrequenciaDiaria e devolve
- * 409 numa segunda tentativa idêntica (core/operacao_views.py), então reenviar
- * depois de uma falha de rede nunca duplica o registro.
- *
- * @param {number} quantidade_alunos
- * @param {string?} data — YYYY-MM-DD (omitir = hoje)
- * @returns {{ id, data, turno, turma, quantidade_alunos, previsao }}
- */
 export async function registrarContagem(quantidade_alunos, data) {
   const body = { quantidade_alunos }
   if (data) body.data = data
-  return req('POST', '/api/operacao/contagem/', body, { retry: true })
+  return http.request(
+    "POST",
+    "/api/operacao/contagem/",
+    body,
+    { retry: true },
+  )
 }

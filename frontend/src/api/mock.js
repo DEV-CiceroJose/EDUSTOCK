@@ -3,6 +3,8 @@
    Hierarquia: Categoria -> Grupo -> Produto. Persiste em localStorage.
 ------------------------------------------------------------------ */
 
+import { getConfig } from "../lib/config"
+
 const KEY = "easystock:db:v4"
 const delay = (ms = 220) => new Promise((r) => setTimeout(r, ms))
 
@@ -29,10 +31,10 @@ function seed() {
     { id: 2, nome: "Mercadinho do Zé", documento: "", endereco: "Rua 5, 23", telefone: "(81) 98888-1111", email: "", emite_nota_fiscal: false, aceita_fiado: true, ativo: true, observacao: "Aceita fiado quando a verba atrasa." },
   ]
   const produtos = [
-    { id: 1, nome: "Arroz Branco Tipo 1", numero_nota_fiscal: "NF-00231", grupo: 1, fornecedor: 1, quantidade: 48, unidade: "KG", estoque_minimo: 20, perecivel: true, periodicidade: "MENSAL", validade: emDias(95), preco: "5.40" },
-    { id: 2, nome: "Feijão Carioca", numero_nota_fiscal: "NF-00231", grupo: 2, fornecedor: 1, quantidade: 12, unidade: "KG", estoque_minimo: 15, perecivel: true, periodicidade: "MENSAL", validade: emDias(20), preco: "8.20" },
-    { id: 3, nome: "Detergente Neutro", numero_nota_fiscal: "NF-00198", grupo: 3, fornecedor: 2, quantidade: 64, unidade: "UN", estoque_minimo: 20, perecivel: false, periodicidade: "EVENTUAL", validade: emDias(310), preco: "2.15" },
-    { id: 4, nome: "Resma Papel A4", numero_nota_fiscal: "NF-00210", grupo: 4, fornecedor: null, quantidade: 25, unidade: "PC", estoque_minimo: 10, perecivel: false, periodicidade: "EVENTUAL", validade: null, preco: "23.00" },
+    { id: 1, nome: "Arroz Branco Tipo 1", grupo: 1, fornecedor: 1, quantidade: 48, unidade: "KG", estoque_minimo: 20, perecivel: true, periodicidade: "MENSAL", validade: emDias(95), ultimo_preco: "5.40" },
+    { id: 2, nome: "Feijão Carioca", grupo: 2, fornecedor: 1, quantidade: 12, unidade: "KG", estoque_minimo: 15, perecivel: true, periodicidade: "MENSAL", validade: emDias(20), ultimo_preco: "8.20" },
+    { id: 3, nome: "Detergente Neutro", grupo: 3, fornecedor: 2, quantidade: 64, unidade: "UN", estoque_minimo: 20, perecivel: false, periodicidade: "EVENTUAL", validade: emDias(310), ultimo_preco: null },
+    { id: 4, nome: "Resma Papel A4", grupo: 4, fornecedor: null, quantidade: 25, unidade: "PC", estoque_minimo: 10, perecivel: false, periodicidade: "EVENTUAL", validade: null, ultimo_preco: null },
   ]
   const dataHoje = hoje.toISOString().slice(0, 10)
   const entradas = [
@@ -123,7 +125,8 @@ export const mockProdutos = {
     const db = load()
     const i = db.produtos.findIndex((x) => x.id === Number(id))
     if (i === -1) throw new Error("Produto não encontrado")
-    const { quantidade, ...semSaldo } = normalize(data)
+    const semSaldo = normalize(data)
+    delete semSaldo.quantidade
     db.produtos[i] = { ...db.produtos[i], ...semSaldo }
     save(db)
     return expand(db.produtos[i], db)
@@ -269,6 +272,8 @@ export const mockEntradas = {
       ajustarSaldo(db, it.produto, "ENTRADA", it.quantidade)
       const preco = it.preco_unitario != null && it.preco_unitario !== "" ? Number(it.preco_unitario) : null
       if (preco != null) total += preco * Number(it.quantidade)
+      const produto = db.produtos.find((p) => p.id === Number(it.produto))
+      if (produto && preco != null) produto.ultimo_preco = String(preco)
       db.movimentacoes.push({
         id: db.seqM++, produto: Number(it.produto), tipo: "ENTRADA",
         quantidade: Number(it.quantidade), preco_unitario: preco, entrada: entradaId,
@@ -316,8 +321,6 @@ export const mockCategorias = {
 }
 
 const CRITICO_DIAS = 7
-const ALERTA_DIAS = 30
-
 function diasAteValidade(iso, hoje = new Date()) {
   const h = new Date(hoje)
   h.setHours(0, 0, 0, 0)
@@ -353,7 +356,8 @@ function motivoEstoque(quantidade, unidade) {
   return `Saldo: ${qtdFmt} ${label}`
 }
 
-function coletarAlertasMock(produtos, { tipo, urgencia } = {}) {
+export function coletarAlertasMock(produtos, { tipo, urgencia, dias_validade } = {}) {
+  const alertaDias = Number(dias_validade ?? getConfig().validityAlertDays)
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)
 
@@ -364,7 +368,7 @@ function coletarAlertasMock(produtos, { tipo, urgencia } = {}) {
     for (const p of produtos) {
       if (!p.validade) continue
       const dias = diasAteValidade(p.validade, hoje)
-      if (dias > ALERTA_DIAS) continue
+      if (dias > alertaDias) continue
       const item = {
         produto_id: p.id,
         nome: p.nome,
@@ -424,10 +428,6 @@ function money(val) {
   return Number(val).toFixed(2)
 }
 
-function produtoTemEntrada(db, produtoId) {
-  return db.movimentacoes.some((m) => m.produto === produtoId && m.entrada != null)
-}
-
 function gerarPrestacaoContasMock(db, inicio, fim) {
   const entradas = db.entradas.filter((e) => e.data >= inicio && e.data <= fim)
   const porFornecedor = new Map()
@@ -445,15 +445,12 @@ function gerarPrestacaoContasMock(db, inicio, fim) {
     }
     const bloco = porFornecedor.get(fid)
     const itens = (e.itens || []).map((it) => {
-      const prod = db.produtos.find((p) => p.id === Number(it.produto))
       const sub = it.preco_unitario != null ? Number(it.quantidade) * Number(it.preco_unitario) : 0
-      const legadoNf = !e.numero_nota_fiscal && prod?.numero_nota_fiscal ? prod.numero_nota_fiscal : null
       return {
         produto_nome: it.produto_nome,
         quantidade: String(it.quantidade),
         preco_unitario: it.preco_unitario != null ? String(it.preco_unitario) : null,
         subtotal: money(sub),
-        numero_nota_fiscal_legado: legadoNf,
       }
     })
     const doc = {
@@ -461,7 +458,6 @@ function gerarPrestacaoContasMock(db, inicio, fim) {
       numero_nota_fiscal: e.numero_nota_fiscal || "",
       data: e.data,
       total: e.total || money(itens.reduce((s, i) => s + Number(i.subtotal), 0)),
-      legado: false,
       itens,
     }
     bloco.documentos.push(doc)
@@ -477,56 +473,6 @@ function gerarPrestacaoContasMock(db, inicio, fim) {
       const cat = grupo ? db.categorias.find((c) => c.id === grupo.categoria) : null
       if (!cat || it.preco_unitario == null) continue
       const sub = Number(it.quantidade) * Number(it.preco_unitario)
-      catTotals.set(cat.id, (catTotals.get(cat.id) || 0) + sub)
-      catNames.set(cat.id, cat.name)
-    }
-  }
-
-  for (const p of db.produtos) {
-    if (!p.numero_nota_fiscal) continue
-    if (produtoTemEntrada(db, p.id)) continue
-    const criado = (p.criado_em || new Date().toISOString()).slice(0, 10)
-    if (criado < inicio || criado > fim) continue
-    const exp = expand(p, db)
-    const fid = p.fornecedor ?? null
-    if (!porFornecedor.has(fid)) {
-      const forn = fid ? db.fornecedores.find((f) => f.id === fid) : null
-      porFornecedor.set(fid, {
-        fornecedor_id: fid,
-        fornecedor_nome: forn?.nome || "Sem fornecedor",
-        documento: forn?.documento || "",
-        documentos: [],
-        total_fornecedor: 0,
-      })
-    }
-    const preco = p.preco != null ? Number(p.preco) : null
-    const sub = preco != null ? Number(p.quantidade) * preco : 0
-    const doc = {
-      entrada_id: null,
-      numero_nota_fiscal: p.numero_nota_fiscal,
-      data: criado,
-      total: money(sub),
-      legado: true,
-      itens: [{
-        produto_nome: p.nome,
-        quantidade: String(p.quantidade),
-        preco_unitario: preco != null ? String(preco) : null,
-        subtotal: money(sub),
-        numero_nota_fiscal_legado: p.numero_nota_fiscal,
-      }],
-    }
-    const bloco = porFornecedor.get(fid)
-    const existente = bloco.documentos.find((d) => d.legado && d.numero_nota_fiscal === p.numero_nota_fiscal)
-    if (existente) {
-      existente.itens.push(doc.itens[0])
-      existente.total = money(Number(existente.total) + sub)
-    } else {
-      bloco.documentos.push(doc)
-    }
-    bloco.total_fornecedor += sub
-    const grupo = db.grupos.find((g) => g.id === p.grupo)
-    const cat = grupo ? db.categorias.find((c) => c.id === grupo.categoria) : null
-    if (cat) {
       catTotals.set(cat.id, (catTotals.get(cat.id) || 0) + sub)
       catNames.set(cat.id, cat.name)
     }
@@ -704,7 +650,6 @@ export const mockOperacao = {
 function normalize(data) {
   return {
     nome: data.nome,
-    numero_nota_fiscal: data.numero_nota_fiscal || null,
     grupo: Number(data.grupo),
     fornecedor: data.fornecedor ? Number(data.fornecedor) : null,
     quantidade: Number(data.quantidade),
@@ -713,6 +658,6 @@ function normalize(data) {
     perecivel: Boolean(data.perecivel),
     periodicidade: data.periodicidade || "EVENTUAL",
     validade: data.validade || null,
-    preco: data.preco === "" || data.preco == null ? null : String(data.preco),
+    ultimo_preco: null,
   }
 }

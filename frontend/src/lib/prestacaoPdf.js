@@ -64,24 +64,24 @@ export function gerarPdfPrestacaoContas(dados) {
     for (const d of f.documentos ?? []) {
       const rows = (d.itens ?? []).map((it) => {
         const base = [
-          d.numero_nota_fiscal || it.numero_nota_fiscal_legado || "—",
+          d.numero_nota_fiscal || "—",
           dataBR(d.data),
           it.produto_nome,
           it.quantidade,
         ]
         if (mostrarPreco) {
-          return [...base, it.preco_unitario ? brl(it.preco_unitario) : "—", brl(it.subtotal), d.legado ? "Legado" : ""]
+          return [...base, it.preco_unitario ? brl(it.preco_unitario) : "—", brl(it.subtotal)]
         }
-        return [...base, d.legado ? "Legado" : ""]
+        return base
       })
       autoTable(doc, {
         startY: y,
         head: [mostrarPreco
-          ? ["NF", "Data", "Produto", "Qtd", "Preço", "Subtotal", ""]
-          : ["NF", "Data", "Produto", "Qtd", ""]],
+          ? ["NF", "Data", "Produto", "Qtd", "Preço", "Subtotal"]
+          : ["NF", "Data", "Produto", "Qtd"]],
         body: rows,
         foot: mostrarPreco
-          ? [[`Documento ${d.legado ? "(legado) " : ""}total`, "", "", "", "", brl(d.total), ""]]
+          ? [["Total do documento", "", "", "", "", brl(d.total)]]
           : undefined,
         theme: "striped",
         headStyles: { fillColor: [47, 122, 91] },

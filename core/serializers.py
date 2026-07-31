@@ -14,15 +14,18 @@ class ProdutoSerializer(serializers.ModelSerializer):
     categoria_nome = serializers.CharField(source="grupo.categoria.name", read_only=True)
     criado_por_nome = serializers.CharField(source="criado_por.username", read_only=True)
     fornecedor_nome = serializers.CharField(source="fornecedor.nome", read_only=True, allow_null=True, default=None)
+    ultimo_preco = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True, allow_null=True
+    )
 
     class Meta:
         model = Produto
         fields = [
-            "id", "nome", "numero_nota_fiscal",
+            "id", "nome",
             "grupo", "grupo_nome", "fornecedor", "fornecedor_nome",
             "categoria", "categoria_nome",
             "quantidade", "unidade", "estoque_minimo", "perecivel", "periodicidade",
-            "validade", "preco",
+            "validade", "ultimo_preco",
             "criado_por_nome", "criado_em", "atualizado_em",
         ]
         read_only_fields = ["quantidade", "criado_por_nome", "criado_em", "atualizado_em"]

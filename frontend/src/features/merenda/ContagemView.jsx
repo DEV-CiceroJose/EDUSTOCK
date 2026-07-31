@@ -2,7 +2,7 @@ import { useState } from "react"
 import { motion } from "motion/react"
 import { operacaoApi } from "../../api"
 import { Icon } from "../../lib/icons.jsx"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 
 const TURNOS = [
   { key: "MANHA", label: "Manhã" },

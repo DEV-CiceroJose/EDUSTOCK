@@ -3,7 +3,7 @@ import { motion } from "motion/react"
 import { fornecedoresApi } from "../../api"
 import { Icon } from "../../lib/icons.jsx"
 import ConfirmDialog from "../../components/ui/ConfirmDialog"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 
 const CHIPS = [
   { key: "todos", label: "Todos" },
@@ -21,7 +21,7 @@ function Badge({ tone, children }) {
   return <span className={`rounded-full px-2 py-0.5 text-[0.66rem] font-bold uppercase ${cls}`}>{children}</span>
 }
 
-export default function FornecedoresView({ fornecedores, onNew, onEdit, onChanged }) {
+export default function FornecedoresView({ fornecedores, onNew, onEdit, onChanged, canManage = true }) {
   const [filtro, setFiltro] = useState("todos")
   const [aExcluir, setAExcluir] = useState(null)
   const toast = useToast()
@@ -58,7 +58,7 @@ export default function FornecedoresView({ fornecedores, onNew, onEdit, onChange
           <h2 className="font-display text-2xl font-bold leading-none">Fornecedores</h2>
           <p className="mt-1 text-sm text-ink-faint">{lista.length} {lista.length === 1 ? "fornecedor" : "fornecedores"}</p>
         </div>
-        <button onClick={onNew} className="btn btn-brand">{Icon.plus(18)} Novo fornecedor</button>
+        {canManage && <button onClick={onNew} className="btn btn-brand">{Icon.plus(18)} Novo fornecedor</button>}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -97,9 +97,11 @@ export default function FornecedoresView({ fornecedores, onNew, onEdit, onChange
                 <h3 className="truncate font-semibold leading-tight" title={f.nome}>{f.nome}</h3>
                 {f.documento && <div className="font-mono text-[0.66rem] text-ink-faint">{f.documento}</div>}
               </div>
-              <button onClick={() => onEdit(f)} className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-faint hover:bg-surface-2" title="Editar">
-                {Icon.edit(15)}
-              </button>
+              {canManage && (
+                <button onClick={() => onEdit(f)} className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-faint hover:bg-surface-2" title="Editar">
+                  {Icon.edit(15)}
+                </button>
+              )}
             </div>
 
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -116,7 +118,7 @@ export default function FornecedoresView({ fornecedores, onNew, onEdit, onChange
               </div>
             )}
 
-            <div className="mt-3 flex gap-1.5 border-t border-line pt-3">
+            {canManage && <div className="mt-3 flex gap-1.5 border-t border-line pt-3">
               <button onClick={() => toggleAtivo(f)} className="btn btn-ghost flex-1 py-1.5 text-xs">
                 {f.ativo ? "Desativar" : "Ativar"}
               </button>
@@ -127,18 +129,18 @@ export default function FornecedoresView({ fornecedores, onNew, onEdit, onChange
               >
                 {Icon.trash(15)}
               </button>
-            </div>
+            </div>}
           </motion.div>
         ))}
       </div>
 
-      <ConfirmDialog
+      {canManage && <ConfirmDialog
         open={!!aExcluir}
         title="Excluir fornecedor"
         message={aExcluir ? `Remover "${aExcluir.nome}"? Se estiver vinculado a produtos, desative em vez de excluir.` : ""}
         onConfirm={excluir}
         onCancel={() => setAExcluir(null)}
-      />
+      />}
     </div>
   )
 }

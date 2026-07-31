@@ -1,8 +1,6 @@
-import { createContext, useContext, useState, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { AnimatePresence, motion } from "motion/react"
-
-const ToastCtx = createContext(() => {})
-export const useToast = () => useContext(ToastCtx)
+import { ToastContext } from "./useToast"
 
 let seq = 0
 
@@ -16,9 +14,14 @@ export function ToastProvider({ children }) {
   }, [])
 
   return (
-    <ToastCtx.Provider value={push}>
+    <ToastContext.Provider value={push}>
       {children}
-      <div className="fixed bottom-20 right-5 z-[10000] flex flex-col gap-2">
+      <div
+        className="fixed bottom-20 right-5 z-[10000] flex flex-col gap-2"
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+      >
         <AnimatePresence>
           {items.map((t) => (
             <motion.div
@@ -41,6 +44,6 @@ export function ToastProvider({ children }) {
           ))}
         </AnimatePresence>
       </div>
-    </ToastCtx.Provider>
+    </ToastContext.Provider>
   )
 }

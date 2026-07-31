@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import Sidebar from "./Sidebar"
@@ -19,5 +19,18 @@ describe("Sidebar", () => {
     render(<MemoryRouter><Sidebar /></MemoryRouter>)
     expect(screen.getByText("Perfil")).toBeInTheDocument()
     expect(screen.getByText("Configurações")).toBeInTheDocument()
+  })
+
+  it("renderiza navegação mobile e fecha ao escolher uma rota", () => {
+    const fechar = vi.fn()
+    salvarSessao({ token: "abc", papel: "OPERADOR", modulos_ativos: ["inventario"] })
+    render(
+      <MemoryRouter>
+        <Sidebar mobile onNavigate={fechar} onClose={fechar} />
+      </MemoryRouter>
+    )
+    expect(screen.getByRole("complementary", { name: "Navegação principal" })).toBeInTheDocument()
+    screen.getByText("Inventário").click()
+    expect(fechar).toHaveBeenCalled()
   })
 })

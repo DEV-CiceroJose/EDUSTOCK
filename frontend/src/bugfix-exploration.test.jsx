@@ -16,8 +16,8 @@ import userEvent from '@testing-library/user-event'
 import Header from './layouts/Header'
 import MainLayout from './layouts/MainLayout'
 import Sidebar from './layouts/Sidebar'
-import AlertasPage from './pages/AlertasPage'
 import AlertTicker from './features/alertas/AlertTicker'
+import { salvarSessao } from './lib/auth'
 
 // Mock react-router-dom's useNavigate
 const mockNavigate = vi.fn()
@@ -43,6 +43,13 @@ vi.mock('./hooks/useDashboardData', () => ({
 describe('Bug Condition Exploration Tests', () => {
   beforeEach(() => {
     mockNavigate.mockClear()
+    sessionStorage.clear()
+    salvarSessao({
+      token: 'test-token',
+      papel: 'ADMIN',
+      is_staff: true,
+      modulos_ativos: ['inventario', 'merenda'],
+    })
   })
 
   /**
@@ -189,8 +196,6 @@ describe('Bug Condition Exploration Tests', () => {
    * On unfixed code, sidebar has no hover state so it's always w-56 on large screens.
    */
   it('Bug 5: Sidebar should be collapsed (w-16) by default and expand (w-56) on hover at lg breakpoint', async () => {
-    const user = userEvent.setup()
-    
     const { container } = render(
       <BrowserRouter>
         <Sidebar />

@@ -4,7 +4,7 @@ import { operacaoApi } from "../../api"
 import { categoryStyle } from "../../lib/catalog"
 import { Icon } from "../../lib/icons.jsx"
 import ConfirmDialog from "../../components/ui/ConfirmDialog"
-import { useToast } from "../../components/ui/Toast"
+import { useToast } from "../../components/ui/useToast"
 
 const TURNOS = [
   { key: "MANHA", label: "Manhã" },
@@ -35,7 +35,28 @@ export default function KitchenProductionView({ onBaixaConcluida }) {
     }
   }, [turno, toast])
 
-  useEffect(() => { carregar() }, [carregar])
+  useEffect(() => {
+    let active = true
+    operacaoApi.planoDoDia({ turno })
+      .then((data) => {
+        if (active) setPlano(data)
+      })
+      .catch((err) => {
+        if (!active) return
+        toast(String(err.message || err), "danger")
+        setPlano(null)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [turno, toast])
+
+  function selecionarTurno(novoTurno) {
+    setLoading(true)
+    setResultado(null)
+    setTurno(novoTurno)
+  }
 
   async function executarBaixa() {
     setConfirmOpen(false)
@@ -83,7 +104,7 @@ export default function KitchenProductionView({ onBaixaConcluida }) {
           <button
             key={t.key}
             type="button"
-            onClick={() => setTurno(t.key)}
+            onClick={() => selecionarTurno(t.key)}
             className={`rounded-full border px-4 py-2 text-lg font-semibold ${
               turno === t.key
                 ? "border-brand bg-brand text-[#f4f1e7]"

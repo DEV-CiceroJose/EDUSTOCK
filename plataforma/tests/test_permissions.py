@@ -3,7 +3,12 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
 from plataforma.models import Modulo, Perfil
-from plataforma.permissions import EhAdmin, RequerModuloAtivo
+from plataforma.permissions import (
+    EhAdmin,
+    LeituraOuAdmin,
+    RequerModuloAtivo,
+    usuario_admin_do_estoque,
+)
 
 
 class RequerModuloAtivoTest(TestCase):
@@ -51,3 +56,36 @@ class EhAdminTest(TestCase):
         request = self.factory.get("/")
         request.user = user
         self.assertFalse(EhAdmin().has_permission(request, None))
+
+
+class AutorizacaoEstoqueTest(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+    def _request(self, method, user):
+        request = getattr(self.factory, method)("/")
+        request.user = user
+        return request
+
+    def test_papel_admin_pode_alterar_cadastro(self):
+        user = User.objects.create_user(username="admin-estoque", password="x")
+        Perfil.objects.create(user=user, papel=Perfil.ADMIN)
+        self.assertTrue(usuario_admin_do_estoque(user))
+        self.assertTrue(
+            LeituraOuAdmin().has_permission(self._request("post", user), None)
+        )
+
+    def test_operador_pode_ler_mas_nao_alterar_cadastro(self):
+        user = User.objects.create_user(username="operador-estoque", password="x")
+        Perfil.objects.create(user=user, papel=Perfil.OPERADOR)
+        permission = LeituraOuAdmin()
+        self.assertTrue(permission.has_permission(self._request("get", user), None))
+        self.assertFalse(permission.has_permission(self._request("post", user), None))
+        self.assertFalse(permission.has_permission(self._request("delete", user), None))
+
+    def test_staff_continua_administrador_operacional(self):
+        user = User.objects.create_user(
+            username="staff-estoque", password="x", is_staff=True
+        )
+        Perfil.objects.create(user=user, papel=Perfil.OPERADOR)
+        self.assertTrue(usuario_admin_do_estoque(user))
