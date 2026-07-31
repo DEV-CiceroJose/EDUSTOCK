@@ -13,7 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.3.0",
+    "@tailwindcss/vite": "^4.3.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "motion": "^12.40.0",
