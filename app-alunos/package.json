@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@edustock/operacao-shared": "file:../packages/operacao-shared",
-    "@tailwindcss/vite": "^4.3.0",
+    "@tailwindcss/vite": "^4.3.3",
     "lucide-react": "^1.25.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
