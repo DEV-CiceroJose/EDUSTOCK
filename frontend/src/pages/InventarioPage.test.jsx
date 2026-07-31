@@ -18,6 +18,7 @@ beforeEach(() => {
 
 vi.mock("../api", () => ({
   categoriasApi: { create: vi.fn().mockResolvedValue({ id: 99, name: "Higiene" }) },
+  gruposApi: { create: vi.fn().mockResolvedValue({ id: 100, nome: "Grãos", categoria: 99 }) },
   produtosApi: {},
   movimentacoesApi: {},
 }))
@@ -25,7 +26,7 @@ vi.mock("../api", () => ({
 vi.mock("../hooks/useDashboardData", () => ({
   useDashboardData: () => ({
     produtos: [],
-    categorias: [],
+    categorias: [{ id: 1, name: "Alimentos" }],
     grupos: [],
     fornecedores: [],
     loading: false,
@@ -70,5 +71,21 @@ describe("InventarioPage — criação de categoria", () => {
     await user.type(screen.getByLabelText(/nome da categoria/i), "Higiene")
     await user.click(screen.getByRole("button", { name: /criar categoria/i }))
     await waitFor(() => expect(categoriasApi.create).toHaveBeenCalledWith({ name: "Higiene" }))
+  })
+
+  it("abre e cria um grupo vinculado a uma categoria", async () => {
+    const user = userEvent.setup()
+    const { gruposApi } = await import("../api")
+    vi.mocked(gruposApi.create).mockClear()
+    render(
+      <MemoryRouter initialEntries={["/inventario"]}>
+        <InventarioPage />
+      </MemoryRouter>
+    )
+    await user.click(screen.getByText("Novo grupo"))
+    expect(screen.getByRole("heading", { name: "Novo grupo" })).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/nome do grupo/i), "Grãos")
+    await user.click(screen.getByRole("button", { name: /criar grupo/i }))
+    await waitFor(() => expect(gruposApi.create).toHaveBeenCalledWith({ nome: "Grãos", categoria: 1 }))
   })
 })

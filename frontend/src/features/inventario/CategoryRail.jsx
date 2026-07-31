@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "motion/react"
 import { categoryStyle } from "../../lib/catalog"
 import { Icon } from "../../lib/icons.jsx"
 
-export default function CategoryRail({ categorias, grupos, counts, total, active, onPick, onAddCategory, canManage = true }) {
+export default function CategoryRail({ categorias, grupos, counts, total, active, onPick, onAddCategory, onAddGroup, canManage = true }) {
   const [aberta, setAberta] = useState(null)
 
   return (
@@ -87,12 +87,20 @@ export default function CategoryRail({ categorias, grupos, counts, total, active
       })}
 
       {canManage && (
-        <button
-          onClick={onAddCategory}
-          className="mt-1 flex items-center justify-center gap-2 rounded-xl border border-dashed border-line py-2.5 text-sm font-semibold text-ink-soft hover:bg-surface-2"
-        >
-          {Icon.plus(16)} Nova categoria
-        </button>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          <button
+            onClick={onAddCategory}
+            className="flex items-center justify-center gap-1 rounded-xl border border-dashed border-line py-2.5 text-xs font-semibold text-ink-soft hover:bg-surface-2"
+          >
+            {Icon.plus(15)} Nova categoria
+          </button>
+          <button
+            onClick={onAddGroup}
+            className="flex items-center justify-center gap-1 rounded-xl border border-dashed border-line py-2.5 text-xs font-semibold text-ink-soft hover:bg-surface-2"
+          >
+            {Icon.plus(15)} Novo grupo
+          </button>
+        </div>
       )}
     </div>
   )

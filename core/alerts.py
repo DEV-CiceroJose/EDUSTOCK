@@ -1,8 +1,7 @@
 from decimal import Decimal
 from datetime import timedelta
 
-from django.db.models import Q, F, Value
-from django.db.models.functions import Cast
+from django.db.models import Q, F
 from django.utils import timezone
 
 from core.models import ConfiguracaoAlertas, Produto
@@ -23,12 +22,18 @@ def urgencia_validade(dias, critico_dias=CRITICO_DIAS):
 
 
 def is_estoque_critico(quantidade, estoque_minimo, estoque_percentual=20):
+    """Classifica o estoque com o mesmo critério exibido no inventário.
+
+    ``estoque_percentual`` permanece na assinatura para compatibilidade com
+    integrações existentes, mas o limite operacional é o estoque mínimo do
+    próprio produto: qualquer saldo positivo menor ou igual a esse valor
+    gera alerta.
+    """
     q = Decimal(str(quantidade))
     m = Decimal(str(estoque_minimo or 0))
     if q <= 0:
         return True, "critico"
-    limiar = Decimal(str(estoque_percentual)) / Decimal("100")
-    if m > 0 and q < m * limiar:
+    if m > 0 and q <= m:
         return True, "alerta"
     return False, None
 
@@ -44,11 +49,10 @@ def queryset_validade(hoje=None, dias_alerta=ALERTA_DIAS):
 
 
 def queryset_estoque_critico(estoque_percentual=20):
-    percentual = Decimal(str(estoque_percentual)) / Decimal("100")
-    limiar = Cast(Value(percentual), Produto._meta.get_field("estoque_minimo"))
+    """Retorna esgotados e itens no/abaixo do estoque mínimo configurado."""
     return _base_qs().filter(
         Q(quantidade__lte=0)
-        | Q(estoque_minimo__gt=0, quantidade__lt=F("estoque_minimo") * limiar)
+        | Q(estoque_minimo__gt=0, quantidade__lte=F("estoque_minimo"))
     )
 
 
