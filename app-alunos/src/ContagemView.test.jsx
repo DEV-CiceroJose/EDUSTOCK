@@ -98,4 +98,15 @@ describe('ContagemView (app-alunos)', () => {
       'Sem conexão com o sistema. Verifique a internet e tente novamente.',
     )
   })
+
+  it('não permite enviar mais de 45 alunos', () => {
+    renderView()
+
+    fireEvent.click(screen.getByRole('button', { name: '4' }))
+    fireEvent.click(screen.getByRole('button', { name: '6' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('O limite permitido é 45 alunos.')
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toBeDisabled()
+    expect(registrarContagem).not.toHaveBeenCalled()
+  })
 })

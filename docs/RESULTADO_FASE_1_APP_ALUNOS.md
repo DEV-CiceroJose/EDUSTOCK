@@ -22,8 +22,8 @@ escopo do App Cozinha.
 
 ### Registro de presença
 
-- O limite de quatro dígitos da interface passou a ter a mesma validação no
-  backend: são aceitos valores inteiros entre 1 e 9999.
+- A interface e o backend aceitam valores inteiros entre 1 e 45, limite máximo
+  definido para uma turma.
 - O conflito de frequência já registrada continua retornando HTTP 409 e agora
   também inclui o código estável `frequencia_duplicada`.
 - Falhas de conexão exibem uma orientação simples para verificar a internet e
@@ -59,7 +59,7 @@ escopo do App Cozinha.
 - Retorno ao PIN após HTTP 401.
 - Mensagem amigável em falha de conexão.
 - Aviso de sessão expirada no login.
-- Rejeição backend de quantidade acima de 9999.
+- Rejeição, na interface e no backend, de quantidade acima de 45.
 - Código estável no conflito de frequência duplicada.
 - Fluxos E2E para sessão incompleta e sessão expirada durante o envio.
 
@@ -70,7 +70,7 @@ foi modificada.
 ## Validações executadas
 
 - Backend operacional: 38 testes aprovados.
-- App Alunos: 19 testes aprovados.
+- App Alunos: 20 testes aprovados.
 - E2E do projeto `alunos`: 3 cenários aprovados.
 - Build de produção do App Alunos: aprovado.
 - Regressão do App Cozinha: 13 testes e build aprovados após a mudança aditiva

@@ -169,7 +169,7 @@ class OperacaoLogoutView(APIView):
 # Contagem de frequência
 # --------------------------------------------------------------------------
 
-MAX_ALUNOS_POR_TURMA = 9999
+MAX_ALUNOS_POR_TURMA = 45
 
 
 class ContagemView(APIView):

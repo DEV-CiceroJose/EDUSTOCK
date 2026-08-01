@@ -127,11 +127,11 @@ class ContagemApiTest(APITestCase):
 
     def test_rejeita_quantidade_acima_do_limite(self):
         resp = self.client_aluno.post("/api/operacao/contagem/", {
-            "quantidade_alunos": 10000,
+            "quantidade_alunos": 46,
         }, format="json")
 
         self.assertEqual(resp.status_code, 400, resp.content)
-        self.assertIn("entre 1 e 9999", resp.data["detail"])
+        self.assertIn("entre 1 e 45", resp.data["detail"])
 
     def test_resumo_dia(self):
         from django.contrib.auth.models import User
@@ -172,7 +172,7 @@ class ContagemApiTest(APITestCase):
         FatorConsumo.objects.create(produto=p, gramas_por_aluno=Decimal("100"))
         hoje = timezone.localdate().isoformat()
         self.client_aluno.post("/api/operacao/contagem/", {
-            "quantidade_alunos": 50,
+            "quantidade_alunos": 40,
         }, format="json")
         resp = self.client_cozinha.get(f"/api/operacao/plano-do-dia/?data={hoje}&turno=MANHA")
         self.assertEqual(resp.status_code, 200)
@@ -185,7 +185,7 @@ class ContagemApiTest(APITestCase):
         FatorConsumo.objects.create(produto=p, gramas_por_aluno=Decimal("100"))
         hoje = timezone.localdate().isoformat()
         self.client_aluno.post("/api/operacao/contagem/", {
-            "quantidade_alunos": 100,
+            "quantidade_alunos": 40,
         }, format="json")
         resp = self.client_cozinha.post("/api/operacao/baixa-de-producao/", {
             "data": hoje, "turno": "MANHA",
@@ -193,4 +193,4 @@ class ContagemApiTest(APITestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["sucesso"], 1)
         p.refresh_from_db()
-        self.assertEqual(p.quantidade, Decimal("10.000"))
+        self.assertEqual(p.quantidade, Decimal("16.000"))
