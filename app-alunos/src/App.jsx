@@ -10,7 +10,7 @@ import { useIdleLogout } from './useIdleLogout.js'
 function Protegido({ children }) {
   const navigate = useNavigate()
   useIdleLogout(() => {
-    logout()
+    void logout()
     navigate('/login', { replace: true })
   })
 

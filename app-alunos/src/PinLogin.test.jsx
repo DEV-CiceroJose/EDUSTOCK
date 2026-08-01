@@ -60,4 +60,21 @@ describe('PinLogin (app-alunos)', () => {
 
     expect(await screen.findByText('PIN inválido.')).toBeInTheDocument()
   })
+
+  it('explica quando uma sessão anterior expirou', async () => {
+    const { default: PinLogin } = await import('./PinLogin.jsx')
+
+    render(
+      <MemoryRouter initialEntries={[{
+        pathname: '/login',
+        state: { message: 'Sua sessão expirou. Digite o PIN novamente.' },
+      }]}>
+        <PinLogin />
+      </MemoryRouter>
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Sua sessão expirou. Digite o PIN novamente.',
+    )
+  })
 })

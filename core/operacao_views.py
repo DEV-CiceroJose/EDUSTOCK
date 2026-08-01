@@ -169,6 +169,9 @@ class OperacaoLogoutView(APIView):
 # Contagem de frequência
 # --------------------------------------------------------------------------
 
+MAX_ALUNOS_POR_TURMA = 9999
+
+
 class ContagemView(APIView):
     """
     POST — registra frequência de uma turma (app-alunos, perfil ALUNO_REP).
@@ -203,11 +206,16 @@ class ContagemView(APIView):
             return Response({"detail": "Turno inválido."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             quantidade_alunos = int(quantidade_alunos)
-            if quantidade_alunos <= 0:
+            if not 1 <= quantidade_alunos <= MAX_ALUNOS_POR_TURMA:
                 raise ValueError
         except (TypeError, ValueError):
             return Response(
-                {"detail": "quantidade_alunos deve ser um inteiro maior que zero."},
+                {
+                    "detail": (
+                        "quantidade_alunos deve ser um inteiro entre "
+                        f"1 e {MAX_ALUNOS_POR_TURMA}."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -223,6 +231,7 @@ class ContagemView(APIView):
         except IntegrityError:
             return Response(
                 {
+                    "codigo": "frequencia_duplicada",
                     "detail": (
                         f"Frequência já registrada hoje para esta turma "
                         f"(turma '{turma}', turno {turno}, data {data.isoformat()})."

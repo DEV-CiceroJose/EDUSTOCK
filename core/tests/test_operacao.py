@@ -123,6 +123,15 @@ class ContagemApiTest(APITestCase):
         resp = self.client_aluno.post("/api/operacao/contagem/", payload, format="json")
         self.assertEqual(resp.status_code, 409)
         self.assertIn("Frequência já registrada", resp.data["detail"])
+        self.assertEqual(resp.data["codigo"], "frequencia_duplicada")
+
+    def test_rejeita_quantidade_acima_do_limite(self):
+        resp = self.client_aluno.post("/api/operacao/contagem/", {
+            "quantidade_alunos": 10000,
+        }, format="json")
+
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertIn("entre 1 e 9999", resp.data["detail"])
 
     def test_resumo_dia(self):
         from django.contrib.auth.models import User

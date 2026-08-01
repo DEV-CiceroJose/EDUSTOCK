@@ -16,6 +16,11 @@ export async function login(pin) {
     pin,
     perfil: "ALUNO_REP",
   })
+
+  if (!data?.token || !data?.turma || !data?.turno || data?.perfil !== "ALUNO_REP") {
+    throw new Error("Não foi possível iniciar uma sessão válida para esta turma.")
+  }
+
   http.setToken(data.token)
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({
     turma: data.turma,
@@ -25,15 +30,38 @@ export async function login(pin) {
   return data
 }
 
-export function logout() {
+export function limparSessao() {
   http.clearToken()
   sessionStorage.removeItem(SESSION_KEY)
 }
 
+export async function logout() {
+  const invalidacao = http.getToken()
+    ? http.request("DELETE", "/api/operacao/auth/logout/").catch(() => null)
+    : Promise.resolve(null)
+
+  limparSessao()
+  await invalidacao
+}
+
 export function getSessao() {
   try {
-    return JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? "null")
+    const sessao = JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? "null")
+    const sessaoValida = (
+      http.isLoggedIn()
+      && sessao?.perfil === "ALUNO_REP"
+      && Boolean(sessao?.turma)
+      && Boolean(sessao?.turno)
+    )
+
+    if (!sessaoValida) {
+      limparSessao()
+      return null
+    }
+
+    return sessao
   } catch {
+    limparSessao()
     return null
   }
 }

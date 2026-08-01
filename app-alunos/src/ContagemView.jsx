@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback, useRef } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { CheckCircle2, AlertTriangle, Delete } from 'lucide-react'
-import { getSessao, registrarContagem, logout } from './api.js'
+import { getSessao, registrarContagem, limparSessao, logout } from './api.js'
 
 const TURNO_LABEL = { MANHA: 'Manhã', TARDE: 'Tarde', INTEGRAL: 'Integral' }
 
@@ -28,12 +28,6 @@ export default function ContagemView() {
   const [mensagemErro, setMensagemErro] = useState('')
   const enviandoRef = useRef(false)
 
-  // Redireciona se sessão expirou
-  if (!sessao) {
-    navigate('/login', { replace: true })
-    return null
-  }
-
   const pressKey = useCallback((val) => {
     if (estado !== 'idle') return
     if (val === 'back') {
@@ -43,6 +37,11 @@ export default function ContagemView() {
       setNumero((n) => n + val)
     }
   }, [estado, numero])
+
+  // Mantém a ordem dos hooks e redireciona se a sessão expirou.
+  if (!sessao) {
+    return <Navigate to="/login" replace />
+  }
 
   async function confirmar() {
     const qtd = parseInt(numero, 10)
@@ -56,8 +55,19 @@ export default function ContagemView() {
       setResultado(data)
       setEstado('sucesso')
     } catch (e) {
+      if (e.status === 401) {
+        limparSessao()
+        navigate('/login', {
+          replace: true,
+          state: { message: 'Sua sessão expirou. Digite o PIN novamente.' },
+        })
+        return
+      }
+
       if (e.status === 409) {
         setMensagemErro('Frequência já registrada hoje para esta turma.')
+      } else if (e instanceof TypeError || !e.status) {
+        setMensagemErro('Sem conexão com o sistema. Verifique a internet e tente novamente.')
       } else {
         setMensagemErro(e.message ?? 'Erro ao registrar. Tente novamente.')
       }
@@ -75,7 +85,7 @@ export default function ContagemView() {
   }
 
   function sair() {
-    logout()
+    void logout()
     navigate('/login', { replace: true })
   }
 
@@ -89,7 +99,7 @@ export default function ContagemView() {
         className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
         style={{ maxWidth: 420, margin: '0 auto' }}
       >
-        <div className="result-card w-full">
+        <div className="result-card w-full" role="status" aria-live="polite">
           <div
             className="mx-auto mb-5 grid place-items-center rounded-full text-ok"
             style={{ width: 80, height: 80, background: 'var(--color-ok-tint)' }}
@@ -165,7 +175,7 @@ export default function ContagemView() {
         className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
         style={{ maxWidth: 420, margin: '0 auto' }}
       >
-        <div className="result-card w-full">
+        <div className="result-card w-full" role="alert">
           <div
             className="mx-auto mb-5 grid place-items-center rounded-full text-err"
             style={{ width: 80, height: 80, background: 'var(--color-err-tint)' }}
@@ -261,6 +271,8 @@ export default function ContagemView() {
       <div
         className="pin-display mb-6 flex items-center justify-center"
         style={{ minHeight: '5rem' }}
+        aria-label="Quantidade de alunos informada"
+        aria-live="polite"
       >
         {numero ? (
           <span style={{ color: 'var(--color-brand)' }}>{numero}</span>
@@ -275,7 +287,7 @@ export default function ContagemView() {
       >
         {teclas.map((t, i) => {
           if (t === '') {
-            return <div key={i} />
+            return <div key={`empty-${i}`} />
           }
           if (t === 'back') {
             return (

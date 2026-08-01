@@ -9,6 +9,7 @@ export default function OperationPinLogin({
   iconClassName = "bg-brand",
   login,
   onSuccess,
+  notice = "",
   fallbackError = "PIN inválido. Tente novamente.",
 }) {
   const [pin, setPin] = useState("")
@@ -61,6 +62,12 @@ export default function OperationPinLogin({
           <span key={index} className={`pin-dot${index < pin.length ? " filled" : ""}`} />
         ))}
       </div>
+
+      {notice && !erro && (
+        <div role="status" className="mb-4 w-full rounded-2xl bg-warn-tint px-4 py-3 text-center text-[0.95rem] font-semibold text-warn">
+          {notice}
+        </div>
+      )}
 
       {erro && (
         <div role="alert" className="mb-4 w-full rounded-2xl bg-err-tint px-4 py-3 text-center text-[0.95rem] font-semibold text-err">
