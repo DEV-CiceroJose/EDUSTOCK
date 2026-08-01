@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 from django.test import TestCase
 from django.utils import timezone
@@ -188,7 +189,7 @@ class ContagemApiTest(APITestCase):
             "quantidade_alunos": 40,
         }, format="json")
         resp = self.client_cozinha.post("/api/operacao/baixa-de-producao/", {
-            "data": hoje, "turno": "MANHA",
+            "operacao_id": str(uuid4()), "data": hoje, "turno": "MANHA",
         }, format="json")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["sucesso"], 1)

@@ -11,6 +11,7 @@ Nomes exatos conforme a especificação:
 
 from datetime import timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -19,7 +20,7 @@ from rest_framework.test import APIClient, APITestCase
 
 from core.models import (
     Categoria, FatorConsumo, FrequenciaDiaria, Grupo, Movimentacao, PinAcesso,
-    Produto, Turma,
+    OperacaoBaixaProducao, Produto, Turma,
 )
 from core.operacao import baixa_de_producao, gerar_plano_do_dia
 from core.operacao_auth import PERFIL_ALUNO, PERFIL_COZINHA, criar_token
@@ -258,12 +259,109 @@ class TestBaixaProducaoAtomicaPorItem(TestCase):
     def test_baixa_via_api(self):
         client = _client_cozinha()
         resp = client.post("/api/operacao/baixa-de-producao/", {
+            "operacao_id": str(uuid4()),
             "data": self.hoje.isoformat(),
             "turno": "MANHA",
         }, format="json")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(resp.data["sucesso"], 1)
         self.assertEqual(resp.data["falhas"], 1)
+
+    def test_repetir_operacao_nao_duplica_movimentacoes(self):
+        client = _client_cozinha()
+        operacao_id = str(uuid4())
+        payload = {
+            "operacao_id": operacao_id,
+            "data": self.hoje.isoformat(),
+            "turno": "MANHA",
+        }
+
+        primeira = client.post("/api/operacao/baixa-de-producao/", payload, format="json")
+        saldo_apos_primeira = Produto.objects.get(pk=self.arroz.pk).quantidade
+        segunda = client.post("/api/operacao/baixa-de-producao/", payload, format="json")
+
+        self.assertEqual(primeira.status_code, 200, primeira.content)
+        self.assertEqual(segunda.status_code, 200, segunda.content)
+        self.assertFalse(primeira.data["repetida"])
+        self.assertTrue(segunda.data["repetida"])
+        self.assertEqual(Produto.objects.get(pk=self.arroz.pk).quantidade, saldo_apos_primeira)
+        self.assertEqual(Movimentacao.objects.filter(motivo="consumo").count(), 1)
+        self.assertEqual(OperacaoBaixaProducao.objects.count(), 1)
+
+    def test_resultado_anterior_pode_ser_consultado(self):
+        client = _client_cozinha()
+        operacao_id = str(uuid4())
+        payload = {
+            "operacao_id": operacao_id,
+            "data": self.hoje.isoformat(),
+            "turno": "MANHA",
+        }
+        client.post("/api/operacao/baixa-de-producao/", payload, format="json")
+
+        consulta = client.get(
+            f"/api/operacao/baixa-de-producao/?operacao_id={operacao_id}"
+        )
+
+        self.assertEqual(consulta.status_code, 200, consulta.content)
+        self.assertTrue(consulta.data["consultada"])
+        self.assertEqual(consulta.data["operacao_id"], operacao_id)
+
+    def test_operacao_id_nao_pode_ser_reutilizado_com_outro_turno(self):
+        client = _client_cozinha()
+        operacao_id = str(uuid4())
+        client.post("/api/operacao/baixa-de-producao/", {
+            "operacao_id": operacao_id,
+            "data": self.hoje.isoformat(),
+            "turno": "MANHA",
+        }, format="json")
+
+        conflito = client.post("/api/operacao/baixa-de-producao/", {
+            "operacao_id": operacao_id,
+            "data": self.hoje.isoformat(),
+            "turno": "TARDE",
+        }, format="json")
+
+        self.assertEqual(conflito.status_code, 409, conflito.content)
+        self.assertEqual(conflito.data["codigo"], "operacao_id_reutilizado")
+
+    def test_baixas_sucessivas_nao_deixam_saldo_negativo(self):
+        self.arroz.quantidade = Decimal("15")
+        self.arroz.save(update_fields=["quantidade"])
+        client = _client_cozinha()
+
+        for _ in range(2):
+            resposta = client.post("/api/operacao/baixa-de-producao/", {
+                "operacao_id": str(uuid4()),
+                "data": self.hoje.isoformat(),
+                "turno": "MANHA",
+            }, format="json")
+            self.assertEqual(resposta.status_code, 200, resposta.content)
+
+        self.arroz.refresh_from_db()
+        self.assertEqual(self.arroz.quantidade, Decimal("5.000"))
+        self.assertGreaterEqual(self.arroz.quantidade, Decimal("0"))
+        self.assertEqual(
+            Movimentacao.objects.filter(produto=self.arroz, motivo="consumo").count(),
+            1,
+        )
+
+    def test_payload_invalido_e_data_historica_sao_rejeitados(self):
+        client = _client_cozinha()
+        sem_identificador = client.post("/api/operacao/baixa-de-producao/", {
+            "data": self.hoje.isoformat(),
+            "turno": "MANHA",
+        }, format="json")
+        data_historica = client.post("/api/operacao/baixa-de-producao/", {
+            "operacao_id": str(uuid4()),
+            "data": (self.hoje - timedelta(days=1)).isoformat(),
+            "turno": "MANHA",
+        }, format="json")
+
+        self.assertEqual(sem_identificador.status_code, 400, sem_identificador.content)
+        self.assertEqual(sem_identificador.data["codigo"], "payload_invalido")
+        self.assertIn("operacao_id", sem_identificador.data["campos"])
+        self.assertEqual(data_historica.status_code, 400, data_historica.content)
+        self.assertIn("data", data_historica.data["campos"])
 
     def test_resultado_lista_erros_individualmente(self):
         resultado = baixa_de_producao(data=self.hoje, turno="MANHA")

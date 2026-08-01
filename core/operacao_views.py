@@ -4,6 +4,7 @@ import logging
 
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.db.models import Sum
 from rest_framework import status
@@ -15,14 +16,19 @@ from rest_framework.throttling import BaseThrottle
 from plataforma.authentication import TokenAcessoAuthentication
 from plataforma.permissions import RequerModuloAtivo
 
-from .models import FrequenciaDiaria
-from .operacao import baixa_de_producao, gerar_plano_do_dia
+from .models import FrequenciaDiaria, OperacaoBaixaProducao
+from .operacao import (
+    OperacaoIdReutilizado,
+    executar_baixa_idempotente,
+    gerar_plano_do_dia,
+)
 from .operacao_auth import (
     PERFIL_ALUNO, PERFIL_COZINHA,
     autenticar_pin, criar_token, invalidar_token,
     requer_perfil_operacao,
 )
 from .services import calcular_previsao_producao, calcular_resumo_dia, total_frequencia
+from .serializers import BaixaProducaoRequestSerializer, ConsultaBaixaProducaoSerializer
 
 
 logger = logging.getLogger(__name__)
@@ -325,15 +331,66 @@ class BaixaProducaoView(APIView):
 
     @requer_perfil_operacao(PERFIL_COZINHA)
     def post(self, request):
-        data, err = _parse_date(request.data.get("data"), default_today=True)
-        if err:
-            return err
-        turno = request.data.get("turno")
-        if turno not in dict(FrequenciaDiaria.TURNO_CHOICES):
-            return Response({"detail": "Turno inválido."}, status=status.HTTP_400_BAD_REQUEST)
-        itens = request.data.get("itens")
-        # user=None — baixa feita pelo app-cozinha, sem vínculo a User Django
-        return Response(
-            baixa_de_producao(data=data, turno=turno, itens_override=itens, user=None),
-            status=status.HTTP_200_OK,
-        )
+        serializer = BaixaProducaoRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "codigo": "payload_invalido",
+                    "detail": "Dados inválidos para a baixa de produção.",
+                    "campos": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dados = serializer.validated_data
+        try:
+            resultado = executar_baixa_idempotente(
+                operacao_id=dados["operacao_id"],
+                data=dados["data"],
+                turno=dados["turno"],
+                itens=dados.get("itens"),
+                user=None,
+            )
+        except OperacaoIdReutilizado as exc:
+            return Response(
+                {"codigo": "operacao_id_reutilizado", "detail": str(exc)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except DjangoValidationError as exc:
+            mensagem = exc.messages[0] if exc.messages else str(exc)
+            return Response(
+                {"codigo": "plano_invalido", "detail": mensagem},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(resultado, status=status.HTTP_200_OK)
+
+    @requer_perfil_operacao(PERFIL_COZINHA)
+    def get(self, request):
+        serializer = ConsultaBaixaProducaoSerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "codigo": "consulta_invalida",
+                    "detail": "Informe um identificador de operação válido.",
+                    "campos": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        operacao = OperacaoBaixaProducao.objects.filter(
+            operacao_id=serializer.validated_data["operacao_id"]
+        ).first()
+        if not operacao:
+            return Response(
+                {
+                    "codigo": "operacao_nao_encontrada",
+                    "detail": "A baixa de produção ainda não foi registrada.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        resultado = dict(operacao.resultado)
+        resultado["repetida"] = True
+        resultado["consultada"] = True
+        return Response(resultado, status=status.HTTP_200_OK)

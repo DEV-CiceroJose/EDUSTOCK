@@ -2,11 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import ProducaoView from './ProducaoView.jsx'
-import { getPlano, baixaProducao } from './api.js'
+import { baixaProducao, consultarBaixa, getPlano } from './api.js'
 
 vi.mock('./api.js', () => ({
   getPlano: vi.fn(),
   baixaProducao: vi.fn(),
+  consultarBaixa: vi.fn(),
+  obterOperacaoPendente: vi.fn(() => '11111111-1111-4111-8111-111111111111'),
+  concluirOperacaoPendente: vi.fn(),
+  limparSessao: vi.fn(),
   logout: vi.fn(),
 }))
 
@@ -41,6 +45,9 @@ describe('ProducaoView (app-cozinha)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     getPlano.mockResolvedValue(PLANO_BASE)
+    const naoEncontrada = new Error('Operação não encontrada')
+    naoEncontrada.status = 404
+    consultarBaixa.mockRejectedValue(naoEncontrada)
   })
 
   it('mostra o ícone de categoria correto e nenhum emoji', async () => {
@@ -78,8 +85,50 @@ describe('ProducaoView (app-cozinha)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Dar baixa/ }))
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain('O plano foi recarregado')
+      expect(document.body.textContent).toContain('tentar novamente com segurança')
     })
     expect(getPlano).toHaveBeenCalledTimes(2)
+  })
+
+  it('recupera o resultado pelo identificador quando a resposta da baixa se perde', async () => {
+    baixaProducao.mockRejectedValue(new TypeError('Failed to fetch'))
+    consultarBaixa.mockResolvedValue({
+      operacao_id: '11111111-1111-4111-8111-111111111111',
+      resultados: [],
+      sucesso: 1,
+      falhas: 0,
+      repetida: true,
+    })
+
+    renderView()
+    await screen.findByTestId('icone-categoria-alimento')
+    fireEvent.click(screen.getByRole('button', { name: 'Dar Baixa de Produção' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Dar baixa/ }))
+
+    expect(await screen.findByText('Resultado recuperado sem repetir movimentações.')).toBeInTheDocument()
+    expect(consultarBaixa).toHaveBeenCalledTimes(1)
+    expect(getPlano).toHaveBeenCalledTimes(1)
+  })
+
+  it('mostra data, turno e itens no diálogo de confirmação', async () => {
+    renderView()
+    await screen.findByTestId('icone-categoria-alimento')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dar Baixa de Produção' }))
+
+    const dialogo = await screen.findByRole('dialog', { name: 'Confirmar baixa de produção' })
+    expect(dialogo).toHaveTextContent('17/07/2026 · Manhã')
+    expect(dialogo).toHaveTextContent('Arroz')
+    expect(dialogo).toHaveTextContent('5,0 kg')
+  })
+
+  it('permite atualizar o plano manualmente e informa a sincronização', async () => {
+    renderView()
+    await screen.findByTestId('icone-categoria-alimento')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar' }))
+
+    await waitFor(() => expect(getPlano).toHaveBeenCalledTimes(2))
+    expect(screen.getByText(/Última atualização:/)).toBeInTheDocument()
   })
 })

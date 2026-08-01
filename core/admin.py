@@ -10,6 +10,7 @@ from .models import (
     FrequenciaDiaria,
     Grupo,
     Movimentacao,
+    OperacaoBaixaProducao,
     PinAcesso,
     Produto,
     Turma,
@@ -234,6 +235,29 @@ class FatorConsumoAdmin(admin.ModelAdmin):
     list_filter = ("ativo", "produto__grupo__categoria")
     search_fields = ("produto__nome",)
     autocomplete_fields = ("produto",)
+
+
+@admin.register(OperacaoBaixaProducao)
+class OperacaoBaixaProducaoAdmin(admin.ModelAdmin):
+    list_display = ("operacao_id", "data", "turno", "status", "criado_em")
+    list_filter = ("status", "turno", "data")
+    search_fields = ("operacao_id",)
+    readonly_fields = (
+        "operacao_id",
+        "data",
+        "turno",
+        "itens_solicitados",
+        "status",
+        "resultado",
+        "criado_em",
+        "atualizado_em",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 # 🔹 PinAcesso Inline

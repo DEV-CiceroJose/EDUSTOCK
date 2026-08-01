@@ -1,11 +1,12 @@
 import { useCallback } from "react"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { ChefHat } from "lucide-react"
 import { OperationPinLogin } from "@edustock/operacao-shared"
 import { login } from "./api.js"
 
 export default function PinLogin() {
   const navigate = useNavigate()
+  const location = useLocation()
   const onSuccess = useCallback(
     () => navigate("/producao", { replace: true }),
     [navigate],
@@ -19,6 +20,7 @@ export default function PinLogin() {
       iconClassName="bg-accent"
       login={login}
       onSuccess={onSuccess}
+      notice={location.state?.message}
       fallbackError="Falha na conexão."
     />
   )

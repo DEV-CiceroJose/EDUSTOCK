@@ -1,13 +1,29 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getPlano, baixaProducao, logout } from './api.js'
-import { UtensilsCrossed, Droplets, Package, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import {
+  baixaProducao,
+  concluirOperacaoPendente,
+  consultarBaixa,
+  getPlano,
+  limparSessao,
+  logout,
+  obterOperacaoPendente,
+} from './api.js'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Droplets,
+  Package,
+  RefreshCw,
+  UtensilsCrossed,
+} from 'lucide-react'
 
 const TURNOS = [
   { key: 'MANHA', label: 'Manhã' },
   { key: 'TARDE', label: 'Tarde' },
   { key: 'INTEGRAL', label: 'Integral' },
 ]
+const TURNO_LABEL = Object.fromEntries(TURNOS.map((turno) => [turno.key, turno.label]))
 
 /** Formata YYYY-MM-DD para dd/mm/aaaa */
 function formatarData(iso) {
@@ -91,23 +107,43 @@ function CardProduto({ item }) {
 /* ─── Modal de confirmação da baixa ─────────────────────────────────── */
 function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
   const itensDisponiveis = plano.itens.filter((i) => !i.estoque_insuficiente)
+  const confirmarRef = useRef(null)
+
+  useEffect(() => {
+    confirmarRef.current?.focus()
+    const fecharComEscape = (event) => {
+      if (event.key === 'Escape' && !loading) onCancelar()
+    }
+    document.addEventListener('keydown', fecharComEscape)
+    return () => document.removeEventListener('keydown', fecharComEscape)
+  }, [loading, onCancelar])
 
   return (
     <div className="modal-overlay" onClick={onCancelar}>
-      <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
-        <h2 className="m-0 mb-1 text-[1.3rem] font-extrabold">
+      <div
+        className="modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-confirmacao-baixa"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="titulo-confirmacao-baixa" className="m-0 mb-1 text-[1.3rem] font-extrabold">
           Confirmar baixa de produção
         </h2>
         <p className="m-0 mb-5 text-[0.9rem] text-ink-soft">
-          Serão registradas saídas de estoque para os itens abaixo.
+          {formatarData(plano.data)} · {TURNO_LABEL[plano.turno] ?? plano.turno}
         </p>
 
         <div className="mb-6 flex flex-col gap-2">
-          {itensDisponiveis.map((item) => (
-            <div key={item.produto_id} className="flex items-center justify-between rounded-[14px] bg-canvas px-4 py-3">
+          {plano.itens.map((item) => (
+            <div
+              key={item.produto_id}
+              className={`flex items-center justify-between rounded-[14px] px-4 py-3 ${item.estoque_insuficiente ? 'bg-err-tint text-err' : 'bg-canvas'}`}
+            >
               <span className="text-[0.95rem] font-semibold">{item.produto_nome}</span>
-              <span className="text-base font-extrabold text-brand">
+              <span className={`text-base font-extrabold ${item.estoque_insuficiente ? 'text-err' : 'text-brand'}`}>
                 {item.quantidade_legivel ?? `${item.quantidade} ${item.unidade}`}
+                {item.estoque_insuficiente && ' · insuficiente'}
               </span>
             </div>
           ))}
@@ -115,11 +151,13 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
 
         {plano.itens.some((i) => i.estoque_insuficiente) && (
           <div className="mb-5 rounded-[14px] bg-warn-tint px-4 py-3 text-[0.88rem] font-semibold text-warn">
-            Itens com estoque insuficiente serão ignorados.
+            A baixa é parcial: itens disponíveis serão processados e os insuficientes aparecerão como falha.
           </div>
         )}
 
         <button
+          ref={confirmarRef}
+          type="button"
           className="btn-action btn-primary"
           onClick={onConfirmar}
           disabled={loading || itensDisponiveis.length === 0}
@@ -131,6 +169,7 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
           )}
         </button>
         <button
+          type="button"
           onClick={onCancelar}
           className="mt-3 w-full cursor-pointer border-none bg-transparent p-[0.9rem] text-[0.95rem] font-semibold text-ink-soft"
         >
@@ -145,14 +184,35 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
 function ModalResultado({ resultado, onFechar }) {
   const IconeResultado = resultado.falhas === 0 ? CheckCircle2 : AlertTriangle
   const corIcone = resultado.falhas === 0 ? 'text-ok' : 'text-warn'
+  const fecharRef = useRef(null)
+
+  useEffect(() => {
+    fecharRef.current?.focus()
+    const fecharComEscape = (event) => {
+      if (event.key === 'Escape') onFechar()
+    }
+    document.addEventListener('keydown', fecharComEscape)
+    return () => document.removeEventListener('keydown', fecharComEscape)
+  }, [onFechar])
 
   return (
     <div className="modal-overlay">
-      <div className="modal-sheet text-center">
+      <div
+        className="modal-sheet text-center"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-resultado-baixa"
+      >
         <IconeResultado size={48} className={`mx-auto mb-2 ${corIcone}`} data-testid="icone-resultado" />
-        <h2 className="m-0 mb-2 text-[1.3rem] font-extrabold">
+        <h2 id="titulo-resultado-baixa" className="m-0 mb-2 text-[1.3rem] font-extrabold">
           Baixa concluída
         </h2>
+
+        {resultado.repetida && (
+          <p className="m-0 text-[0.85rem] font-semibold text-ink-soft">
+            Resultado recuperado sem repetir movimentações.
+          </p>
+        )}
 
         <div className="my-4 flex justify-center gap-6">
           <div>
@@ -173,7 +233,7 @@ function ModalResultado({ resultado, onFechar }) {
           </div>
         ))}
 
-        <button className="btn-action btn-primary mt-4" onClick={onFechar}>
+        <button ref={fecharRef} type="button" className="btn-action btn-primary mt-4" onClick={onFechar}>
           Fechar
         </button>
       </div>
@@ -189,10 +249,26 @@ export default function ProducaoView() {
   const [plano, setPlano] = useState(null)
   const [loadingPlano, setLoadingPlano] = useState(false)
   const [erroPlano, setErroPlano] = useState('')
+  const [ultimaSincronizacao, setUltimaSincronizacao] = useState('')
   const [modalAberto, setModalAberto] = useState(false)
   const [loadingBaixa, setLoadingBaixa] = useState(false)
   const [resultado, setResultado] = useState(null)
   const enviandoRef = useRef(false)
+
+  const redirecionarErroDeAcesso = useCallback((erro) => {
+    if (erro.status !== 401 && erro.status !== 403) return false
+
+    limparSessao()
+    navigate('/login', {
+      replace: true,
+      state: {
+        message: erro.status === 403
+          ? 'O módulo de merenda está indisponível para este acesso.'
+          : 'Sua sessão expirou. Digite o PIN novamente.',
+      },
+    })
+    return true
+  }, [navigate])
 
   const carregarPlano = useCallback(async () => {
     setLoadingPlano(true)
@@ -200,17 +276,18 @@ export default function ProducaoView() {
     try {
       const p = await getPlano(data, turno)
       setPlano(p)
+      setUltimaSincronizacao(new Date().toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }))
     } catch (e) {
-      if (e.status === 401 || e.status === 403) {
-        logout()
-        navigate('/login', { replace: true })
-        return
-      }
+      if (redirecionarErroDeAcesso(e)) return
       setErroPlano(e.message ?? 'Erro ao carregar plano.')
     } finally {
       setLoadingPlano(false)
     }
-  }, [data, turno, navigate])
+  }, [data, turno, redirecionarErroDeAcesso])
 
   useEffect(() => {
     carregarPlano()
@@ -220,22 +297,35 @@ export default function ProducaoView() {
     if (enviandoRef.current) return
     enviandoRef.current = true
     setLoadingBaixa(true)
+    const operacaoId = obterOperacaoPendente(data, turno)
     try {
-      const res = await baixaProducao(data, turno)
+      const res = await baixaProducao(data, turno, undefined, operacaoId)
+      concluirOperacaoPendente(data, turno, operacaoId)
       setResultado(res)
       setModalAberto(false)
     } catch (e) {
+      if (redirecionarErroDeAcesso(e)) return
+
       const semResposta = e.status === undefined
       setModalAberto(false)
       if (semResposta) {
-        // Sem resposta do servidor: não sabemos se a baixa foi registrada.
-        // Recarrega o plano primeiro (isso zera erroPlano internamente) e só
-        // então define o aviso, para que carregarPlano não o sobrescreva.
-        await carregarPlano()
-        setErroPlano(
-          'Não foi possível confirmar se a baixa foi registrada. O plano foi recarregado — confira o saldo antes de tentar de novo.'
-        )
+        try {
+          const resultadoConsultado = await consultarBaixa(operacaoId)
+          concluirOperacaoPendente(data, turno, operacaoId)
+          setResultado(resultadoConsultado)
+        } catch (erroConsulta) {
+          if (redirecionarErroDeAcesso(erroConsulta)) return
+          await carregarPlano()
+          setErroPlano(
+            erroConsulta.status === 404
+              ? 'A baixa não foi encontrada no servidor. Você pode tentar novamente com segurança.'
+              : 'Não foi possível confirmar a baixa. O identificador foi preservado para uma nova tentativa segura.'
+          )
+        }
       } else {
+        if (e.status === 409) {
+          concluirOperacaoPendente(data, turno, operacaoId)
+        }
         setErroPlano(e.message ?? 'Erro ao registrar baixa.')
       }
     } finally {
@@ -246,11 +336,11 @@ export default function ProducaoView() {
 
   function fecharResultado() {
     setResultado(null)
-    carregarPlano()
+    void carregarPlano()
   }
 
   function sair() {
-    logout()
+    void logout()
     navigate('/login', { replace: true })
   }
 
@@ -293,25 +383,45 @@ export default function ProducaoView() {
         <div className="flex gap-2">
           {TURNOS.map((t) => (
             <button
+              type="button"
               key={t.key}
               onClick={() => setTurno(t.key)}
               className={`turno-chip${turno === t.key ? ' active' : ' border-white/30 bg-white/10 text-white/75'}`}
+              aria-pressed={turno === t.key}
             >
               {t.label}
             </button>
           ))}
         </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3 text-[0.8rem] text-white/80">
+          <span>
+            {ultimaSincronizacao
+              ? `Última atualização: ${ultimaSincronizacao}`
+              : 'Aguardando atualização do plano'}
+          </span>
+          <button
+            type="button"
+            onClick={carregarPlano}
+            disabled={loadingPlano}
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3 py-2 font-bold text-white disabled:cursor-wait disabled:opacity-60"
+          >
+            <RefreshCw size={15} className={loadingPlano ? 'animate-spin' : ''} />
+            Atualizar
+          </button>
+        </div>
       </header>
 
       <main style={{ flex: 1, padding: '1.25rem', paddingBottom: '7rem' }}>
         {loadingPlano && (
-          <div style={{ textAlign: 'center', color: 'var(--color-ink-faint)', paddingTop: '3rem', fontSize: '1rem' }}>
+          <div role="status" style={{ textAlign: 'center', color: 'var(--color-ink-faint)', paddingTop: '3rem', fontSize: '1rem' }}>
             Carregando plano…
           </div>
         )}
 
         {erroPlano && !loadingPlano && (
           <div
+            role="alert"
             style={{
               background: 'var(--color-err-tint)',
               color: 'var(--color-err)',
@@ -351,12 +461,14 @@ export default function ProducaoView() {
       <footer className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t-[1.5px] border-line bg-surface px-5 py-4">
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={sair}
             className="shrink-0 cursor-pointer rounded-2xl border-[1.5px] border-line bg-canvas px-4 py-3.5 text-[0.9rem] font-semibold text-ink-soft"
           >
             Sair
           </button>
           <button
+            type="button"
             className="btn-action btn-primary flex-1"
             disabled={!plano || itensDisponiveis.length === 0 || loadingPlano}
             onClick={() => setModalAberto(true)}
@@ -370,7 +482,9 @@ export default function ProducaoView() {
         <ModalBaixa
           plano={plano}
           onConfirmar={executarBaixa}
-          onCancelar={() => setModalAberto(false)}
+          onCancelar={() => {
+            if (!loadingBaixa) setModalAberto(false)
+          }}
           loading={loadingBaixa}
         />
       )}

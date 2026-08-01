@@ -24,6 +24,12 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
+    {
+      command: "npm --prefix ../app-cozinha run build && npm --prefix ../app-cozinha run preview -- --host 127.0.0.1 --port 4175",
+      url: "http://127.0.0.1:4175",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
   ],
   projects: [
     {
@@ -40,6 +46,14 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         baseURL: "http://127.0.0.1:4174",
+      },
+    },
+    {
+      name: "cozinha",
+      testMatch: /cozinha\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: "http://127.0.0.1:4175",
       },
     },
   ],
