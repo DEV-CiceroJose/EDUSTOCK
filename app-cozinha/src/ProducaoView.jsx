@@ -18,12 +18,14 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 
-const TURNOS = [
-  { key: 'MANHA', label: 'Manhã' },
-  { key: 'TARDE', label: 'Tarde' },
-  { key: 'INTEGRAL', label: 'Integral' },
+const REFEICOES = [
+  { key: 'CAFE_MANHA', label: 'Café da manhã' },
+  { key: 'ALMOCO', label: 'Almoço' },
+  { key: 'LANCHE_TARDE', label: 'Lanche da tarde' },
 ]
-const TURNO_LABEL = Object.fromEntries(TURNOS.map((turno) => [turno.key, turno.label]))
+const REFEICAO_LABEL = Object.fromEntries(
+  REFEICOES.map((refeicao) => [refeicao.key, refeicao.label]),
+)
 
 /** Formata YYYY-MM-DD para dd/mm/aaaa */
 function formatarData(iso) {
@@ -39,12 +41,12 @@ function hoje() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-/** Determina o turno padrão pelo horário atual */
-function turnoAtual() {
+/** Determina a refeição sugerida pelo horário atual. */
+function refeicaoAtual() {
   const h = new Date().getHours()
-  if (h < 12) return 'MANHA'
-  if (h < 18) return 'TARDE'
-  return 'INTEGRAL'
+  if (h < 10) return 'CAFE_MANHA'
+  if (h < 15) return 'ALMOCO'
+  return 'LANCHE_TARDE'
 }
 
 /* ─── Ícone por categoria ────────────────────────────────────────────── */
@@ -131,7 +133,7 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
           Confirmar baixa de produção
         </h2>
         <p className="m-0 mb-5 text-[0.9rem] text-ink-soft">
-          {formatarData(plano.data)} · {TURNO_LABEL[plano.turno] ?? plano.turno}
+          {formatarData(plano.data)} · {REFEICAO_LABEL[plano.refeicao] ?? plano.refeicao}
         </p>
 
         <div className="mb-6 flex flex-col gap-2">
@@ -244,7 +246,7 @@ function ModalResultado({ resultado, onFechar }) {
 /* ─── View principal ─────────────────────────────────────────────────── */
 export default function ProducaoView() {
   const navigate = useNavigate()
-  const [turno, setTurno] = useState(turnoAtual)
+  const [refeicao, setRefeicao] = useState(refeicaoAtual)
   const [data] = useState(hoje)
   const [plano, setPlano] = useState(null)
   const [loadingPlano, setLoadingPlano] = useState(false)
@@ -274,7 +276,7 @@ export default function ProducaoView() {
     setLoadingPlano(true)
     setErroPlano('')
     try {
-      const p = await getPlano(data, turno)
+      const p = await getPlano(data, refeicao)
       setPlano(p)
       setUltimaSincronizacao(new Date().toLocaleTimeString('pt-BR', {
         hour: '2-digit',
@@ -287,7 +289,7 @@ export default function ProducaoView() {
     } finally {
       setLoadingPlano(false)
     }
-  }, [data, turno, redirecionarErroDeAcesso])
+  }, [data, refeicao, redirecionarErroDeAcesso])
 
   useEffect(() => {
     carregarPlano()
@@ -297,10 +299,10 @@ export default function ProducaoView() {
     if (enviandoRef.current) return
     enviandoRef.current = true
     setLoadingBaixa(true)
-    const operacaoId = obterOperacaoPendente(data, turno)
+    const operacaoId = obterOperacaoPendente(data, refeicao)
     try {
-      const res = await baixaProducao(data, turno, undefined, operacaoId)
-      concluirOperacaoPendente(data, turno, operacaoId)
+      const res = await baixaProducao(data, refeicao, undefined, operacaoId)
+      concluirOperacaoPendente(data, refeicao, operacaoId)
       setResultado(res)
       setModalAberto(false)
     } catch (e) {
@@ -311,7 +313,7 @@ export default function ProducaoView() {
       if (semResposta) {
         try {
           const resultadoConsultado = await consultarBaixa(operacaoId)
-          concluirOperacaoPendente(data, turno, operacaoId)
+          concluirOperacaoPendente(data, refeicao, operacaoId)
           setResultado(resultadoConsultado)
         } catch (erroConsulta) {
           if (redirecionarErroDeAcesso(erroConsulta)) return
@@ -324,7 +326,11 @@ export default function ProducaoView() {
         }
       } else {
         if (e.status === 409) {
-          concluirOperacaoPendente(data, turno, operacaoId)
+          concluirOperacaoPendente(data, refeicao, operacaoId)
+          if (e.data?.codigo === 'refeicao_ja_baixada' && e.data?.resultado) {
+            setResultado(e.data.resultado)
+            return
+          }
         }
         setErroPlano(e.message ?? 'Erro ao registrar baixa.')
       }
@@ -380,16 +386,16 @@ export default function ProducaoView() {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          {TURNOS.map((t) => (
+        <div className="refeicao-tabs">
+          {REFEICOES.map((itemRefeicao) => (
             <button
               type="button"
-              key={t.key}
-              onClick={() => setTurno(t.key)}
-              className={`turno-chip${turno === t.key ? ' active' : ' border-white/30 bg-white/10 text-white/75'}`}
-              aria-pressed={turno === t.key}
+              key={itemRefeicao.key}
+              onClick={() => setRefeicao(itemRefeicao.key)}
+              className={`refeicao-chip${refeicao === itemRefeicao.key ? ' active' : ' border-white/30 bg-white/10 text-white/75'}`}
+              aria-pressed={refeicao === itemRefeicao.key}
             >
-              {t.label}
+              {itemRefeicao.label}
             </button>
           ))}
         </div>
@@ -444,7 +450,7 @@ export default function ProducaoView() {
 
         {!loadingPlano && plano && plano.itens.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--color-ink-faint)', paddingTop: '3rem', fontSize: '1rem' }}>
-            Nenhum item de produção para este turno.<br />
+            Nenhum item de produção para esta refeição.<br />
             <span style={{ fontSize: '0.85rem' }}>Verifique se as frequências foram registradas.</span>
           </div>
         )}
@@ -470,10 +476,10 @@ export default function ProducaoView() {
           <button
             type="button"
             className="btn-action btn-primary flex-1"
-            disabled={!plano || itensDisponiveis.length === 0 || loadingPlano}
+            disabled={!plano || itensDisponiveis.length === 0 || loadingPlano || plano.baixa_realizada}
             onClick={() => setModalAberto(true)}
           >
-            Dar Baixa de Produção
+            {plano?.baixa_realizada ? 'Baixa já realizada' : 'Dar Baixa de Produção'}
           </button>
         </div>
       </footer>

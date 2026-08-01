@@ -239,13 +239,13 @@ class FatorConsumoAdmin(admin.ModelAdmin):
 
 @admin.register(OperacaoBaixaProducao)
 class OperacaoBaixaProducaoAdmin(admin.ModelAdmin):
-    list_display = ("operacao_id", "data", "turno", "status", "criado_em")
-    list_filter = ("status", "turno", "data")
+    list_display = ("operacao_id", "data", "refeicao", "status", "criado_em")
+    list_filter = ("status", "refeicao", "data")
     search_fields = ("operacao_id",)
     readonly_fields = (
         "operacao_id",
         "data",
-        "turno",
+        "refeicao",
         "itens_solicitados",
         "status",
         "resultado",

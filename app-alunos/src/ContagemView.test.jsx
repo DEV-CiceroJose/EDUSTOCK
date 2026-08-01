@@ -35,13 +35,13 @@ function renderComRotas() {
 describe('ContagemView (app-alunos)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    getSessao.mockReturnValue({ turma: '6A', turno: 'MANHA' })
+    getSessao.mockReturnValue({ turma: '6A', turno: 'INTEGRAL' })
   })
 
   it('mostra o ícone de sucesso sem emoji ao confirmar a contagem', async () => {
     registrarContagem.mockResolvedValue({
       turma: '6A',
-      turno: 'MANHA',
+      turno: 'INTEGRAL',
       quantidade_alunos: 30,
       previsao: null,
     })
@@ -68,7 +68,7 @@ describe('ContagemView (app-alunos)', () => {
     fireEvent.click(botaoConfirmar)
     fireEvent.click(botaoConfirmar)
 
-    resolverContagem({ turma: '6A', turno: 'MANHA', quantidade_alunos: 3, previsao: null })
+    resolverContagem({ turma: '6A', turno: 'INTEGRAL', quantidade_alunos: 3, previsao: null })
     await waitFor(() => expect(registrarContagem).toHaveBeenCalledTimes(1))
   })
 

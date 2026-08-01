@@ -104,7 +104,7 @@ class ContagemApiTest(APITestCase):
         from core.operacao_auth import criar_token, PERFIL_ALUNO, PERFIL_COZINHA
         self.client_aluno = APIClient()
         self.client_aluno.credentials(
-            HTTP_X_OPERACAO_TOKEN=criar_token(PERFIL_ALUNO, turma="6A", turno="MANHA")
+            HTTP_X_OPERACAO_TOKEN=criar_token(PERFIL_ALUNO, turma="6A", turno="INTEGRAL")
         )
         self.client_cozinha = APIClient()
         self.client_cozinha.credentials(
@@ -175,7 +175,9 @@ class ContagemApiTest(APITestCase):
         self.client_aluno.post("/api/operacao/contagem/", {
             "quantidade_alunos": 40,
         }, format="json")
-        resp = self.client_cozinha.get(f"/api/operacao/plano-do-dia/?data={hoje}&turno=MANHA")
+        resp = self.client_cozinha.get(
+            f"/api/operacao/plano-do-dia/?data={hoje}&refeicao=ALMOCO"
+        )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data["itens"]), 1)
 
@@ -189,7 +191,7 @@ class ContagemApiTest(APITestCase):
             "quantidade_alunos": 40,
         }, format="json")
         resp = self.client_cozinha.post("/api/operacao/baixa-de-producao/", {
-            "operacao_id": str(uuid4()), "data": hoje, "turno": "MANHA",
+            "operacao_id": str(uuid4()), "data": hoje, "refeicao": "ALMOCO",
         }, format="json")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["sucesso"], 1)

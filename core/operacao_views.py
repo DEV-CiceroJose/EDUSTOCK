@@ -19,6 +19,7 @@ from plataforma.permissions import RequerModuloAtivo
 from .models import FrequenciaDiaria, OperacaoBaixaProducao
 from .operacao import (
     OperacaoIdReutilizado,
+    RefeicaoJaBaixada,
     executar_baixa_idempotente,
     gerar_plano_do_dia,
 )
@@ -28,7 +29,11 @@ from .operacao_auth import (
     requer_perfil_operacao,
 )
 from .services import calcular_previsao_producao, calcular_resumo_dia, total_frequencia
-from .serializers import BaixaProducaoRequestSerializer, ConsultaBaixaProducaoSerializer
+from .serializers import (
+    BaixaProducaoRequestSerializer,
+    ConsultaBaixaProducaoSerializer,
+    PlanoProducaoQuerySerializer,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -309,16 +314,33 @@ class PlanoDoDiaView(APIView):
 
     @requer_perfil_operacao(PERFIL_COZINHA)
     def get(self, request):
-        data, err = _parse_date(request.query_params.get("data"), default_today=True)
-        if err:
-            return err
-        turno = request.query_params.get("turno")
-        if turno not in dict(FrequenciaDiaria.TURNO_CHOICES):
+        serializer = PlanoProducaoQuerySerializer(data=request.query_params)
+        if not serializer.is_valid():
             return Response(
-                {"detail": "Parâmetro 'turno' é obrigatório. Use MANHA, TARDE ou INTEGRAL."},
+                {
+                    "codigo": "consulta_invalida",
+                    "detail": "Informe uma data e refeição válidas.",
+                    "campos": serializer.errors,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response(gerar_plano_do_dia(data=data, turno=turno))
+
+        dados = serializer.validated_data
+        plano = gerar_plano_do_dia(
+            data=dados["data"],
+            turno=FrequenciaDiaria.INTEGRAL,
+        )
+        operacao = OperacaoBaixaProducao.objects.filter(
+            data=dados["data"],
+            refeicao=dados["refeicao"],
+        ).first()
+        plano.update({
+            "refeicao": dados["refeicao"],
+            "refeicao_label": dict(OperacaoBaixaProducao.REFEICAO_CHOICES)[dados["refeicao"]],
+            "baixa_realizada": bool(operacao),
+            "status_baixa": operacao.status if operacao else None,
+        })
+        return Response(plano)
 
 
 # --------------------------------------------------------------------------
@@ -347,13 +369,24 @@ class BaixaProducaoView(APIView):
             resultado = executar_baixa_idempotente(
                 operacao_id=dados["operacao_id"],
                 data=dados["data"],
-                turno=dados["turno"],
+                refeicao=dados["refeicao"],
                 itens=dados.get("itens"),
                 user=None,
             )
         except OperacaoIdReutilizado as exc:
             return Response(
                 {"codigo": "operacao_id_reutilizado", "detail": str(exc)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except RefeicaoJaBaixada as exc:
+            resultado_anterior = dict(exc.operacao.resultado)
+            resultado_anterior["repetida"] = True
+            return Response(
+                {
+                    "codigo": "refeicao_ja_baixada",
+                    "detail": str(exc),
+                    "resultado": resultado_anterior,
+                },
                 status=status.HTTP_409_CONFLICT,
             )
         except DjangoValidationError as exc:

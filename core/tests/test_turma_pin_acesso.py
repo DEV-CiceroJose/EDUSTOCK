@@ -15,6 +15,9 @@ class TurmaModelTest(TestCase):
         with self.assertRaises(IntegrityError):
             Turma.objects.create(nome="Test Turma B", curso=Turma.DS, ano=1)
 
+    def test_periodo_disponivel_e_apenas_integral(self):
+        self.assertEqual(Turma.TURNO_CHOICES, [(Turma.INTEGRAL, "Integral")])
+
 
 class PinAcessoModelTest(TestCase):
     def setUp(self):

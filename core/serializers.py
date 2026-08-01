@@ -8,9 +8,9 @@ from .models import (
     Categoria,
     Entrada,
     Fornecedor,
-    FrequenciaDiaria,
     Grupo,
     Movimentacao,
+    OperacaoBaixaProducao,
     Produto,
 )
 
@@ -36,7 +36,7 @@ class BaixaProducaoItemSerializer(serializers.Serializer):
 class BaixaProducaoRequestSerializer(serializers.Serializer):
     operacao_id = serializers.UUIDField()
     data = serializers.DateField(default=timezone.localdate)
-    turno = serializers.ChoiceField(choices=FrequenciaDiaria.TURNO_CHOICES)
+    refeicao = serializers.ChoiceField(choices=OperacaoBaixaProducao.REFEICAO_CHOICES)
     itens = BaixaProducaoItemSerializer(many=True, required=False)
 
     def validate_data(self, value):
@@ -47,7 +47,7 @@ class BaixaProducaoRequestSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
-        campos_extras = set(self.initial_data) - {"operacao_id", "data", "turno", "itens"}
+        campos_extras = set(self.initial_data) - {"operacao_id", "data", "refeicao", "itens"}
         if campos_extras:
             raise serializers.ValidationError({
                 "campos": f"Campos não reconhecidos: {', '.join(sorted(campos_extras))}."
@@ -63,6 +63,11 @@ class BaixaProducaoRequestSerializer(serializers.Serializer):
 
 class ConsultaBaixaProducaoSerializer(serializers.Serializer):
     operacao_id = serializers.UUIDField()
+
+
+class PlanoProducaoQuerySerializer(serializers.Serializer):
+    data = serializers.DateField(default=timezone.localdate)
+    refeicao = serializers.ChoiceField(choices=OperacaoBaixaProducao.REFEICAO_CHOICES)
 
 
 class CategoriaSerializer(serializers.ModelSerializer):

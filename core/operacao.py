@@ -3,7 +3,13 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from .models import FatorConsumo, Movimentacao, OperacaoBaixaProducao, Produto
+from .models import (
+    FatorConsumo,
+    FrequenciaDiaria,
+    Movimentacao,
+    OperacaoBaixaProducao,
+    Produto,
+)
 from .services import calcular_previsao_producao, registrar_movimentacao, total_frequencia
 
 UNIDADES_EM_GRAMAS = {"KG", "L"}
@@ -11,6 +17,12 @@ UNIDADES_EM_GRAMAS = {"KG", "L"}
 
 class OperacaoIdReutilizado(Exception):
     pass
+
+
+class RefeicaoJaBaixada(Exception):
+    def __init__(self, operacao):
+        self.operacao = operacao
+        super().__init__("A baixa desta refeição já foi realizada hoje.")
 
 
 def _money_qty(val):
@@ -142,39 +154,50 @@ def _normalizar_itens_solicitados(itens):
 
 
 @transaction.atomic
-def executar_baixa_idempotente(*, operacao_id, data, turno, itens=None, user=None):
+def executar_baixa_idempotente(*, operacao_id, data, refeicao, itens=None, user=None):
     itens_normalizados = _normalizar_itens_solicitados(itens)
-    operacao, criada = (
-        OperacaoBaixaProducao.objects.select_for_update().get_or_create(
-            operacao_id=operacao_id,
-            defaults={
-                "data": data,
-                "turno": turno,
-                "itens_solicitados": itens_normalizados,
-                "status": OperacaoBaixaProducao.CONCLUIDA,
-                "resultado": {},
-            },
-        )
+    operacao_existente = (
+        OperacaoBaixaProducao.objects.select_for_update()
+        .filter(operacao_id=operacao_id)
+        .first()
     )
 
-    if not criada:
+    if operacao_existente:
         mesma_requisicao = (
-            operacao.data == data
-            and operacao.turno == turno
-            and operacao.itens_solicitados == itens_normalizados
+            operacao_existente.data == data
+            and operacao_existente.refeicao == refeicao
+            and operacao_existente.itens_solicitados == itens_normalizados
         )
         if not mesma_requisicao:
             raise OperacaoIdReutilizado(
                 "Este identificador já foi usado em outra baixa de produção."
             )
 
-        resultado_anterior = dict(operacao.resultado)
+        resultado_anterior = dict(operacao_existente.resultado)
         resultado_anterior["repetida"] = True
         return resultado_anterior
 
+    operacao, criada = OperacaoBaixaProducao.objects.select_for_update().get_or_create(
+        data=data,
+        refeicao=refeicao,
+        defaults={
+            "operacao_id": operacao_id,
+            "itens_solicitados": itens_normalizados,
+            "status": OperacaoBaixaProducao.CONCLUIDA,
+            "resultado": {},
+        },
+    )
+
+    if not criada:
+        if operacao.operacao_id == operacao_id:
+            resultado_anterior = dict(operacao.resultado)
+            resultado_anterior["repetida"] = True
+            return resultado_anterior
+        raise RefeicaoJaBaixada(operacao)
+
     resultado = baixa_de_producao(
         data=data,
-        turno=turno,
+        turno=FrequenciaDiaria.INTEGRAL,
         itens_override=itens_normalizados,
         user=user,
     )
@@ -185,6 +208,8 @@ def executar_baixa_idempotente(*, operacao_id, data, turno, itens=None, user=Non
     )
     resultado.update({
         "operacao_id": str(operacao_id),
+        "refeicao": refeicao,
+        "refeicao_label": operacao.get_refeicao_display(),
         "status_operacao": status_operacao,
         "repetida": False,
     })

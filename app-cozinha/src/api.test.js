@@ -34,7 +34,7 @@ describe('api.js — retry de rede', () => {
       .mockResolvedValueOnce(respostaJson(200, { itens: [] }))
     global.fetch = fetchMock
 
-    const resultado = await getPlano('2026-07-17', 'MANHA')
+    const resultado = await getPlano('2026-07-17', 'ALMOCO')
 
     expect(resultado).toEqual({ itens: [] })
     expect(fetchMock).toHaveBeenCalledTimes(2)
@@ -47,7 +47,7 @@ describe('api.js — retry de rede', () => {
     await expect(
       baixaProducao(
         '2026-07-17',
-        'MANHA',
+        'ALMOCO',
         undefined,
         '11111111-1111-4111-8111-111111111111',
       ),
@@ -59,18 +59,18 @@ describe('api.js — retry de rede', () => {
     const fetchMock = vi.fn().mockResolvedValue(respostaJson(403, { detail: 'Módulo inativo' }))
     global.fetch = fetchMock
 
-    await expect(getPlano('2026-07-17', 'MANHA')).rejects.toThrow('Módulo inativo')
+    await expect(getPlano('2026-07-17', 'ALMOCO')).rejects.toThrow('Módulo inativo')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('preserva o mesmo identificador até a operação ser concluída', () => {
-    const primeira = obterOperacaoPendente('2026-07-17', 'MANHA')
-    const segunda = obterOperacaoPendente('2026-07-17', 'MANHA')
+    const primeira = obterOperacaoPendente('2026-07-17', 'ALMOCO')
+    const segunda = obterOperacaoPendente('2026-07-17', 'ALMOCO')
 
     expect(segunda).toBe(primeira)
 
-    concluirOperacaoPendente('2026-07-17', 'MANHA', primeira)
-    expect(obterOperacaoPendente('2026-07-17', 'MANHA')).not.toBe(primeira)
+    concluirOperacaoPendente('2026-07-17', 'ALMOCO', primeira)
+    expect(obterOperacaoPendente('2026-07-17', 'ALMOCO')).not.toBe(primeira)
   })
 
   it('envia o identificador no payload e permite consultar o resultado', async () => {
@@ -80,12 +80,12 @@ describe('api.js — retry de rede', () => {
       .mockResolvedValueOnce(respostaJson(200, { operacao_id: operacaoId, consultada: true }))
     global.fetch = fetchMock
 
-    await baixaProducao('2026-07-17', 'MANHA', undefined, operacaoId)
+    await baixaProducao('2026-07-17', 'ALMOCO', undefined, operacaoId)
     await consultarBaixa(operacaoId)
 
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
       data: '2026-07-17',
-      turno: 'MANHA',
+      refeicao: 'ALMOCO',
       operacao_id: operacaoId,
     })
     expect(fetchMock.mock.calls[1][0]).toContain(`operacao_id=${operacaoId}`)

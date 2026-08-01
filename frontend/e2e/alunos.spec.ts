@@ -10,7 +10,7 @@ test("representante entra com PIN e registra a presença da turma", async ({ pag
         body: JSON.stringify({
           token: "token-alunos-e2e",
           turma: "3º DS",
-          turno: "MANHA",
+          turno: "INTEGRAL",
           perfil: "ALUNO_REP",
         }),
       })
@@ -20,7 +20,7 @@ test("representante entra com PIN e registra a presença da turma", async ({ pag
       contentType: "application/json",
       body: JSON.stringify({
         turma: "3º DS",
-        turno: "MANHA",
+        turno: "INTEGRAL",
         quantidade_alunos: 25,
         previsao: { total_alunos: 25, media_historica: 24, alerta_reducao: false },
       }),
@@ -67,7 +67,7 @@ test("sessão expirada durante o envio retorna ao PIN com orientação", async (
         body: JSON.stringify({
           token: "token-expirado-e2e",
           turma: "3º DS",
-          turno: "MANHA",
+          turno: "INTEGRAL",
           perfil: "ALUNO_REP",
         }),
       })

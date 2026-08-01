@@ -17,7 +17,12 @@ export async function login(pin) {
     perfil: "ALUNO_REP",
   })
 
-  if (!data?.token || !data?.turma || !data?.turno || data?.perfil !== "ALUNO_REP") {
+  if (
+    !data?.token
+    || !data?.turma
+    || data?.turno !== "INTEGRAL"
+    || data?.perfil !== "ALUNO_REP"
+  ) {
     throw new Error("Não foi possível iniciar uma sessão válida para esta turma.")
   }
 
@@ -51,7 +56,7 @@ export function getSessao() {
       http.isLoggedIn()
       && sessao?.perfil === "ALUNO_REP"
       && Boolean(sessao?.turma)
-      && Boolean(sessao?.turno)
+      && sessao?.turno === "INTEGRAL"
     )
 
     if (!sessaoValida) {

@@ -62,20 +62,20 @@ describe('api.js — ciclo de sessão', () => {
     global.fetch = vi.fn().mockResolvedValue(respostaJson(200, {
       token: 'token-valido',
       turma: '6A',
-      turno: 'MANHA',
+      turno: 'INTEGRAL',
       perfil: 'ALUNO_REP',
     }))
 
     await login('1234')
 
-    expect(getSessao()).toEqual({ turma: '6A', turno: 'MANHA', perfil: 'ALUNO_REP' })
+    expect(getSessao()).toEqual({ turma: '6A', turno: 'INTEGRAL', perfil: 'ALUNO_REP' })
     expect(sessionStorage.getItem('operacao_token')).toBe('token-valido')
   })
 
   it('descarta metadados antigos quando o token não existe', () => {
     sessionStorage.setItem('operacao_sessao', JSON.stringify({
       turma: '6A',
-      turno: 'MANHA',
+      turno: 'INTEGRAL',
       perfil: 'ALUNO_REP',
     }))
 
@@ -87,7 +87,7 @@ describe('api.js — ciclo de sessão', () => {
     sessionStorage.setItem('operacao_token', 'token-valido')
     sessionStorage.setItem('operacao_sessao', JSON.stringify({
       turma: '6A',
-      turno: 'MANHA',
+      turno: 'INTEGRAL',
       perfil: 'ALUNO_REP',
     }))
     const fetchMock = vi.fn().mockResolvedValue(respostaJson(204, null))

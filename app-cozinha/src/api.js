@@ -51,13 +51,13 @@ function lerOperacoesPendentes() {
   }
 }
 
-function chaveOperacao(data, turno) {
-  return `${data}:${turno}`
+function chaveOperacao(data, refeicao) {
+  return `${data}:${refeicao}`
 }
 
-export function obterOperacaoPendente(data, turno) {
+export function obterOperacaoPendente(data, refeicao) {
   const operacoes = lerOperacoesPendentes()
-  const chave = chaveOperacao(data, turno)
+  const chave = chaveOperacao(data, refeicao)
   if (!operacoes[chave]) {
     operacoes[chave] = globalThis.crypto.randomUUID()
     sessionStorage.setItem(OPERACOES_PENDENTES_KEY, JSON.stringify(operacoes))
@@ -65,25 +65,25 @@ export function obterOperacaoPendente(data, turno) {
   return operacoes[chave]
 }
 
-export function concluirOperacaoPendente(data, turno, operacaoId) {
+export function concluirOperacaoPendente(data, refeicao, operacaoId) {
   const operacoes = lerOperacoesPendentes()
-  const chave = chaveOperacao(data, turno)
+  const chave = chaveOperacao(data, refeicao)
   if (operacoes[chave] !== operacaoId) return
   delete operacoes[chave]
   sessionStorage.setItem(OPERACOES_PENDENTES_KEY, JSON.stringify(operacoes))
 }
 
-export async function getPlano(data, turno) {
+export async function getPlano(data, refeicao) {
   return http.request(
     "GET",
-    `/api/operacao/plano-do-dia/?data=${data}&turno=${turno}`,
+    `/api/operacao/plano-do-dia/?data=${data}&refeicao=${refeicao}`,
     undefined,
     { retry: true },
   )
 }
 
-export async function baixaProducao(data, turno, itens, operacaoId = obterOperacaoPendente(data, turno)) {
-  const body = { data, turno, operacao_id: operacaoId }
+export async function baixaProducao(data, refeicao, itens, operacaoId = obterOperacaoPendente(data, refeicao)) {
+  const body = { data, refeicao, operacao_id: operacaoId }
   if (itens) body.itens = itens
   return http.request(
     "POST",

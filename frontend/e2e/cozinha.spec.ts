@@ -2,7 +2,11 @@ import { expect, test, type Page } from "@playwright/test"
 
 const plano = {
   data: "2026-08-01",
-  turno: "MANHA",
+  turno: "INTEGRAL",
+  refeicao: "ALMOCO",
+  refeicao_label: "Almoço",
+  baixa_realizada: false,
+  status_baixa: null,
   total_alunos: 40,
   previsao: null,
   itens: [
@@ -57,11 +61,13 @@ test("cozinha entra, confere a ordem e conclui uma baixa parcial", async ({ page
 
     const body = request.postDataJSON()
     operacaoId = body.operacao_id
+    expect(body.refeicao).toBe("ALMOCO")
     return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
         operacao_id: operacaoId,
+        refeicao: "ALMOCO",
         status_operacao: "PARCIAL",
         repetida: false,
         sucesso: 1,
@@ -78,6 +84,10 @@ test("cozinha entra, confere a ordem e conclui uma baixa parcial", async ({ page
   await informarPin(page)
   await expect(page).toHaveURL(/\/producao$/)
   await expect(page.getByText("Arroz")).toBeVisible()
+  await expect(page.getByRole("button", { name: "Café da manhã" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Almoço" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Lanche da tarde" })).toBeVisible()
+  await page.getByRole("button", { name: "Almoço" }).click()
 
   await page.getByRole("button", { name: "Dar Baixa de Produção" }).click()
   const dialogo = page.getByRole("dialog", { name: "Confirmar baixa de produção" })
@@ -110,6 +120,7 @@ test("resposta perdida é reconciliada sem repetir a baixa", async ({ page }) =>
       contentType: "application/json",
       body: JSON.stringify({
         operacao_id: new URL(request.url()).searchParams.get("operacao_id"),
+        refeicao: "ALMOCO",
         status_operacao: "CONCLUIDA",
         repetida: true,
         consultada: true,
@@ -122,6 +133,7 @@ test("resposta perdida é reconciliada sem repetir a baixa", async ({ page }) =>
 
   await page.goto("/login")
   await informarPin(page)
+  await page.getByRole("button", { name: "Almoço" }).click()
   await page.getByRole("button", { name: "Dar Baixa de Produção" }).click()
   await page.getByRole("dialog").getByRole("button", { name: "Dar baixa" }).click()
 

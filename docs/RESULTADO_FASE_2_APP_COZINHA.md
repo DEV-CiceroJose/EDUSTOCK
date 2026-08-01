@@ -15,15 +15,15 @@ na branch `new/subapps-fases-2-3`.
   resultado.
 - Repetir o mesmo payload com o mesmo identificador retorna o resultado
   anterior e não cria novas movimentações.
-- Reutilizar o identificador com outra data, turno ou lista de itens retorna
+- Reutilizar o identificador com outra data, refeição ou lista de itens retorna
   HTTP 409 com o código `operacao_id_reutilizado`.
 - A operação e as movimentações são processadas em uma transação. Os produtos
   continuam bloqueados individualmente durante a atualização do saldo.
 - Uma exceção não tratada desfaz a operação inteira, permitindo uma repetição
   segura; falhas de estoque previstas são registradas no resultado parcial.
 
-Foi criado o modelo `OperacaoBaixaProducao`, com migration própria, para guardar
-data, turno, itens solicitados, status e resultado final.
+Foi criado o modelo `OperacaoBaixaProducao`, com migrations próprias, para
+guardar data, refeição, itens solicitados, status e resultado final.
 As operações podem ser consultadas no Django Admin em modo somente leitura.
 
 ## Contrato da API
@@ -38,7 +38,7 @@ Payload obrigatório:
 {
   "operacao_id": "UUID",
   "data": "AAAA-MM-DD",
-  "turno": "MANHA"
+  "refeicao": "ALMOCO"
 }
 ```
 
@@ -58,6 +58,12 @@ reconhecidos são rejeitados com HTTP 400.
 ## Regras formalizadas
 
 - Baixas de estoque só podem ser registradas na data atual.
+- Cada turma possui exclusivamente o período integral e registra uma única
+  frequência diária.
+- A cozinha possui três operações independentes por dia: `CAFE_MANHA`,
+  `ALMOCO` e `LANCHE_TARDE`.
+- Cada refeição aceita no máximo uma baixa por data. Uma nova tentativa com
+  outro identificador retorna `refeicao_ja_baixada` sem alterar o estoque.
 - Consultar o plano continua sendo uma operação somente de leitura.
 - A baixa é parcial por item: produtos com saldo suficiente são processados e
   produtos insuficientes permanecem inalterados, aparecendo como falha.
@@ -67,7 +73,7 @@ reconhecidos são rejeitados com HTTP 400.
 
 ## Interface do App Cozinha
 
-- O modal de confirmação mostra data, turno, produtos, quantidades e itens com
+- O modal de confirmação mostra data, refeição, produtos, quantidades e itens com
   estoque insuficiente.
 - A política de baixa parcial é explicada antes da confirmação.
 - Foi adicionado botão de atualização manual e horário da última sincronização.
@@ -96,7 +102,7 @@ reconhecidos são rejeitados com HTTP 400.
 
 ## Validações executadas
 
-- App Cozinha: 20 testes aprovados.
+- App Cozinha: 22 testes aprovados.
 - Backend operacional: 43 testes aprovados.
 - E2E do projeto `cozinha`: 3 cenários aprovados.
 - Build de produção do App Cozinha: aprovado.

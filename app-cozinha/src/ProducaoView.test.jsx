@@ -16,7 +16,10 @@ vi.mock('./api.js', () => ({
 
 const PLANO_BASE = {
   data: '2026-07-17',
-  turno: 'MANHA',
+  turno: 'INTEGRAL',
+  refeicao: 'ALMOCO',
+  refeicao_label: 'Almoço',
+  baixa_realizada: false,
   total_alunos: 120,
   previsao: null,
   itens: [
@@ -71,7 +74,7 @@ describe('ProducaoView (app-cozinha)', () => {
     fireEvent.click(botaoConfirmar)
     fireEvent.click(botaoConfirmar)
 
-    resolverBaixa({ data: '2026-07-17', turno: 'MANHA', resultados: [], sucesso: 1, falhas: 0 })
+    resolverBaixa({ data: '2026-07-17', refeicao: 'ALMOCO', resultados: [], sucesso: 1, falhas: 0 })
     await waitFor(() => expect(baixaProducao).toHaveBeenCalledTimes(1))
   })
 
@@ -110,14 +113,14 @@ describe('ProducaoView (app-cozinha)', () => {
     expect(getPlano).toHaveBeenCalledTimes(1)
   })
 
-  it('mostra data, turno e itens no diálogo de confirmação', async () => {
+  it('mostra data, refeição e itens no diálogo de confirmação', async () => {
     renderView()
     await screen.findByTestId('icone-categoria-alimento')
 
     fireEvent.click(screen.getByRole('button', { name: 'Dar Baixa de Produção' }))
 
     const dialogo = await screen.findByRole('dialog', { name: 'Confirmar baixa de produção' })
-    expect(dialogo).toHaveTextContent('17/07/2026 · Manhã')
+    expect(dialogo).toHaveTextContent('17/07/2026 · Almoço')
     expect(dialogo).toHaveTextContent('Arroz')
     expect(dialogo).toHaveTextContent('5,0 kg')
   })
@@ -130,5 +133,23 @@ describe('ProducaoView (app-cozinha)', () => {
 
     await waitFor(() => expect(getPlano).toHaveBeenCalledTimes(2))
     expect(screen.getByText(/Última atualização:/)).toBeInTheDocument()
+  })
+
+  it('oferece exatamente as três refeições diárias', async () => {
+    renderView()
+    await screen.findByTestId('icone-categoria-alimento')
+
+    expect(screen.getByRole('button', { name: 'Café da manhã' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Almoço' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Lanche da tarde' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Integral' })).not.toBeInTheDocument()
+  })
+
+  it('bloqueia nova baixa quando a refeição já foi processada', async () => {
+    getPlano.mockResolvedValue({ ...PLANO_BASE, baixa_realizada: true })
+
+    renderView()
+
+    expect(await screen.findByRole('button', { name: 'Baixa já realizada' })).toBeDisabled()
   })
 })

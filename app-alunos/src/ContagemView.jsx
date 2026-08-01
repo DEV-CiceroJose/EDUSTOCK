@@ -3,7 +3,6 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { CheckCircle2, AlertTriangle, Delete } from 'lucide-react'
 import { getSessao, registrarContagem, limparSessao, logout } from './api.js'
 
-const TURNO_LABEL = { MANHA: 'Manhã', TARDE: 'Tarde', INTEGRAL: 'Integral' }
 const MAX_ALUNOS_POR_TURMA = 45
 
 /**
@@ -108,7 +107,7 @@ export default function ContagemView() {
           </div>
 
           <p style={{ fontSize: '1rem', color: 'var(--color-ink-soft)', margin: 0 }}>
-            Turma {resultado.turma} — {TURNO_LABEL[resultado.turno] ?? resultado.turno}
+            Turma {resultado.turma} — Período integral
           </p>
 
           <div
@@ -248,7 +247,7 @@ export default function ContagemView() {
             Turma {sessao.turma}
           </div>
           <div style={{ color: 'var(--color-ink-soft)', fontSize: '0.95rem', marginTop: 2 }}>
-            {TURNO_LABEL[sessao.turno] ?? sessao.turno}
+            Período integral
           </div>
         </div>
         <button
