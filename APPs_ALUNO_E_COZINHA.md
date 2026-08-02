@@ -180,8 +180,8 @@ Foram executadas as seguintes verificações:
 - conferência de que manifestos, ícones, service workers, CSS e JavaScript foram
   copiados para os dois diretórios `dist`;
 - build de produção dos dois aplicativos;
-- suíte de testes do app Alunos: **24 testes aprovados**;
-- suíte de testes do app Cozinha: **28 testes aprovados**.
+- suíte de testes do app Alunos: **25 testes aprovados**;
+- suíte de testes do app Cozinha: **29 testes aprovados**.
 
 ## O que ainda falta
 

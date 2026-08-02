@@ -22,5 +22,14 @@ describe("PWA do App Alunos", () => {
 
     expect(serviceWorker).toContain("url.pathname.startsWith('/api/')")
     expect(serviceWorker).toContain("request.method !== 'GET'")
+    expect(serviceWorker).toContain("`${CACHE_PREFIX}v2`")
+  })
+
+  it("recupera a inicialização sem deixar uma tela branca", () => {
+    const main = ler("src/main.jsx")
+
+    expect(main).toContain("registro.unregister()")
+    expect(main).toContain("mostrarFalhaDeInicializacao()")
+    expect(main).toContain("Recarregar aplicativo")
   })
 })
