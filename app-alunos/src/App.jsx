@@ -11,7 +11,10 @@ function Protegido({ children }) {
   const navigate = useNavigate()
   useIdleLogout(() => {
     void logout()
-    navigate('/login', { replace: true })
+    navigate('/login', {
+      replace: true,
+      state: { message: 'Sessão encerrada por inatividade. Digite o PIN novamente.' },
+    })
   })
 
   return getSessao() ? children : <Navigate to="/login" replace />

@@ -51,7 +51,9 @@ describe('api.js — retry de rede', () => {
         undefined,
         '11111111-1111-4111-8111-111111111111',
       ),
-    ).rejects.toThrow('Failed to fetch')
+    ).rejects.toThrow(
+      'Sem conexão com o sistema. Verifique a internet e tente novamente.',
+    )
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 

@@ -151,6 +151,7 @@ export default function ContagemView() {
         </div>
 
         <button
+          type="button"
           onClick={sair}
           className="mt-8 w-full rounded-2xl py-4"
           style={{
@@ -194,6 +195,7 @@ export default function ContagemView() {
         </div>
 
         <button
+          type="button"
           onClick={reiniciar}
           className="mt-6 w-full rounded-2xl py-4"
           style={{
@@ -209,6 +211,7 @@ export default function ContagemView() {
         </button>
 
         <button
+          type="button"
           onClick={sair}
           className="mt-3 w-full rounded-2xl py-4"
           style={{
@@ -240,6 +243,7 @@ export default function ContagemView() {
     <div
       className="flex min-h-screen flex-col bg-white px-6 pb-8 pt-6"
       style={{ maxWidth: 420, margin: '0 auto' }}
+      aria-busy={estado === 'loading'}
     >
       <div className="mb-6 flex items-center justify-between">
         <div>
@@ -251,6 +255,7 @@ export default function ContagemView() {
           </div>
         </div>
         <button
+          type="button"
           onClick={sair}
           style={{
             background: 'var(--color-canvas)',
@@ -313,6 +318,7 @@ export default function ContagemView() {
             return (
               <button
                 key="back"
+                type="button"
                 onClick={() => pressKey('back')}
                 className="numkey numkey-back"
                 aria-label="Apagar"
@@ -324,6 +330,7 @@ export default function ContagemView() {
           return (
             <button
               key={t}
+              type="button"
               onClick={() => pressKey(t)}
               className="numkey"
             >
@@ -334,6 +341,7 @@ export default function ContagemView() {
       </div>
 
       <button
+        type="button"
         onClick={confirmar}
         disabled={!podeConfirmar}
         className="numkey-confirm mt-4 w-full rounded-2xl py-5"

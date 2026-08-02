@@ -121,18 +121,19 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
   }, [loading, onCancelar])
 
   return (
-    <div className="modal-overlay" onClick={onCancelar}>
+    <div className="modal-overlay" onClick={loading ? undefined : onCancelar}>
       <div
         className="modal-sheet"
         role="dialog"
         aria-modal="true"
         aria-labelledby="titulo-confirmacao-baixa"
+        aria-describedby="descricao-confirmacao-baixa"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id="titulo-confirmacao-baixa" className="m-0 mb-1 text-[1.3rem] font-extrabold">
           Confirmar baixa de produção
         </h2>
-        <p className="m-0 mb-5 text-[0.9rem] text-ink-soft">
+        <p id="descricao-confirmacao-baixa" className="m-0 mb-5 text-[0.9rem] text-ink-soft">
           {formatarData(plano.data)} · {REFEICAO_LABEL[plano.refeicao] ?? plano.refeicao}
         </p>
 
@@ -256,6 +257,7 @@ export default function ProducaoView() {
   const [loadingBaixa, setLoadingBaixa] = useState(false)
   const [resultado, setResultado] = useState(null)
   const enviandoRef = useRef(false)
+  const abrirBaixaRef = useRef(null)
 
   const redirecionarErroDeAcesso = useCallback((erro) => {
     if (erro.status !== 401 && erro.status !== 403) return false
@@ -308,7 +310,7 @@ export default function ProducaoView() {
     } catch (e) {
       if (redirecionarErroDeAcesso(e)) return
 
-      const semResposta = e.status === undefined
+      const semResposta = !e.status
       setModalAberto(false)
       if (semResposta) {
         try {
@@ -342,7 +344,14 @@ export default function ProducaoView() {
 
   function fecharResultado() {
     setResultado(null)
+    abrirBaixaRef.current?.focus()
     void carregarPlano()
+  }
+
+  function cancelarBaixa() {
+    if (loadingBaixa) return
+    setModalAberto(false)
+    abrirBaixaRef.current?.focus()
   }
 
   function sair() {
@@ -365,7 +374,7 @@ export default function ProducaoView() {
     >
       <header className="sticky top-0 z-20 bg-accent px-5 py-4 text-white">
         {plano?.previsao?.alerta_reducao && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl bg-warn px-4 py-2.5 text-[0.9rem] font-bold text-white">
+          <div role="status" className="mb-3 flex items-center gap-2 rounded-xl bg-warn px-4 py-2.5 text-[0.9rem] font-bold text-white">
             <AlertTriangle size={18} />
             Frequência abaixo de 50% da média — considere reduzir a produção
           </div>
@@ -386,7 +395,7 @@ export default function ProducaoView() {
           </div>
         </div>
 
-        <div className="refeicao-tabs">
+        <div className="refeicao-tabs" role="group" aria-label="Refeição da baixa">
           {REFEICOES.map((itemRefeicao) => (
             <button
               type="button"
@@ -418,7 +427,10 @@ export default function ProducaoView() {
         </div>
       </header>
 
-      <main style={{ flex: 1, padding: '1.25rem', paddingBottom: '7rem' }}>
+      <main
+        style={{ flex: 1, padding: '1.25rem', paddingBottom: '7rem' }}
+        aria-busy={loadingPlano}
+      >
         {loadingPlano && (
           <div role="status" style={{ textAlign: 'center', color: 'var(--color-ink-faint)', paddingTop: '3rem', fontSize: '1rem' }}>
             Carregando plano…
@@ -440,6 +452,7 @@ export default function ProducaoView() {
           >
             {erroPlano}
             <button
+              type="button"
               onClick={carregarPlano}
               style={{ display: 'block', margin: '0.75rem auto 0', fontWeight: 700, cursor: 'pointer', background: 'none', border: 'none', color: 'var(--color-err)', textDecoration: 'underline' }}
             >
@@ -474,6 +487,7 @@ export default function ProducaoView() {
             Sair
           </button>
           <button
+            ref={abrirBaixaRef}
             type="button"
             className="btn-action btn-primary flex-1"
             disabled={!plano || itensDisponiveis.length === 0 || loadingPlano || plano.baixa_realizada}
@@ -488,9 +502,7 @@ export default function ProducaoView() {
         <ModalBaixa
           plano={plano}
           onConfirmar={executarBaixa}
-          onCancelar={() => {
-            if (!loadingBaixa) setModalAberto(false)
-          }}
+          onCancelar={cancelarBaixa}
           loading={loadingBaixa}
         />
       )}

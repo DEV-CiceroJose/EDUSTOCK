@@ -23,6 +23,8 @@ describe('PinLogin (app-alunos)', () => {
 
     expect(screen.getByTestId('icone-cabecalho')).toBeInTheDocument()
     expect(screen.queryByText('🏫')).not.toBeInTheDocument()
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'false')
+    expect(screen.getByRole('button', { name: 'Apagar' })).toBeDisabled()
   })
 
   it('chama login apenas com o PIN ao completar os 4 dígitos', async () => {

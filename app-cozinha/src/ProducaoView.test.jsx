@@ -143,6 +143,18 @@ describe('ProducaoView (app-cozinha)', () => {
     expect(screen.getByRole('button', { name: 'Almoço' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Lanche da tarde' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Integral' })).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Refeição da baixa' })).toBeInTheDocument()
+  })
+
+  it('devolve o foco ao botão principal ao cancelar a confirmação', async () => {
+    renderView()
+    await screen.findByTestId('icone-categoria-alimento')
+
+    const abrir = screen.getByRole('button', { name: 'Dar Baixa de Produção' })
+    fireEvent.click(abrir)
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar' }))
+
+    await waitFor(() => expect(abrir).toHaveFocus())
   })
 
   it('bloqueia nova baixa quando a refeição já foi processada', async () => {

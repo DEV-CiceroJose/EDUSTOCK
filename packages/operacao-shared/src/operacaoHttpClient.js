@@ -1,4 +1,5 @@
 const DEFAULT_BACKOFF_MS = [500, 1500]
+const NETWORK_ERROR_MESSAGE = "Sem conexão com o sistema. Verifique a internet e tente novamente."
 
 function esperar(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -52,7 +53,12 @@ export function createOperacaoHttpClient({
       return response.json()
     }
 
-    throw ultimoErroDeRede
+    const erroDeRede = new Error(NETWORK_ERROR_MESSAGE, {
+      cause: ultimoErroDeRede,
+    })
+    erroDeRede.codigo = "erro_rede"
+    erroDeRede.status = 0
+    throw erroDeRede
   }
 
   return {

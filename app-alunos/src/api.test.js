@@ -36,7 +36,9 @@ describe('api.js — retry de rede', () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     global.fetch = fetchMock
 
-    await expect(login('1234')).rejects.toThrow('Failed to fetch')
+    await expect(login('1234')).rejects.toThrow(
+      'Sem conexão com o sistema. Verifique a internet e tente novamente.',
+    )
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 

@@ -56,5 +56,23 @@ export default defineConfig({
         baseURL: "http://127.0.0.1:4175",
       },
     },
+    {
+      name: "alunos-tablet",
+      testMatch: /alunos\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 768, height: 1024 },
+        baseURL: "http://127.0.0.1:4174",
+      },
+    },
+    {
+      name: "cozinha-tablet",
+      testMatch: /cozinha\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 768, height: 1024 },
+        baseURL: "http://127.0.0.1:4175",
+      },
+    },
   ],
 })

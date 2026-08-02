@@ -251,12 +251,15 @@ Editar `app-alunos/.env`:
 ```env
 # URL base da API Django (vazio = usa proxy do Vite)
 VITE_API_BASE=
+
+# Inatividade até o encerramento da sessão, em minutos
+VITE_IDLE_TIMEOUT_MIN=5
 ```
 
-> O app-alunos **não guarda PINs nem mapeamento de turma/turno localmente** —
+> O app-alunos **não guarda PINs nem mapeamento de turma localmente** —
 > nada disso é embutido no bundle JS. Todo PIN digitado é enviado direto para
-> `POST /api/operacao/auth/`; turma e turno da sessão vêm sempre da resposta
-> do backend. Os PINs de cada turma são cadastrados e consultados apenas via
+> `POST /api/operacao/auth/`; a turma da sessão vem sempre da resposta do
+> backend e todas as turmas operacionais são integrais. Os PINs são cadastrados apenas via
 > Django Admin, em `/admin/core/turma/` (ver seção 4.5).
 
 ```bash
@@ -282,16 +285,14 @@ Editar `app-cozinha/.env`:
 ```env
 # URL base da API Django (vazio = usa proxy do Vite)
 VITE_API_BASE=
+
+# Inatividade até o encerramento da sessão, em minutos
+VITE_IDLE_TIMEOUT_MIN=5
 ```
 
-> `VITE_PIN_COZINHA` **não é mais necessário** — deixe-o ausente/vazio. O app
-> envia o PIN digitado direto para `POST /api/operacao/auth/` e a validação
-> é sempre feita pelo backend contra `PinAcesso` (papel "Equipe da cozinha",
-> sem turma). Se a variável estiver definida, o `PinLogin.jsx` ainda faz uma
-> checagem local opcional antes de chamar o backend (só para reduzir a
-> latência percebida quando o PIN está claramente errado); ela nunca
-> substitui a validação do backend e não expõe PINs de turma alguma, já que
-> a cozinha tem um único PIN. O padrão recomendado é deixá-la sem definir.
+> O PIN digitado é enviado direto para `POST /api/operacao/auth/` e validado
+> pelo backend contra `PinAcesso` (papel "Equipe da cozinha", sem turma).
+> Nenhum PIN deve ser configurado em variáveis `VITE_*` ou incluído no bundle.
 
 ```bash
 npm run dev
@@ -328,11 +329,15 @@ OPERACAO_TOKEN_TTL_HORAS = 12
 ### 4.6 Rodar os Testes
 
 ```bash
-# Todos os testes do backend (104 testes)
+# Todos os testes do backend
 python manage.py test
 
 # Apenas o módulo de operação/merenda
 python manage.py test core.tests.test_operacao core.tests.test_operacao_spec
+
+# Testes dos sub-apps
+cd app-alunos && npm test -- --run --maxWorkers=1
+cd app-cozinha && npm test -- --run --maxWorkers=1
 
 # Testes do frontend administrativo
 cd frontend && npm test
@@ -396,7 +401,9 @@ Todos em `core/models.py`.
 
 #### Modelos do Módulo E (Merenda)
 
-**`FrequenciaDiaria`** — Contagem de alunos por turma/turno/dia.
+**`FrequenciaDiaria`** — Contagem de alunos por turma/período/dia. Novos
+registros dos representantes usam sempre `INTEGRAL`; os demais choices são
+mantidos para compatibilidade histórica e serviços administrativos.
 
 | Campo | Tipo | Notas |
 |---|---|---|
@@ -418,6 +425,18 @@ Constraint única: (`data`, `turno`, `turma`) — bloqueia duplicatas com HTTP 4
 | `gramas_por_aluno` | Decimal(6,2) | quantidade em gramas por aluno |
 | `ativo` | Boolean | padrão True |
 
+**`OperacaoBaixaProducao`** — Registro idempotente da baixa executada pela cozinha.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `operacao_id` | UUID | único; usado para repetição e reconciliação segura |
+| `data` | Date | dia da produção |
+| `refeicao` | choices | CAFE_MANHA, ALMOCO, LANCHE_TARDE |
+| `status` | choices | CONCLUIDA ou PARCIAL |
+| `resultado` | JSON | resposta persistida da operação |
+
+Constraint única: (`data`, `refeicao`) — no máximo três baixas por dia.
+
 ---
 
 #### Modelos de Autenticação por PIN
@@ -433,7 +452,7 @@ embutido no bundle JS do `app-alunos`/`app-cozinha`.
 | `nome` | CharField(50) | único, ex.: "1º DS-A" |
 | `curso` | choices | `DS` (Desenvolvimento de Sistemas), `TET` (Eletrotécnica) |
 | `ano` | PositiveSmallIntegerField | |
-| `turno` | choices | MANHA, TARDE, INTEGRAL (padrão INTEGRAL) |
+| `turno` | choices | somente INTEGRAL |
 | `ativo` | Boolean | padrão True |
 
 No admin (`/admin/core/turma/`), cada `Turma` tem um inline de até 3
@@ -445,7 +464,8 @@ No admin (`/admin/core/turma/`), cada `Turma` tem um inline de até 3
 |---|---|---|
 | `papel` | choices | `ALUNO_REP` (representante de turma) ou `COZINHA` |
 | `turma` | FK → Turma, null/blank | obrigatório para `ALUNO_REP`, deve ser nulo para `COZINHA` |
-| `pin` | CharField(4) | único, validado por regex `^\d{4}$` |
+| `pin` | CharField(128) | hash não reversível, não editável diretamente |
+| `pin_fingerprint` | CharField(64) | índice protegido e único para localizar o registro |
 | `titular` | CharField(100) | nome de quem escolheu o PIN, opcional |
 | `ativo` | Boolean | padrão True — PINs inativos são ignorados no login |
 
@@ -499,20 +519,22 @@ Tokens de admin Django são rejeitados com **HTTP 403**.
 | POST | `/api/operacao/auth/` | — | Login por PIN, retorna token de sessão |
 | DELETE | `/api/operacao/auth/logout/` | qualquer | Invalida token |
 | POST | `/api/operacao/contagem/` | ALUNO_REP | Registra frequência da turma |
-| GET | `/api/operacao/contagem/` | ALUNO_REP, COZINHA | Consulta total do dia/turno |
+| GET | `/api/operacao/contagem/` | ALUNO_REP, COZINHA | Consulta frequências do dia |
 | GET | `/api/operacao/resumo/` | Token do dashboard | Resumo do dia para o dashboard admin |
-| GET | `/api/operacao/plano-do-dia/` | COZINHA | Ordem de produção calculada |
-| POST | `/api/operacao/baixa-de-producao/` | COZINHA | Registra saídas de estoque |
+| GET | `/api/operacao/plano-do-dia/` | COZINHA | Calcula o plano da refeição selecionada |
+| POST | `/api/operacao/baixa-de-producao/` | COZINHA | Registra uma baixa idempotente por refeição |
+| GET | `/api/operacao/baixa-de-producao/` | COZINHA | Consulta o resultado por `operacao_id` |
 
 #### Login por PIN
 
 ```
 POST /api/operacao/auth/
-Body:  { "pin": "1001", "perfil": "ALUNO_REP" }
-       { "pin": "9999", "perfil": "COZINHA"   }
+Body:  { "pin": "<4-dígitos>", "perfil": "ALUNO_REP" }
+       { "pin": "<4-dígitos>", "perfil": "COZINHA"   }
 
-200:   { "token": "uuid...", "perfil": "ALUNO_REP", "turma": "6A", "turno": "MANHA" }
+200:   { "token": "uuid...", "perfil": "ALUNO_REP", "turma": "1º DS-A", "turno": "INTEGRAL" }
 401:   { "detail": "PIN inválido." }
+429:   { "detail": "Muitas tentativas de acesso..." }
 ```
 
 #### Registrar Frequência
@@ -522,7 +544,7 @@ POST /api/operacao/contagem/
 Header: X-Operacao-Token: <token-aluno>
 Body:   { "quantidade_alunos": 32, "data": "2026-06-07" }
 
-201:  { "id": 1, "data": "...", "turma": "6A", "turno": "MANHA",
+201:  { "id": 1, "data": "...", "turma": "1º DS-A", "turno": "INTEGRAL",
         "quantidade_alunos": 32,
         "previsao": { "total_alunos": 32, "media_historica": 30.5,
                       "alerta_reducao": false } }
@@ -532,11 +554,13 @@ Body:   { "quantidade_alunos": 32, "data": "2026-06-07" }
 #### Plano do Dia
 
 ```
-GET /api/operacao/plano-do-dia/?data=2026-06-07&turno=MANHA
+GET /api/operacao/plano-do-dia/?data=2026-06-07&refeicao=ALMOCO
 Header: X-Operacao-Token: <token-cozinha>
 
 200: {
-  "data": "2026-06-07", "turno": "MANHA", "total_alunos": 210,
+  "data": "2026-06-07", "turno": "INTEGRAL", "refeicao": "ALMOCO",
+  "refeicao_label": "Almoço", "baixa_realizada": false,
+  "total_alunos": 210,
   "previsao": { "alerta_reducao": false, ... },
   "itens": [
     {
@@ -554,9 +578,14 @@ Header: X-Operacao-Token: <token-cozinha>
 ```
 POST /api/operacao/baixa-de-producao/
 Header: X-Operacao-Token: <token-cozinha>
-Body:   { "data": "2026-06-07", "turno": "MANHA" }
+Body:   {
+  "data": "2026-06-07",
+  "refeicao": "ALMOCO",
+  "operacao_id": "<uuid>"
+}
 
 200: {
+  "operacao_id": "<uuid>", "refeicao": "ALMOCO", "repetida": false,
   "sucesso": 3, "falhas": 1,
   "resultados": [
     { "ok": true,  "produto_nome": "Arroz Branco", "quantidade": "16.800", ... },
@@ -564,6 +593,31 @@ Body:   { "data": "2026-06-07", "turno": "MANHA" }
   ]
 }
 ```
+
+Cada dia aceita uma baixa para `CAFE_MANHA`, uma para `ALMOCO` e uma para
+`LANCHE_TARDE`. Repetir o mesmo `operacao_id` devolve o resultado anterior sem
+movimentar o estoque novamente. Uma segunda operação para a mesma refeição e
+data retorna `409 refeicao_ja_baixada`.
+
+#### Códigos de resposta operacionais
+
+| HTTP | Código/cenário | Ação esperada no app |
+|---|---|---|
+| 400 | `payload_invalido`, `consulta_invalida`, `plano_invalido` | Corrigir os dados enviados |
+| 401 | PIN inválido, token ausente ou expirado | Limpar a sessão e solicitar o PIN |
+| 403 | Perfil incorreto ou módulo de merenda inativo | Encerrar o acesso e orientar o operador |
+| 404 | `operacao_nao_encontrada` | Manter o UUID e permitir nova tentativa segura |
+| 409 | `frequencia_duplicada` | Informar que a turma já registrou presença |
+| 409 | `operacao_id_reutilizado` | Gerar operação apenas para uma nova ação |
+| 409 | `refeicao_ja_baixada` | Exibir o resultado já registrado |
+| 429 | Limite de tentativas de PIN | Respeitar `Retry-After` antes de tentar novamente |
+
+Falhas sem resposta HTTP são exibidas como indisponibilidade de conexão. A
+contagem e as consultas podem repetir automaticamente; a baixa nunca recebe
+retry cego e é reconciliada por `operacao_id`.
+
+O roteiro de operação, smoke tests pós-deploy e riscos restantes está em
+[`docs/OPERACAO_SUBAPPS.md`](docs/OPERACAO_SUBAPPS.md).
 
 ---
 
@@ -614,8 +668,12 @@ def post(self, request):
 - **`ProdutoSerializer`** — expõe `grupo_nome`, `categoria`, `categoria_nome`, `fornecedor_nome` como campos somente-leitura. Campo `quantidade` é somente-leitura (controlado por service).
 - **`EntradaSerializer`** — nested write para `itens`; `create()` delega para `registrar_entrada()`.
 - **`MovimentacaoSerializer`** — `entrada` somente-leitura.
+- **`PlanoProducaoQuerySerializer`** — valida `data` e uma das três refeições.
+- **`BaixaProducaoRequestSerializer`** — valida data, refeição, UUID idempotente e itens opcionais.
+- **`ConsultaBaixaProducaoSerializer`** — valida o UUID usado na reconciliação de uma baixa.
 
-Os endpoints de operação **não usam serializers DRF** — retornam dicts Python diretamente para evitar expor campos financeiros por acidente.
+As respostas operacionais continuam sendo dicionários controlados pelos
+serviços, sem expor campos financeiros.
 
 ---
 
@@ -691,6 +749,9 @@ Retorna JSON agrupado por fornecedor e NF. Suporta dados legados (produtos com N
 | `0012` | Ajuste de `registrado_por_turma` em `FrequenciaDiaria` |
 | `0013` | Modelos `Turma` e `PinAcesso` (substituem os PINs hardcoded em `settings.py`/`.env`) |
 | `0014` | Seed de dados: as 12 turmas reais da escola |
+| `0015`–`0018` | Remoção do perfil legado, proteção de PIN/cache, índices e configuração de alertas |
+| `0019` | Persistência das operações idempotentes de baixa de produção |
+| `0020` | Turmas somente integrais e três refeições diárias independentes |
 
 ---
 
@@ -749,12 +810,13 @@ Abrir app → /login (PinLogin)
   └─ Auto-confirma ao completar
   └─ POST /api/operacao/auth/ { pin, perfil: "ALUNO_REP" }
        (única validação — não há PIN nem turma copiados localmente)
-  └─ Sessão (token + turma + turno, vindos da resposta do backend)
+  └─ Sessão (token + turma integral, vindos da resposta do backend)
        salva em sessionStorage
 
 → /registrar (ContagemView)
-  └─ Exibe turma e turno (somente leitura)
+  └─ Exibe turma e informa "Período integral"
   └─ Teclado numérico grande (botões ≥ 64px, fonte ≥ 24px)
+  └─ Aceita de 1 a 45 alunos; frontend e backend validam o limite
   └─ POST /api/operacao/contagem/
   └─ Tela de sucesso: número + variação em relação à média
        Ex.: "32 alunos — +5% em relação à média"
@@ -770,11 +832,13 @@ Abrir app → /login (PinLogin)
 | `src/App.jsx` | Roteamento + guarda de rota (redireciona sem sessão) |
 | `src/PinLogin.jsx` | Teclado 4 dígitos, auto-confirma, envia direto ao backend |
 | `src/ContagemView.jsx` | Display numérico, teclado, estados: idle/loading/sucesso/erro |
+| `../packages/operacao-shared/` | Login por PIN, cliente HTTP e tokens visuais compartilhados |
 
 ### Variáveis de ambiente
 
 ```env
 VITE_API_BASE=                        # vazio = usa proxy do Vite
+VITE_IDLE_TIMEOUT_MIN=5               # minutos; padrão 5
 ```
 
 > Não há mais `VITE_PINS`/`VITE_TURNOS` — o app não guarda PIN nem
@@ -795,7 +859,7 @@ Abrir app → /login (PinLogin)
   └─ POST /api/operacao/auth/ { perfil: "COZINHA" }
 
 → /producao (ProducaoView)
-  └─ Cabeçalho: data atual + chips de turno (Manhã/Tarde/Integral)
+  └─ Cabeçalho: data atual + Café da manhã/Almoço/Lanche da tarde
   └─ Total de alunos do dia em destaque
   └─ Banner amarelo se alerta_reducao=true
   └─ Cards de receita por produto:
@@ -806,7 +870,8 @@ Abrir app → /login (PinLogin)
   └─ Botão "Dar Baixa de Produção" fixo no rodapé
        - Desabilitado se nenhum item disponível
        - Clique → modal de confirmação listando itens + quantidades
-       - Confirmar → POST /api/operacao/baixa-de-producao/
+       - Confirmar → POST idempotente em /api/operacao/baixa-de-producao/
+       - Cada refeição aceita somente uma baixa por dia
        - Modal de resultado: sucessos e falhas individualizados
 ```
 
@@ -814,23 +879,24 @@ Abrir app → /login (PinLogin)
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `src/api.js` | `login()`, `logout()`, `isLoggedIn()`, `getPlano()`, `baixaProducao()` |
+| `src/api.js` | Sessão, plano, UUID pendente, baixa e consulta de reconciliação |
 | `src/App.jsx` | Roteamento + guarda de rota |
-| `src/PinLogin.jsx` | Teclado 4 dígitos, envia direto ao backend; `VITE_PIN_COZINHA` opcional só faz uma checagem local extra |
+| `src/PinLogin.jsx` | Teclado de 4 dígitos; a validação ocorre somente no backend |
 | `src/ProducaoView.jsx` | Cabeçalho, cards, modal de confirmação, modal de resultado |
+| `../packages/operacao-shared/` | Login por PIN, cliente HTTP e tokens visuais compartilhados |
 
 ### Variáveis de ambiente
 
 ```env
-VITE_PIN_COZINHA=          # opcional — deixe vazio; validação real é sempre no backend
 VITE_API_BASE=             # vazio = usa proxy do Vite
+VITE_IDLE_TIMEOUT_MIN=5    # minutos; padrão 5
 ```
 
 ---
 
 ## 9. Testes
 
-### Backend (104 testes, todos passando)
+### Backend
 
 ```bash
 python manage.py test
@@ -895,21 +961,24 @@ Merendeira abre app → digita PIN da cozinha
     │
     ▼ POST /api/operacao/auth/ { pin, perfil: "COZINHA" }
     │
-    ▼ GET /api/operacao/plano-do-dia/?data=...&turno=MANHA
+    ▼ Seleciona café da manhã, almoço ou lanche da tarde
+    │
+    ▼ GET /api/operacao/plano-do-dia/?data=...&refeicao=ALMOCO
        Para cada FatorConsumo ativo:
-         quantidade = gramas_por_aluno × total_alunos / 1000
+         quantidade = gramas_por_aluno × frequência integral / 1000
          estoque_insuficiente = saldo_atual < quantidade
     │
     ▼ Cards de receita exibidos
     │
     ▼ "Dar Baixa de Produção" → modal de confirmação
     │
-    ▼ POST /api/operacao/baixa-de-producao/
+    ▼ POST /api/operacao/baixa-de-producao/ com operacao_id único
        Para cada item:
          registrar_movimentacao(tipo=SAIDA, motivo="consumo")
          [transação atômica POR ITEM — falha não cancela demais]
     │
     ▼ Modal de resultado: sucessos e falhas individualizados
+       Uma repetição recupera o resultado sem movimentar o estoque novamente
 ```
 
 ### 10.3 Registro de Entrada em Lote (admin)
@@ -949,9 +1018,10 @@ Para o Módulo E funcionar com dados reais, configure `FatorConsumo` para os pro
 | B — Fornecedores | 2026-06-04 | Modelo Fornecedor, API, UI |
 | C — Movimentações | 2026-06-04 | Entrada, Movimentacao (append-only), services atômicos, alertas |
 | D — Relatórios | 2026-06-07 | Prestação de contas, exportação CSV/PDF |
-| E — Merenda | 2026-06-07 | FrequenciaDiaria, FatorConsumo, endpoints /operacao/*, autenticação PIN, app-alunos, app-cozinha, 104 testes |
+| E — Merenda | 2026-06-07 | FrequenciaDiaria, FatorConsumo, endpoints /operacao/*, autenticação PIN, app-alunos e app-cozinha |
 | Fix CSS | 2026-06-07 | `padding` shorthand sobrescrevia `pl-10` na barra de busca |
 | Turmas/PINs no banco | 2026-07-18 | Modelos `Turma`/`PinAcesso` substituem `OPERACAO_PINS_ALUNOS`/`OPERACAO_PIN_COZINHA` (settings.py) e `VITE_PINS`/`VITE_TURNOS`/`VITE_PIN_COZINHA` (env do app-alunos); corrige vazamento de PINs no bundle JS público — gestão passa a ser 100% via Django Admin |
+| Sub-apps operacionais | 2026-08-02 | Presença integral limitada a 45, baixas idempotentes por três refeições, revisão de acessibilidade e documentação operacional |
 
 ---
 
@@ -1004,8 +1074,9 @@ cd app-cozinha && npm run build
 |---|---|---|---|
 | frontend | `VITE_USE_MOCK` | `true` | `false` para usar backend real |
 | app-alunos | `VITE_API_BASE` | `""` | URL base da API (vazio = proxy Vite) |
-| app-cozinha | `VITE_PIN_COZINHA` | — | opcional, deixe vazio; checagem local extra apenas |
+| app-alunos | `VITE_IDLE_TIMEOUT_MIN` | `5` | Inatividade até o logout, em minutos |
 | app-cozinha | `VITE_API_BASE` | `""` | URL base da API |
+| app-cozinha | `VITE_IDLE_TIMEOUT_MIN` | `5` | Inatividade até o logout, em minutos |
 
 > PINs não são mais variáveis de ambiente. São geridos via Django Admin
 > (modelos `Turma`/`PinAcesso`, seção 4.5/5.1).
@@ -1038,4 +1109,4 @@ OPERACAO_TOKEN_TTL_HORAS = 12
 
 ---
 
-*Documentação atualizada em 18 de julho de 2026 — branches: `tudo-finalizado-mas-feio` (baseline), `apps-merenda-e-alunosv1` (Módulo E) e `worktree-turmas-pins-preco` (PINs movidos para os modelos `Turma`/`PinAcesso`, geridos via Django Admin).*
+*Documentação atualizada em 2 de agosto de 2026 na branch `new/subapps-fases-2-3`.*
