@@ -210,6 +210,11 @@ Acesse cada URL e teste:
 - **Alunos**: https://edustock-alunos.onrender.com (PIN cadastrado no Django Admin, por turma)
 - **Admin Django**: https://edustock-backend.onrender.com/admin
 
+Os apps **Cozinha** e **Alunos** são PWAs. Depois do primeiro acesso por HTTPS,
+podem ser instalados pela opção **Instalar app** do navegador (no iPhone/iPad,
+use **Compartilhar → Adicionar à Tela de Início**). Cada app recebe nome e ícone
+próprios e abre em uma janela independente do navegador.
+
 ## ⚡ Plano Gratuito da Render
 
 **Limitações do plano Free:**
