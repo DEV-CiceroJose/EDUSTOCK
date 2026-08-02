@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Os aplicativos **EasyStock Alunos** e **EasyStock Cozinha** foram transformados
+Os aplicativos **EduStock Alunos** e **EduStock Cozinha** foram transformados
 em Progressive Web Apps (PWAs). Com isso, continuam funcionando como sites e
 também podem ser instalados diretamente pelo navegador, sem precisar publicar
 um aplicativo nas lojas Google Play ou App Store.
@@ -147,7 +147,7 @@ não é possível:
 - consultar o plano de produção;
 - registrar a produção da cozinha;
 - consultar ou registrar frequência de alunos;
-- sincronizar alterações com o EasyStock.
+- sincronizar alterações com o EduStock.
 
 O cache atual evita uma tela totalmente indisponível, mas não implementa coleta
 offline nem sincronização posterior de dados.
@@ -178,8 +178,8 @@ Foram executadas as seguintes verificações:
 - conferência de que manifestos, ícones, service workers, CSS e JavaScript foram
   copiados para os dois diretórios `dist`;
 - build de produção dos dois aplicativos;
-- suíte de testes do app Alunos: **22 testes aprovados**;
-- suíte de testes do app Cozinha: **25 testes aprovados**.
+- suíte de testes do app Alunos: **23 testes aprovados**;
+- suíte de testes do app Cozinha: **26 testes aprovados**.
 
 ## O que ainda falta
 

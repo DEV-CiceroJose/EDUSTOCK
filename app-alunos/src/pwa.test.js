@@ -10,7 +10,7 @@ describe("PWA do App Alunos", () => {
     const manifest = JSON.parse(ler("public/manifest.webmanifest"))
     const html = ler("index.html")
 
-    expect(manifest.name).toBe("EasyStock Alunos")
+    expect(manifest.name).toBe("EduStock Alunos")
     expect(manifest.start_url).toBe("/login")
     expect(manifest.display).toBe("standalone")
     expect(manifest.icons.map((icone) => icone.sizes)).toEqual(["192x192", "512x512"])

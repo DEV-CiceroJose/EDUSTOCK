@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "EasyStock Cozinha",
+  "name": "EduStock Cozinha",
   "short_name": "Cozinha",
-  "description": "Registro de produção da cozinha escolar no EasyStock.",
+  "description": "Registro de produção da cozinha escolar no EduStock.",
   "lang": "pt-BR",
   "start_url": "/login",
   "scope": "/",

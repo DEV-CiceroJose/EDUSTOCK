@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { CheckCircle2, AlertTriangle, Delete } from 'lucide-react'
+import { Backspace } from '@phosphor-icons/react/Backspace'
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle'
+import { Warning } from '@phosphor-icons/react/Warning'
 import { getSessao, registrarContagem, limparSessao, logout } from './api.js'
 
 const MAX_ALUNOS_POR_TURMA = 45
@@ -103,7 +105,7 @@ export default function ContagemView() {
             className="mx-auto mb-5 grid place-items-center rounded-full text-ok"
             style={{ width: 80, height: 80, background: 'var(--color-ok-tint)' }}
           >
-            <CheckCircle2 size={40} data-testid="icone-sucesso" />
+            <CheckCircle size={40} weight="duotone" data-testid="icone-sucesso" />
           </div>
 
           <p style={{ fontSize: '1rem', color: 'var(--color-ink-soft)', margin: 0 }}>
@@ -130,7 +132,7 @@ export default function ContagemView() {
               className="mt-4 flex items-center justify-center gap-1.5 text-[0.95rem] font-semibold"
               style={{ color: alerta ? 'var(--color-warn)' : 'var(--color-ink-soft)' }}
             >
-              {alerta && <AlertTriangle size={16} />}
+              {alerta && <Warning size={16} weight="fill" />}
               {variacao}
             </p>
           )}
@@ -180,7 +182,7 @@ export default function ContagemView() {
             className="mx-auto mb-5 grid place-items-center rounded-full text-err"
             style={{ width: 80, height: 80, background: 'var(--color-err-tint)' }}
           >
-            <AlertTriangle size={40} data-testid="icone-erro" />
+            <Warning size={40} weight="duotone" data-testid="icone-erro" />
           </div>
           <p
             style={{
@@ -323,7 +325,7 @@ export default function ContagemView() {
                 className="numkey numkey-back"
                 aria-label="Apagar"
               >
-                <Delete size={22} />
+                <Backspace size={22} weight="bold" />
               </button>
             )
           }

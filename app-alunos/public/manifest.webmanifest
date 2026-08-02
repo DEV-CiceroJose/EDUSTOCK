@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "EasyStock Alunos",
+  "name": "EduStock Alunos",
   "short_name": "Alunos",
-  "description": "Registro de frequência escolar do EasyStock.",
+  "description": "Registro de frequência escolar do EduStock.",
   "lang": "pt-BR",
   "start_url": "/login",
   "scope": "/",

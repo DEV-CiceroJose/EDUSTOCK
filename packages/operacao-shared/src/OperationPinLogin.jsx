@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 const TECLAS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"]
 
@@ -11,10 +11,24 @@ export default function OperationPinLogin({
   onSuccess,
   notice = "",
   fallbackError = "PIN inválido. Tente novamente.",
+  disabled = false,
+  disabledNotice = "",
+  footer = null,
+  backspaceIcon = "⌫",
 }) {
   const [pin, setPin] = useState("")
   const [erro, setErro] = useState("")
   const [loading, setLoading] = useState(false)
+  const [slowLoading, setSlowLoading] = useState(false)
+
+  useEffect(() => {
+    if (!loading) {
+      setSlowLoading(false)
+      return undefined
+    }
+    const timer = window.setTimeout(() => setSlowLoading(true), 1500)
+    return () => window.clearTimeout(timer)
+  }, [loading])
 
   const confirmar = useCallback(async (pinValue) => {
     if (pinValue.length !== 4) return
@@ -46,7 +60,7 @@ export default function OperationPinLogin({
 
   return (
     <main
-      className="mx-auto flex min-h-screen max-w-[420px] flex-col items-center justify-center bg-white px-6 py-10"
+      className="operation-pin-shell"
       aria-busy={loading}
     >
       <div className="mb-8 text-center">
@@ -72,7 +86,13 @@ export default function OperationPinLogin({
         ))}
       </div>
 
-      {notice && !erro && (
+      {disabled && disabledNotice && (
+        <div role="status" aria-live="polite" className="mb-4 w-full rounded-2xl bg-err-tint px-4 py-3 text-center text-[0.95rem] font-semibold text-err">
+          {disabledNotice}
+        </div>
+      )}
+
+      {notice && !erro && !disabled && (
         <div role="status" aria-live="polite" className="mb-4 w-full rounded-2xl bg-warn-tint px-4 py-3 text-center text-[0.95rem] font-semibold text-warn">
           {notice}
         </div>
@@ -95,9 +115,9 @@ export default function OperationPinLogin({
                 onClick={() => pressKey("back")}
                 className="numkey numkey-back"
                 aria-label="Apagar"
-                disabled={loading || pin.length === 0}
+                disabled={disabled || loading || pin.length === 0}
               >
-                ⌫
+                {backspaceIcon}
               </button>
             )
           }
@@ -107,7 +127,7 @@ export default function OperationPinLogin({
               type="button"
               onClick={() => pressKey(key)}
               className="numkey"
-              disabled={loading || pin.length >= 4}
+              disabled={disabled || loading || pin.length >= 4}
             >
               {key}
             </button>
@@ -116,8 +136,12 @@ export default function OperationPinLogin({
       </div>
 
       {loading && (
-        <p role="status" aria-live="polite" className="mt-6 text-center text-[0.95rem] text-ink-soft">Verificando…</p>
+        <p role="status" aria-live="polite" className="mt-6 text-center text-[0.95rem] text-ink-soft">
+          {slowLoading ? "Servidor iniciando, aguarde…" : "Verificando…"}
+        </p>
       )}
+
+      {footer}
     </main>
   )
 }
