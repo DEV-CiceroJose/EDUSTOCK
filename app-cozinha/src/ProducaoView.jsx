@@ -5,18 +5,18 @@ import {
   concluirOperacaoPendente,
   consultarBaixa,
   getPlano,
+  getStatusDoDia,
   limparSessao,
   logout,
   obterOperacaoPendente,
 } from './api.js'
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Droplets,
-  Package,
-  RefreshCw,
-  UtensilsCrossed,
-} from 'lucide-react'
+import { ArrowsClockwise } from '@phosphor-icons/react/ArrowsClockwise'
+import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank'
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle'
+import { Drop } from '@phosphor-icons/react/Drop'
+import { ForkKnife } from '@phosphor-icons/react/ForkKnife'
+import { Package } from '@phosphor-icons/react/Package'
+import { Warning } from '@phosphor-icons/react/Warning'
 
 const REFEICOES = [
   { key: 'CAFE_MANHA', label: 'Café da manhã' },
@@ -53,12 +53,12 @@ function refeicaoAtual() {
 function IconeCategoria({ nome }) {
   const n = (nome ?? '').toLowerCase()
   if (n.includes('alimento') || n.includes('merenda') || n.includes('refeit')) {
-    return <UtensilsCrossed size={24} data-testid="icone-categoria-alimento" />
+    return <ForkKnife size={24} weight="duotone" data-testid="icone-categoria-alimento" />
   }
   if (n.includes('limpeza') || n.includes('higie')) {
-    return <Droplets size={24} data-testid="icone-categoria-limpeza" />
+    return <Drop size={24} weight="duotone" data-testid="icone-categoria-limpeza" />
   }
-  return <Package size={24} data-testid="icone-categoria-padrao" />
+  return <Package size={24} weight="duotone" data-testid="icone-categoria-padrao" />
 }
 
 /* ─── Card de produto ─────────────────────────────────────────────────── */
@@ -91,7 +91,7 @@ function CardProduto({ item }) {
         </div>
         {item.estoque_insuficiente && (
           <div className="stock-warning">
-            <AlertTriangle size={14} /> Estoque insuficiente
+            <Warning size={14} weight="fill" /> Estoque insuficiente
           </div>
         )}
       </div>
@@ -160,7 +160,7 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
         >
           {loading ? 'Registrando…' : (
             <>
-              <CheckCircle2 size={20} /> Dar baixa
+              <CheckCircle size={20} weight="bold" /> Dar baixa
             </>
           )}
         </button>
@@ -178,7 +178,7 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
 
 /* ─── Modal de resultado da baixa ───────────────────────────────────── */
 function ModalResultado({ resultado, onFechar }) {
-  const IconeResultado = resultado.falhas === 0 ? CheckCircle2 : AlertTriangle
+  const IconeResultado = resultado.falhas === 0 ? CheckCircle : Warning
   const corIcone = resultado.falhas === 0 ? 'text-ok' : 'text-warn'
   const fecharRef = useRef(null)
 
@@ -246,6 +246,8 @@ export default function ProducaoView() {
   const [loadingPlano, setLoadingPlano] = useState(false)
   const [erroPlano, setErroPlano] = useState('')
   const [ultimaSincronizacao, setUltimaSincronizacao] = useState('')
+  const [statusRefeicoes, setStatusRefeicoes] = useState({})
+  const [historicoRecente, setHistoricoRecente] = useState([])
   const [modalAberto, setModalAberto] = useState(false)
   const [loadingBaixa, setLoadingBaixa] = useState(false)
   const [resultado, setResultado] = useState(null)
@@ -271,9 +273,16 @@ export default function ProducaoView() {
     setLoadingPlano(true)
     setErroPlano('')
     try {
-      const p = await getPlano(data, refeicao)
+      const [p, statusDia] = await Promise.all([
+        getPlano(data, refeicao),
+        getStatusDoDia(data),
+      ])
       setPlano(p)
-      setUltimaSincronizacao(new Date().toLocaleTimeString('pt-BR', {
+      setStatusRefeicoes(Object.fromEntries(
+        statusDia.refeicoes.map((item) => [item.refeicao, item]),
+      ))
+      setHistoricoRecente(statusDia.historico_recente ?? [])
+      setUltimaSincronizacao(new Date(statusDia.sincronizado_em).toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -368,7 +377,7 @@ export default function ProducaoView() {
       <header className="sticky top-0 z-20 bg-accent px-5 py-4 text-white">
         {plano?.previsao?.alerta_reducao && (
           <div role="status" className="mb-3 flex items-center gap-2 rounded-xl bg-warn px-4 py-2.5 text-[0.9rem] font-bold text-white">
-            <AlertTriangle size={18} />
+            <Warning size={18} weight="fill" />
             Frequência abaixo de 50% da média — considere reduzir a produção
           </div>
         )}
@@ -394,9 +403,12 @@ export default function ProducaoView() {
               type="button"
               key={itemRefeicao.key}
               onClick={() => setRefeicao(itemRefeicao.key)}
-              className={`refeicao-chip${refeicao === itemRefeicao.key ? ' active' : ''}`}
+              className={`refeicao-chip${refeicao === itemRefeicao.key ? ' active' : ''}${statusRefeicoes[itemRefeicao.key]?.baixa_realizada ? ' completed' : ''}`}
               aria-pressed={refeicao === itemRefeicao.key}
             >
+              {statusRefeicoes[itemRefeicao.key]?.baixa_realizada && (
+                <CheckCircle size={16} weight="fill" aria-hidden="true" />
+              )}
               {itemRefeicao.label}
             </button>
           ))}
@@ -414,7 +426,7 @@ export default function ProducaoView() {
             disabled={loadingPlano}
             className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3 py-2 font-bold text-white disabled:cursor-wait disabled:opacity-60"
           >
-            <RefreshCw size={15} className={loadingPlano ? 'animate-spin' : ''} />
+            <ArrowsClockwise size={15} weight="bold" className={loadingPlano ? 'animate-spin' : ''} />
             Atualizar
           </button>
         </div>
@@ -467,6 +479,26 @@ export default function ProducaoView() {
               <CardProduto key={item.produto_id} item={item} />
             ))}
           </div>
+        )}
+
+        {!loadingPlano && historicoRecente.length > 0 && (
+          <details className="mt-5 rounded-2xl border border-line bg-surface p-4">
+            <summary className="flex cursor-pointer list-none items-center gap-2 font-bold text-brand">
+              <CalendarBlank size={20} weight="duotone" /> Histórico de baixas
+            </summary>
+            <div className="mt-3 flex flex-col gap-2">
+              {historicoRecente.map((registro) => (
+                <div key={`${registro.data}-${registro.refeicao}`} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-ink-soft">
+                    {formatarData(registro.data)} · {registro.refeicao_label}
+                  </span>
+                  <strong className={registro.status === 'CONCLUIDA' ? 'text-ok' : 'text-warn'}>
+                    {registro.status === 'CONCLUIDA' ? 'Concluída' : 'Parcial'}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </details>
         )}
       </main>
 

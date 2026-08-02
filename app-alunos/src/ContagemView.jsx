@@ -1,9 +1,19 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { CheckCircle2, AlertTriangle, Delete } from 'lucide-react'
-import { getSessao, registrarContagem, limparSessao, logout } from './api.js'
+import { Backspace } from '@phosphor-icons/react/Backspace'
+import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank'
+import { CheckCircle } from '@phosphor-icons/react/CheckCircle'
+import { SpinnerGap } from '@phosphor-icons/react/SpinnerGap'
+import { Warning } from '@phosphor-icons/react/Warning'
+import { getSessao, getStatusDoDia, registrarContagem, limparSessao, logout } from './api.js'
 
 const MAX_ALUNOS_POR_TURMA = 45
+
+function formatarData(iso) {
+  if (!iso) return ''
+  const [ano, mes, dia] = iso.slice(0, 10).split('-')
+  return `${dia}/${mes}/${ano}`
+}
 
 /**
  * Formata a variação percentual em relação à média histórica.
@@ -23,9 +33,10 @@ export default function ContagemView() {
   const sessao = getSessao()
 
   const [numero, setNumero] = useState('')    // string de dígitos do teclado
-  const [estado, setEstado] = useState('idle') // 'idle' | 'loading' | 'sucesso' | 'erro'
+  const [estado, setEstado] = useState('carregando') // carregando | idle | loading | sucesso | erro
   const [resultado, setResultado] = useState(null)
   const [mensagemErro, setMensagemErro] = useState('')
+  const [ultimaSincronizacao, setUltimaSincronizacao] = useState('')
   const enviandoRef = useRef(false)
 
   const pressKey = useCallback((val) => {
@@ -36,6 +47,51 @@ export default function ContagemView() {
       setNumero((n) => n + val)
     }
   }, [estado, numero])
+
+  const carregarStatus = useCallback(async () => {
+    if (!sessao) return
+    setEstado('carregando')
+    setMensagemErro('')
+    try {
+      const statusDia = await getStatusDoDia()
+      setUltimaSincronizacao(new Date(statusDia.sincronizado_em).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }))
+      if (statusDia.frequencia_registrada) {
+        setResultado({
+          turma: statusDia.turma,
+          turno: statusDia.turno,
+          quantidade_alunos: statusDia.frequencia.quantidade_alunos,
+          registrada_em: statusDia.frequencia.registrada_em,
+          recuperado: true,
+          historico_recente: statusDia.historico_recente ?? [],
+        })
+        setEstado('sucesso')
+      } else {
+        setEstado('idle')
+      }
+    } catch (erro) {
+      if (erro.status === 401) {
+        limparSessao()
+        navigate('/login', {
+          replace: true,
+          state: { message: 'Sua sessão expirou. Digite o PIN novamente.' },
+        })
+        return
+      }
+      setMensagemErro(
+        erro.status === 403
+          ? erro.message
+          : 'Não foi possível confirmar o registro do dia. Verifique a conexão e tente novamente.'
+      )
+      setEstado('erro')
+    }
+  }, [navigate, sessao?.turma])
+
+  useEffect(() => {
+    void carregarStatus()
+  }, [carregarStatus])
 
   // Mantém a ordem dos hooks e redireciona se a sessão expirou.
   if (!sessao) {
@@ -51,7 +107,15 @@ export default function ContagemView() {
     setEstado('loading')
     try {
       const data = await registrarContagem(qtd)
-      setResultado(data)
+      const statusAtualizado = await getStatusDoDia()
+      setResultado({
+        ...data,
+        historico_recente: statusAtualizado.historico_recente ?? [],
+      })
+      setUltimaSincronizacao(new Date(statusAtualizado.sincronizado_em).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }))
       setEstado('sucesso')
     } catch (e) {
       if (e.status === 401) {
@@ -76,16 +140,18 @@ export default function ContagemView() {
     }
   }
 
-  function reiniciar() {
-    setNumero('')
-    setEstado('idle')
-    setResultado(null)
-    setMensagemErro('')
-  }
-
   function sair() {
     void logout()
     navigate('/login', { replace: true })
+  }
+
+  if (estado === 'carregando') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
+        <SpinnerGap size={36} weight="bold" className="mb-4 animate-spin text-brand" />
+        <p className="font-semibold text-ink-soft">Sincronizando o registro de hoje…</p>
+      </div>
+    )
   }
 
   /* ---- Tela de Sucesso ---- */
@@ -103,12 +169,18 @@ export default function ContagemView() {
             className="mx-auto mb-5 grid place-items-center rounded-full text-ok"
             style={{ width: 80, height: 80, background: 'var(--color-ok-tint)' }}
           >
-            <CheckCircle2 size={40} data-testid="icone-sucesso" />
+            <CheckCircle size={40} weight="duotone" data-testid="icone-sucesso" />
           </div>
 
           <p style={{ fontSize: '1rem', color: 'var(--color-ink-soft)', margin: 0 }}>
             Turma {resultado.turma} — Período integral
           </p>
+
+          {resultado.recuperado && (
+            <p className="mt-3 font-semibold text-ok">
+              A frequência desta turma já foi enviada hoje.
+            </p>
+          )}
 
           <div
             style={{
@@ -130,7 +202,7 @@ export default function ContagemView() {
               className="mt-4 flex items-center justify-center gap-1.5 text-[0.95rem] font-semibold"
               style={{ color: alerta ? 'var(--color-warn)' : 'var(--color-ink-soft)' }}
             >
-              {alerta && <AlertTriangle size={16} />}
+              {alerta && <Warning size={16} weight="fill" />}
               {variacao}
             </p>
           )}
@@ -148,7 +220,29 @@ export default function ContagemView() {
               Frequência abaixo de 50% da média histórica
             </div>
           )}
+
+          {ultimaSincronizacao && (
+            <p className="mt-4 text-sm text-ink-faint">
+              Sincronizado às {ultimaSincronizacao}
+            </p>
+          )}
         </div>
+
+        {resultado.historico_recente?.length > 0 && (
+          <section className="mt-5 w-full rounded-2xl border border-line bg-canvas p-4" aria-labelledby="historico-turma">
+            <h2 id="historico-turma" className="mb-3 flex items-center gap-2 text-base font-bold text-brand">
+              <CalendarBlank size={20} weight="duotone" /> Histórico recente
+            </h2>
+            <div className="flex flex-col gap-2">
+              {resultado.historico_recente.map((registro) => (
+                <div key={`${registro.data}-${registro.criado_em}`} className="flex items-center justify-between text-sm">
+                  <span className="text-ink-soft">{formatarData(registro.data)}</span>
+                  <strong>{registro.quantidade_alunos} alunos</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <button
           type="button"
@@ -180,7 +274,7 @@ export default function ContagemView() {
             className="mx-auto mb-5 grid place-items-center rounded-full text-err"
             style={{ width: 80, height: 80, background: 'var(--color-err-tint)' }}
           >
-            <AlertTriangle size={40} data-testid="icone-erro" />
+            <Warning size={40} weight="duotone" data-testid="icone-erro" />
           </div>
           <p
             style={{
@@ -196,7 +290,7 @@ export default function ContagemView() {
 
         <button
           type="button"
-          onClick={reiniciar}
+          onClick={carregarStatus}
           className="mt-6 w-full rounded-2xl py-4"
           style={{
             background: 'var(--color-brand)',
@@ -243,7 +337,7 @@ export default function ContagemView() {
     <div
       className="flex min-h-screen flex-col bg-white px-6 pb-8 pt-6"
       style={{ maxWidth: 420, margin: '0 auto' }}
-      aria-busy={estado === 'loading'}
+      aria-busy={estado === 'loading' || estado === 'carregando'}
     >
       <div className="mb-6 flex items-center justify-between">
         <div>
@@ -278,6 +372,12 @@ export default function ContagemView() {
       >
         Quantos alunos estão presentes?
       </p>
+
+      {ultimaSincronizacao && (
+        <p className="mb-2 text-center text-xs text-ink-faint">
+          Sincronizado às {ultimaSincronizacao}
+        </p>
+      )}
 
       <div
         className="pin-display mb-6 flex items-center justify-center"
@@ -323,7 +423,7 @@ export default function ContagemView() {
                 className="numkey numkey-back"
                 aria-label="Apagar"
               >
-                <Delete size={22} />
+                <Backspace size={22} weight="bold" />
               </button>
             )
           }

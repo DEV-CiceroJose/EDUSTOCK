@@ -82,6 +82,15 @@ export async function getPlano(data, refeicao) {
   )
 }
 
+export async function getStatusDoDia(data) {
+  return http.request(
+    "GET",
+    `/api/operacao/status-do-dia/?data=${encodeURIComponent(data)}`,
+    undefined,
+    { retry: true },
+  )
+}
+
 export async function baixaProducao(data, refeicao, itens, operacaoId = obterOperacaoPendente(data, refeicao)) {
   const body = { data, refeicao, operacao_id: operacaoId }
   if (itens) body.itens = itens

@@ -111,11 +111,20 @@ html, body, #root {
   color: var(--color-brand-dark);
   cursor: pointer;
   transition: background 100ms, border-color 100ms, color 100ms;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
 }
 .refeicao-chip.active {
   background: var(--color-brand);
   border-color: var(--color-brand);
   color: #fff;
+}
+.refeicao-chip.completed:not(.active) {
+  background: var(--color-ok-tint);
+  border-color: color-mix(in srgb, var(--color-ok) 35%, transparent);
+  color: var(--color-ok);
 }
 
 @media (min-width: 520px) {

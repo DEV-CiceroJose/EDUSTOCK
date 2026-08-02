@@ -1,12 +1,15 @@
 import { useCallback } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { School } from "lucide-react"
-import { OperationPinLogin } from "@edustock/operacao-shared"
+import { Backspace } from "@phosphor-icons/react/Backspace"
+import { GraduationCap } from "@phosphor-icons/react/GraduationCap"
+import { OperationPinLogin, usePwaLifecycle } from "@edustock/operacao-shared"
 import { login } from "./api.js"
+import PwaControls from "./PwaControls.jsx"
 
 export default function PinLogin() {
   const navigate = useNavigate()
   const location = useLocation()
+  const pwa = usePwaLifecycle()
   const onSuccess = useCallback(
     () => navigate("/registrar", { replace: true }),
     [navigate],
@@ -14,12 +17,16 @@ export default function PinLogin() {
 
   return (
     <OperationPinLogin
-      title="Frequência"
+      title="EduStock Alunos"
       subtitle="Digite o PIN da sua turma"
-      icon={<School size={32} data-testid="icone-cabecalho" />}
+      icon={<GraduationCap size={34} weight="duotone" data-testid="icone-cabecalho" />}
       login={login}
       onSuccess={onSuccess}
       notice={location.state?.message}
+      disabled={!pwa.online}
+      disabledNotice="Sem conexão. Conecte o dispositivo à internet para entrar."
+      footer={<PwaControls pwa={pwa} />}
+      backspaceIcon={<Backspace size={22} weight="bold" />}
     />
   )
 }

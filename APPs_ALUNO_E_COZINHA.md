@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Os aplicativos **EasyStock Alunos** e **EasyStock Cozinha** foram transformados
+Os aplicativos **EduStock Alunos** e **EduStock Cozinha** foram transformados
 em Progressive Web Apps (PWAs). Com isso, continuam funcionando como sites e
 também podem ser instalados diretamente pelo navegador, sem precisar publicar
 um aplicativo nas lojas Google Play ou App Store.
@@ -147,18 +147,20 @@ não é possível:
 - consultar o plano de produção;
 - registrar a produção da cozinha;
 - consultar ou registrar frequência de alunos;
-- sincronizar alterações com o EasyStock.
+- sincronizar alterações com o EduStock.
 
 O cache atual evita uma tela totalmente indisponível, mas não implementa coleta
 offline nem sincronização posterior de dados.
 
 ## Compatibilidade com o deploy atual
 
-Não foi necessário alterar o `render.yaml`. Os dois serviços já são publicados
-como sites estáticos independentes:
+Os dois serviços continuam publicados como sites estáticos independentes:
 
 - `edustock-alunos` publica `app-alunos/dist`;
 - `edustock-cozinha` publica `app-cozinha/dist`.
+
+O `render.yaml` passou a usar `/api/health/` para validar banco e cache antes de
+considerar o backend saudável.
 
 O Vite copia automaticamente os manifestos, service workers e ícones da pasta
 `public/` para `dist/`. As regras de rewrite existentes na Render continuam
@@ -178,8 +180,8 @@ Foram executadas as seguintes verificações:
 - conferência de que manifestos, ícones, service workers, CSS e JavaScript foram
   copiados para os dois diretórios `dist`;
 - build de produção dos dois aplicativos;
-- suíte de testes do app Alunos: **22 testes aprovados**;
-- suíte de testes do app Cozinha: **25 testes aprovados**.
+- suíte de testes do app Alunos: **25 testes aprovados**;
+- suíte de testes do app Cozinha: **29 testes aprovados**.
 
 ## O que ainda falta
 
@@ -197,14 +199,8 @@ Foram executadas as seguintes verificações:
 
 ### Melhorias opcionais
 
-- Adicionar um botão **Instalar aplicativo** dentro da tela de login. Hoje a
-  instalação é oferecida pelo menu ou pela interface nativa do navegador.
-- Adicionar uma explicação visual específica para instalação no iPhone, onde o
-  evento automático de instalação não está disponível como no Chrome.
 - Adicionar screenshots aos manifestos para enriquecer a caixa de instalação em
   navegadores que suportam esse recurso.
-- Criar uma tela offline amigável informando que registros e autenticação
-  exigem conexão.
 - Implementar, somente se houver requisito operacional, uma fila offline com
   sincronização posterior. Isso exige regras para conflitos, expiração da
   sessão, segurança dos dados e prevenção de registros duplicados.

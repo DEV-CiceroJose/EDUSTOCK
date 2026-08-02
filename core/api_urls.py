@@ -7,7 +7,7 @@ from .api_views import (
 )
 from .operacao_views import (
     ContagemView, ResumoFrequenciaView, PlanoDoDiaView, BaixaProducaoView,
-    OperacaoLoginView, OperacaoLogoutView,
+    HealthCheckView, OperacaoLoginView, OperacaoLogoutView, StatusDoDiaView,
 )
 
 router = DefaultRouter()
@@ -20,6 +20,7 @@ router.register(r"movimentacoes", MovimentacaoViewSet, basename="movimentacao")
 router.register(r"entradas", EntradaViewSet, basename="entrada")
 
 urlpatterns = [
+    path("health/", HealthCheckView.as_view(), name="health-check"),
     path("alertas/", AlertasView.as_view(), name="alertas"),
     path("relatorios/prestacao-contas/", PrestacaoContasView.as_view(), name="prestacao-contas"),
 
@@ -30,6 +31,7 @@ urlpatterns = [
 
     # app-alunos — contagem de frequência (POST: ALUNO_REP / GET: ALUNO_REP + COZINHA)
     path("operacao/contagem/", ContagemView.as_view(), name="operacao-contagem"),
+    path("operacao/status-do-dia/", StatusDoDiaView.as_view(), name="operacao-status-dia"),
 
     # Dashboard admin — resumo sem autenticação de perfil
     path("operacao/resumo/", ResumoFrequenciaView.as_view(), name="operacao-resumo"),

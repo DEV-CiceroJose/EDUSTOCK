@@ -50,3 +50,16 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+.operation-pin-shell {
+  display: flex;
+  width: 100%;
+  max-width: 420px;
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: 2.5rem 1.5rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}

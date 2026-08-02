@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import PinLogin from './PinLogin.jsx'
+import { login } from './api.js'
 
 vi.mock('./api.js', () => ({
   login: vi.fn(),
@@ -8,13 +10,11 @@ vi.mock('./api.js', () => ({
 
 describe('PinLogin (app-alunos)', () => {
   beforeEach(() => {
-    vi.resetModules()
     vi.clearAllMocks()
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
   })
 
-  it('mostra o ícone School no cabeçalho, sem emoji', async () => {
-    const { default: PinLogin } = await import('./PinLogin.jsx')
-
+  it('mostra o ícone Phosphor no cabeçalho, sem emoji', () => {
     render(
       <MemoryRouter>
         <PinLogin />
@@ -22,15 +22,14 @@ describe('PinLogin (app-alunos)', () => {
     )
 
     expect(screen.getByTestId('icone-cabecalho')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'EduStock Alunos' })).toBeInTheDocument()
     expect(screen.queryByText('🏫')).not.toBeInTheDocument()
     expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'false')
     expect(screen.getByRole('button', { name: 'Apagar' })).toBeDisabled()
   })
 
-  it('chama login apenas com o PIN ao completar os 4 dígitos', async () => {
-    const { login } = await import('./api.js')
+  it('chama login apenas com o PIN ao completar os 4 dígitos', () => {
     login.mockResolvedValue({ token: 'abc', turma: '1º DS-A', turno: 'INTEGRAL' })
-    const { default: PinLogin } = await import('./PinLogin.jsx')
 
     render(
       <MemoryRouter>
@@ -46,9 +45,7 @@ describe('PinLogin (app-alunos)', () => {
   })
 
   it('mostra erro do backend sem travar a interface quando o PIN não é reconhecido', async () => {
-    const { login } = await import('./api.js')
     login.mockRejectedValue(new Error('PIN inválido.'))
-    const { default: PinLogin } = await import('./PinLogin.jsx')
 
     render(
       <MemoryRouter>
@@ -63,9 +60,7 @@ describe('PinLogin (app-alunos)', () => {
     expect(await screen.findByText('PIN inválido.')).toBeInTheDocument()
   })
 
-  it('explica quando uma sessão anterior expirou', async () => {
-    const { default: PinLogin } = await import('./PinLogin.jsx')
-
+  it('explica quando uma sessão anterior expirou', () => {
     render(
       <MemoryRouter initialEntries={[{
         pathname: '/login',
@@ -75,8 +70,19 @@ describe('PinLogin (app-alunos)', () => {
       </MemoryRouter>
     )
 
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Sua sessão expirou. Digite o PIN novamente.',
+    expect(screen.getByText('Sua sessão expirou. Digite o PIN novamente.')).toBeInTheDocument()
+  })
+
+  it('bloqueia o teclado quando o dispositivo está sem conexão', () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+
+    render(
+      <MemoryRouter>
+        <PinLogin />
+      </MemoryRouter>
     )
+
+    expect(screen.getByText('Sem conexão. Conecte o dispositivo à internet para entrar.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '1' })).toBeDisabled()
   })
 })
