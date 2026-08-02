@@ -18,6 +18,7 @@ html, body, #root {
 /* Card de produto na ordem de produção */
 .recipe-card {
   background: var(--color-surface);
+  color: var(--color-ink);
   border: 1.5px solid var(--color-line);
   border-radius: 20px;
   padding: 1.25rem 1.5rem;
@@ -61,6 +62,43 @@ html, body, #root {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
 }
+.recipe-info {
+  min-width: 0;
+  flex: 1;
+}
+.recipe-name {
+  color: var(--color-ink);
+  font-size: 1.08rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+.recipe-category {
+  margin-top: 0.2rem;
+  color: var(--color-ink-soft);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.recipe-amount {
+  flex-shrink: 0;
+  text-align: right;
+}
+.recipe-quantity {
+  color: var(--color-brand);
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.recipe-quantity.insufficient { color: var(--color-err); }
+.stock-warning {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+  color: var(--color-err);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
 .refeicao-chip {
   min-height: 44px;
   padding: 0.5rem;
@@ -70,6 +108,7 @@ html, body, #root {
   line-height: 1.1;
   border: 2px solid var(--color-line);
   background: var(--color-surface);
+  color: var(--color-brand-dark);
   cursor: pointer;
   transition: background 100ms, border-color 100ms, color 100ms;
 }
@@ -81,6 +120,20 @@ html, body, #root {
 
 @media (min-width: 520px) {
   .refeicao-chip { font-size: 0.95rem; }
+}
+
+@media (max-width: 420px) {
+  .recipe-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding: 1rem;
+  }
+  .recipe-amount {
+    width: 100%;
+    padding-left: 4.25rem;
+    text-align: left;
+  }
+  .stock-warning { justify-content: flex-start; }
 }
 
 /* Botão numérico PIN */

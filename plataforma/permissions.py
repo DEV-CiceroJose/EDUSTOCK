@@ -29,7 +29,12 @@ class EhAdmin(BasePermission):
     message = "Apenas administradores podem acessar este recurso."
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_staff)
+        if not request.user or not request.user.is_authenticated:
+            return False
+        try:
+            return request.user.perfil.papel == "ADMIN"
+        except AttributeError:
+            return False
 
 
 def usuario_admin_do_estoque(user):

@@ -601,12 +601,21 @@ export const mockOperacao = {
     const d = data || new Date().toISOString().slice(0, 10)
     const total = totalFreq(db, d)
     const media = mediaHistoricaMock(db, d)
+    const turmasAgrupadas = db.frequencias
+      .filter((frequencia) => frequencia.data === d)
+      .reduce((totais, frequencia) => {
+        totais[frequencia.turma] = (totais[frequencia.turma] || 0) + Number(frequencia.quantidade_alunos)
+        return totais
+      }, {})
     return {
       data: d,
       total_alunos: total,
       media_historica: Math.round(media * 100) / 100,
       variacao_pct: media > 0 ? Math.round(((total - media) / media) * 1000) / 10 : null,
       alerta_reducao: media > 0 && total < media * 0.5,
+      turmas: Object.entries(turmasAgrupadas)
+        .sort(([turmaA], [turmaB]) => turmaA.localeCompare(turmaB))
+        .map(([turma, quantidade_alunos]) => ({ turma, quantidade_alunos })),
     }
   },
   async planoDoDia({ data, turno }) {

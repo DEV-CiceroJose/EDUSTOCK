@@ -88,6 +88,9 @@ test("cozinha entra, confere a ordem e conclui uma baixa parcial", async ({ page
   await expect(page.getByRole("button", { name: "Almoço" })).toBeVisible()
   await expect(page.getByRole("button", { name: "Lanche da tarde" })).toBeVisible()
   await page.getByRole("button", { name: "Almoço" }).click()
+  await expect(page.getByRole("button", { name: "Café da manhã" })).toHaveCSS("color", "rgb(26, 62, 51)")
+  await expect(page.getByText("Arroz")).toHaveCSS("color", "rgb(32, 40, 31)")
+  await expect(page.getByText("4,0 kg")).toHaveCSS("color", "rgb(33, 77, 63)")
 
   await page.getByRole("button", { name: "Dar Baixa de Produção" }).click()
   const dialogo = page.getByRole("dialog", { name: "Confirmar baixa de produção" })

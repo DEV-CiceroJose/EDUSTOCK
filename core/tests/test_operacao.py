@@ -165,6 +165,13 @@ class ContagemApiTest(APITestCase):
         resp = client_admin.get("/api/operacao/resumo/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["total_alunos"], 50)
+        self.assertEqual(
+            resp.data["turmas"],
+            [
+                {"turma": "6A", "quantidade_alunos": 30},
+                {"turma": "7B", "quantidade_alunos": 20},
+            ],
+        )
 
     def test_plano_do_dia(self):
         cat = Categoria.objects.create(name="Alimentos")

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 import RequireAuth from "./components/RequireAuth"
+import RequireAdmin from "./components/RequireAdmin"
 import RequireModule from "./components/RequireModule"
 import LandingPage from "./pages/LandingPage"
 
@@ -49,8 +50,10 @@ export default function App() {
 
             <Route path="perfil" element={<PerfilPage />} />
             <Route path="configuracoes" element={<ConfiguracoesPage />} />
-            <Route path="admin/modulos" element={<AdminModulosPage />} />
-            <Route path="admin/usuarios" element={<AdminUsuariosPage />} />
+            <Route element={<RequireAdmin />}>
+              <Route path="admin/modulos" element={<AdminModulosPage />} />
+              <Route path="admin/usuarios" element={<AdminUsuariosPage />} />
+            </Route>
             <Route path="modulo-indisponivel" element={<ModuloIndisponivelPage />} />
           </Route>
         </Route>

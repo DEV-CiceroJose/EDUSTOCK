@@ -57,6 +57,8 @@ describe('ProducaoView (app-cozinha)', () => {
     renderView()
 
     expect(await screen.findByTestId('icone-categoria-alimento')).toBeInTheDocument()
+    expect(screen.getByText('Arroz')).toHaveClass('recipe-name')
+    expect(screen.getByText('5,0 kg')).toHaveClass('recipe-quantity')
     expect(screen.queryByText('⚠️')).not.toBeInTheDocument()
     expect(screen.queryByText('✅')).not.toBeInTheDocument()
   })
@@ -144,6 +146,12 @@ describe('ProducaoView (app-cozinha)', () => {
     expect(screen.getByRole('button', { name: 'Lanche da tarde' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Integral' })).not.toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Refeição da baixa' })).toBeInTheDocument()
+
+    const inativas = screen.getAllByRole('button').filter(
+      (button) => button.classList.contains('refeicao-chip') && button.getAttribute('aria-pressed') === 'false',
+    )
+    expect(inativas.length).toBeGreaterThan(0)
+    inativas.forEach((button) => expect(button).not.toHaveClass('text-white/75'))
   })
 
   it('devolve o foco ao botão principal ao cancelar a confirmação', async () => {

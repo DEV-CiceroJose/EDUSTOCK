@@ -76,28 +76,21 @@ function CardProduto({ item }) {
         <IconeCategoria nome={item.categoria_nome} />
       </div>
 
-      <div className="min-w-0 flex-1">
-        <div style={{ fontSize: '1.05rem', fontWeight: 700, lineHeight: 1.2 }}>
+      <div className="recipe-info">
+        <div className="recipe-name">
           {item.produto_nome}
         </div>
-        <div style={{ color: 'var(--color-ink-soft)', fontSize: '0.85rem', marginTop: 2 }}>
+        <div className="recipe-category">
           {item.categoria_nome}
         </div>
       </div>
 
-      <div className="text-right shrink-0">
-        <div
-          style={{
-            fontSize: '1.4rem',
-            fontWeight: 800,
-            color: item.estoque_insuficiente ? 'var(--color-err)' : 'var(--color-brand)',
-            lineHeight: 1,
-          }}
-        >
+      <div className="recipe-amount">
+        <div className={item.estoque_insuficiente ? 'recipe-quantity insufficient' : 'recipe-quantity'}>
           {item.quantidade_legivel ?? `${item.quantidade} ${item.unidade}`}
         </div>
         {item.estoque_insuficiente && (
-          <div className="mt-1 flex items-center justify-end gap-1 text-[0.78rem] font-bold text-err">
+          <div className="stock-warning">
             <AlertTriangle size={14} /> Estoque insuficiente
           </div>
         )}
@@ -401,7 +394,7 @@ export default function ProducaoView() {
               type="button"
               key={itemRefeicao.key}
               onClick={() => setRefeicao(itemRefeicao.key)}
-              className={`refeicao-chip${refeicao === itemRefeicao.key ? ' active' : ' border-white/30 bg-white/10 text-white/75'}`}
+              className={`refeicao-chip${refeicao === itemRefeicao.key ? ' active' : ''}`}
               aria-pressed={refeicao === itemRefeicao.key}
             >
               {itemRefeicao.label}

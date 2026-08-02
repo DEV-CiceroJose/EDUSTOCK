@@ -115,6 +115,12 @@ def calcular_previsao_producao(data, turno):
 def calcular_resumo_dia(data):
     """Resumo agregado do dia (todos os turnos) para o widget do dashboard."""
     total_alunos = total_frequencia(data=data)
+    turmas = list(
+        FrequenciaDiaria.objects.filter(data=data)
+        .values("turma")
+        .annotate(quantidade_alunos=Sum("quantidade_alunos"))
+        .order_by("turma")
+    )
     media_historica = _media_diaria_frequencia(data=data, turno=None)
     variacao_pct = None
     alerta_reducao = False
@@ -129,4 +135,5 @@ def calcular_resumo_dia(data):
         "media_historica": float(media_historica.quantize(Decimal("0.01"))),
         "variacao_pct": variacao_pct,
         "alerta_reducao": alerta_reducao,
+        "turmas": turmas,
     }
