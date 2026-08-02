@@ -190,15 +190,17 @@ para detalhes da landing, migração de dados e testes E2E.
 - ✅ Navegação rápida entre páginas
 
 ### App Cozinha
-- 👨‍🍳 Registro de produção diária por turno
+- 👨‍🍳 Registro de produção para café da manhã, almoço e lanche da tarde
 - 📋 Visualização do plano do dia
 - 🔐 Autenticação por PIN único
+- 📲 Instalável pelo navegador como aplicativo (PWA)
 
 ### App Alunos
 - 👨‍🎓 Registro de contagem de presença por turma
 - 📊 Acompanhamento de frequência
 - 🔐 Autenticação por PIN de turma
-- ⏰ Registro por turno (Manhã/Tarde/Integral)
+- ⏰ Registro simplificado para turmas de período integral
+- 📲 Instalável pelo navegador como aplicativo (PWA)
 
 ## 🤝 Contribuindo
 
