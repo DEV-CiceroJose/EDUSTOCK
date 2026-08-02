@@ -32,6 +32,11 @@ O resumo diário da operação agora retorna a lista `turmas`, formada por:
 O quadro `Merenda hoje` apresenta esses registros abaixo do total geral. Quando
 não houver presença registrada, mostra uma mensagem de estado vazio.
 
+Como todas as turmas operam em período integral, a tela de contagem não exibe
+mais os filtros `Manhã`, `Tarde` e `Integral`. As opções `Total` e turmas são
+mostradas diretamente, e todo novo registro envia `INTEGRAL` automaticamente
+para o servidor.
+
 ## Legibilidade no App Cozinha
 
 - As refeições não selecionadas usam texto verde-escuro sobre fundo claro.

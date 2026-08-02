@@ -4,12 +4,6 @@ import { operacaoApi } from "../../api"
 import { Icon } from "../../lib/icons.jsx"
 import { useToast } from "../../components/ui/useToast"
 
-const TURNOS = [
-  { key: "MANHA", label: "Manhã" },
-  { key: "TARDE", label: "Tarde" },
-  { key: "INTEGRAL", label: "Integral" },
-]
-
 const TURMAS_RAPIDAS = [
   "Total",
   "1º DS-A", "1º DS-B", "2º DS-A", "2º DS-B", "3º DS-A", "3º DS-B",
@@ -55,7 +49,6 @@ function TecladoNumerico({ valor, onChange, onConfirm, disabled }) {
 
 export default function ContagemView({ onRegistrado }) {
   const toast = useToast()
-  const [turno, setTurno] = useState("MANHA")
   const [turma, setTurma] = useState("Total")
   const [valor, setValor] = useState("")
   const [status, setStatus] = useState(null) // ok | dup | err
@@ -73,7 +66,7 @@ export default function ContagemView({ onRegistrado }) {
     try {
       const resp = await operacaoApi.registrarContagem({
         turma: turma.trim(),
-        turno,
+        turno: "INTEGRAL",
         quantidade_alunos: qtd,
       })
       setStatus("ok")
@@ -106,23 +99,6 @@ export default function ContagemView({ onRegistrado }) {
       </div>
 
       <div className="flex flex-wrap justify-center gap-2">
-        {TURNOS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTurno(t.key)}
-            className={`rounded-full border px-4 py-2 text-base font-semibold ${
-              turno === t.key
-                ? "border-brand bg-brand text-[#f4f1e7]"
-                : "border-line bg-surface text-ink-soft"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4 flex flex-wrap justify-center gap-2">
         {TURMAS_RAPIDAS.map((t) => (
           <button
             key={t}
@@ -171,7 +147,7 @@ export default function ContagemView({ onRegistrado }) {
         >
           <p className="font-semibold text-ok">Contagem salva com sucesso</p>
           <p className="mt-1 text-sm text-ink-soft">
-            Total no turno: {ultimaPrevisao.total_alunos} alunos
+            Total do dia: {ultimaPrevisao.total_alunos} alunos
             {ultimaPrevisao.alerta_reducao && (
               <span className="ml-2 font-bold text-out">— presença muito baixa</span>
             )}
@@ -181,7 +157,7 @@ export default function ContagemView({ onRegistrado }) {
 
       {status === "dup" && (
         <div className="card mt-4 border border-low bg-low-tint p-4 text-center text-sm font-semibold text-low">
-          Esta turma já foi registrada hoje neste turno.
+          Esta turma já foi registrada hoje.
         </div>
       )}
     </div>

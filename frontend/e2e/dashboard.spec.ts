@@ -196,6 +196,11 @@ test("merenda mostra o histórico diário separado por turma", async ({ page }) 
 
   await page.getByTitle("Merenda").click()
 
+  await expect(page.getByRole("button", { name: "Manhã", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Tarde", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Integral", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Total", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "2º DS-A", exact: true })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Turmas registradas hoje" })).toBeVisible()
   const historico = page.getByRole("list", { name: "Histórico diário por turma" })
   await expect(historico.getByText("1º DS-A")).toBeVisible()
