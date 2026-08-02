@@ -7,7 +7,7 @@ from .api_views import (
 )
 from .operacao_views import (
     ContagemView, ResumoFrequenciaView, PlanoDoDiaView, BaixaProducaoView,
-    OperacaoLoginView, OperacaoLogoutView, StatusDoDiaView,
+    HealthCheckView, OperacaoLoginView, OperacaoLogoutView, StatusDoDiaView,
 )
 
 router = DefaultRouter()
@@ -20,6 +20,7 @@ router.register(r"movimentacoes", MovimentacaoViewSet, basename="movimentacao")
 router.register(r"entradas", EntradaViewSet, basename="entrada")
 
 urlpatterns = [
+    path("health/", HealthCheckView.as_view(), name="health-check"),
     path("alertas/", AlertasView.as_view(), name="alertas"),
     path("relatorios/prestacao-contas/", PrestacaoContasView.as_view(), name="prestacao-contas"),
 

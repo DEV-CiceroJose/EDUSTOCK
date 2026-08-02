@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, connection
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import status
@@ -53,6 +53,41 @@ def _turma_ativa_da_sessao(sessao):
     if sessao.get("turma") and sessao.get("turno"):
         return SimpleNamespace(nome=sessao["turma"], turno=sessao["turno"])
     return None
+
+
+class HealthCheckView(APIView):
+    """Sinal mínimo de disponibilidade, sem expor configuração interna."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        verificacoes = {"banco": False, "cache": False}
+        try:
+            connection.ensure_connection()
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                verificacoes["banco"] = cursor.fetchone()[0] == 1
+        except Exception:
+            logger.exception("Falha na verificação de saúde do banco")
+
+        try:
+            chave = "healthcheck:cache"
+            valor = timezone.now().isoformat()
+            cache.set(chave, valor, timeout=30)
+            verificacoes["cache"] = cache.get(chave) == valor
+        except Exception:
+            logger.exception("Falha na verificação de saúde do cache")
+
+        saudavel = all(verificacoes.values())
+        return Response(
+            {
+                "status": "ok" if saudavel else "indisponivel",
+                "verificacoes": verificacoes,
+                "verificado_em": timezone.now().isoformat(),
+            },
+            status=status.HTTP_200_OK if saudavel else status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
 
 
 def _identificador_cliente(request):
@@ -171,6 +206,8 @@ class OperacaoLoginView(APIView):
             turma=dados.get("turma", ""),
             turno=dados.get("turno", ""),
             turma_id=dados.get("turma_id"),
+            pin_acesso_id=dados.get("pin_acesso_id"),
+            pin_versao=dados.get("pin_versao", ""),
         )
         return Response({
             "token": token,
@@ -359,6 +396,11 @@ class StatusDoDiaView(APIView):
                     "quantidade_alunos": frequencia.quantidade_alunos,
                     "registrada_em": frequencia.criado_em.isoformat(),
                 },
+                "historico_recente": list(
+                    FrequenciaDiaria.objects.filter(turma=turma.nome)
+                    .order_by("-data", "-criado_em")
+                    .values("data", "quantidade_alunos", "criado_em")[:7]
+                ),
             })
             return Response(resposta)
 
@@ -378,6 +420,16 @@ class StatusDoDiaView(APIView):
                 ),
             }
             for chave, label in OperacaoBaixaProducao.REFEICAO_CHOICES
+        ]
+        resposta["historico_recente"] = [
+            {
+                "data": item.data.isoformat(),
+                "refeicao": item.refeicao,
+                "refeicao_label": item.get_refeicao_display(),
+                "status": item.status,
+                "atualizada_em": item.atualizado_em.isoformat(),
+            }
+            for item in OperacaoBaixaProducao.objects.order_by("-data", "-atualizado_em")[:15]
         ]
         return Response(resposta)
 

@@ -1,12 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Backspace } from '@phosphor-icons/react/Backspace'
+import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank'
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle'
 import { SpinnerGap } from '@phosphor-icons/react/SpinnerGap'
 import { Warning } from '@phosphor-icons/react/Warning'
 import { getSessao, getStatusDoDia, registrarContagem, limparSessao, logout } from './api.js'
 
 const MAX_ALUNOS_POR_TURMA = 45
+
+function formatarData(iso) {
+  if (!iso) return ''
+  const [ano, mes, dia] = iso.slice(0, 10).split('-')
+  return `${dia}/${mes}/${ano}`
+}
 
 /**
  * Formata a variação percentual em relação à média histórica.
@@ -58,6 +65,7 @@ export default function ContagemView() {
           quantidade_alunos: statusDia.frequencia.quantidade_alunos,
           registrada_em: statusDia.frequencia.registrada_em,
           recuperado: true,
+          historico_recente: statusDia.historico_recente ?? [],
         })
         setEstado('sucesso')
       } else {
@@ -99,8 +107,12 @@ export default function ContagemView() {
     setEstado('loading')
     try {
       const data = await registrarContagem(qtd)
-      setResultado(data)
-      setUltimaSincronizacao(new Date().toLocaleTimeString('pt-BR', {
+      const statusAtualizado = await getStatusDoDia()
+      setResultado({
+        ...data,
+        historico_recente: statusAtualizado.historico_recente ?? [],
+      })
+      setUltimaSincronizacao(new Date(statusAtualizado.sincronizado_em).toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit',
       }))
@@ -215,6 +227,22 @@ export default function ContagemView() {
             </p>
           )}
         </div>
+
+        {resultado.historico_recente?.length > 0 && (
+          <section className="mt-5 w-full rounded-2xl border border-line bg-canvas p-4" aria-labelledby="historico-turma">
+            <h2 id="historico-turma" className="mb-3 flex items-center gap-2 text-base font-bold text-brand">
+              <CalendarBlank size={20} weight="duotone" /> Histórico recente
+            </h2>
+            <div className="flex flex-col gap-2">
+              {resultado.historico_recente.map((registro) => (
+                <div key={`${registro.data}-${registro.criado_em}`} className="flex items-center justify-between text-sm">
+                  <span className="text-ink-soft">{formatarData(registro.data)}</span>
+                  <strong>{registro.quantidade_alunos} alunos</strong>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <button
           type="button"

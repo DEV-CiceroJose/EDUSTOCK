@@ -132,6 +132,10 @@ describe('ContagemView (app-alunos)', () => {
       turno: 'INTEGRAL',
       frequencia_registrada: true,
       frequencia: { quantidade_alunos: 28, registrada_em: '2026-08-02T08:15:00-03:00' },
+      historico_recente: [
+        { data: '2026-08-02', quantidade_alunos: 28, criado_em: '2026-08-02T08:15:00-03:00' },
+        { data: '2026-08-01', quantidade_alunos: 30, criado_em: '2026-08-01T08:10:00-03:00' },
+      ],
       sincronizado_em: '2026-08-02T12:00:00-03:00',
     })
 
@@ -139,6 +143,9 @@ describe('ContagemView (app-alunos)', () => {
 
     expect(await screen.findByText('A frequência desta turma já foi enviada hoje.')).toBeInTheDocument()
     expect(screen.getByText('28')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Histórico recente' })).toBeInTheDocument()
+    expect(screen.getByText('01/08/2026')).toBeInTheDocument()
+    expect(screen.getByText('30 alunos')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Confirmar' })).not.toBeInTheDocument()
   })
 })

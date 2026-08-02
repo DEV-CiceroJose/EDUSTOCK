@@ -534,6 +534,31 @@ class TestLoginPorPin(APITestCase):
         resp = c.post("/api/operacao/contagem/", {"quantidade_alunos": 30}, format="json")
         self.assertEqual(resp.status_code, 401, resp.content)
 
+    def test_desativar_ou_trocar_pin_revoga_sessao_existente(self):
+        login = self.client.post("/api/operacao/auth/", {
+            "pin": "0001", "perfil": "ALUNO_REP",
+        }, format="json")
+        cliente = APIClient()
+        cliente.credentials(HTTP_X_OPERACAO_TOKEN=login.data["token"])
+
+        pin = PinAcesso.objects.get(turma=self.turma, pin_fingerprint=PinAcesso.gerar_fingerprint("0001"))
+        pin.definir_pin("0004")
+        pin.save(update_fields=["pin", "pin_fingerprint"])
+
+        resposta = cliente.get("/api/operacao/status-do-dia/")
+        self.assertEqual(resposta.status_code, 401, resposta.content)
+
+        novo_login = self.client.post("/api/operacao/auth/", {
+            "pin": "0004", "perfil": "ALUNO_REP",
+        }, format="json")
+        novo_cliente = APIClient()
+        novo_cliente.credentials(HTTP_X_OPERACAO_TOKEN=novo_login.data["token"])
+        pin.ativo = False
+        pin.save(update_fields=["ativo"])
+
+        revogada = novo_cliente.get("/api/operacao/status-do-dia/")
+        self.assertEqual(revogada.status_code, 401, revogada.content)
+
 
 # ---------------------------------------------------------------------------
 # GET /api/operacao/contagem/ — acessível pelo app-cozinha
@@ -581,6 +606,12 @@ class TestStatusOperacionalDoDia(APITestCase):
         return cliente
 
     def test_aluno_recupera_frequencia_ja_registrada(self):
+        FrequenciaDiaria.objects.create(
+            data=self.hoje - timedelta(days=1),
+            turno=FrequenciaDiaria.INTEGRAL,
+            turma=self.turma.nome,
+            quantidade_alunos=31,
+        )
         frequencia = FrequenciaDiaria.objects.create(
             data=self.hoje,
             turno=FrequenciaDiaria.INTEGRAL,
@@ -595,6 +626,8 @@ class TestStatusOperacionalDoDia(APITestCase):
         self.assertEqual(resposta.data["frequencia"]["id"], frequencia.id)
         self.assertEqual(resposta.data["frequencia"]["quantidade_alunos"], 28)
         self.assertIn("sincronizado_em", resposta.data)
+        self.assertEqual(len(resposta.data["historico_recente"]), 2)
+        self.assertEqual(resposta.data["historico_recente"][0]["quantidade_alunos"], 28)
 
     def test_sessao_reflete_renome_e_bloqueia_turma_desativada(self):
         cliente = self._cliente_aluno()
@@ -627,3 +660,15 @@ class TestStatusOperacionalDoDia(APITestCase):
         self.assertTrue(por_refeicao["CAFE_MANHA"]["baixa_realizada"])
         self.assertFalse(por_refeicao["ALMOCO"]["baixa_realizada"])
         self.assertFalse(por_refeicao["LANCHE_TARDE"]["baixa_realizada"])
+        self.assertEqual(len(resposta.data["historico_recente"]), 1)
+        self.assertEqual(resposta.data["historico_recente"][0]["refeicao"], "CAFE_MANHA")
+
+
+class TestHealthCheck(APITestCase):
+    def test_health_confirma_banco_e_cache_sem_autenticacao(self):
+        resposta = self.client.get("/api/health/")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        self.assertEqual(resposta.data["status"], "ok")
+        self.assertEqual(resposta.data["verificacoes"], {"banco": True, "cache": True})
+        self.assertIn("verificado_em", resposta.data)

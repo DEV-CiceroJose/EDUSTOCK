@@ -52,6 +52,8 @@ def criar_token(
     turma: str = "",
     turno: str = "",
     turma_id: int | None = None,
+    pin_acesso_id: int | None = None,
+    pin_versao: str = "",
 ) -> str:
     token = str(uuid.uuid4())
     cache.set(_chave_sessao(token), {
@@ -59,13 +61,32 @@ def criar_token(
         "turma": turma,
         "turno": turno,
         "turma_id": turma_id,
+        "pin_acesso_id": pin_acesso_id,
+        "pin_versao": pin_versao,
     }, timeout=TOKEN_TTL_SEGUNDOS)
     return token
 
 
 def validar_token(token: str) -> dict | None:
     """Retorna o dict da sessão ou None se inválido/expirado."""
-    return cache.get(_chave_sessao(token))
+    chave = _chave_sessao(token)
+    sessao = cache.get(chave)
+    if not sessao:
+        return None
+
+    pin_acesso_id = sessao.get("pin_acesso_id")
+    if not pin_acesso_id:
+        return sessao
+
+    from core.models import PinAcesso
+
+    pin_atual = PinAcesso.objects.filter(pk=pin_acesso_id, ativo=True).only(
+        "pin_fingerprint"
+    ).first()
+    if not pin_atual or pin_atual.pin_fingerprint != sessao.get("pin_versao"):
+        cache.delete(chave)
+        return None
+    return sessao
 
 
 def invalidar_token(token: str) -> None:
@@ -88,21 +109,23 @@ def _dados_pin_aluno(pin: str) -> dict | None:
     if not pin_acesso or not pin_acesso.confere_pin(pin):
         return None
     return {
+        "pin_acesso_id": pin_acesso.id,
+        "pin_versao": pin_acesso.pin_fingerprint,
         "turma_id": pin_acesso.turma_id,
         "turma": pin_acesso.turma.nome,
         "turno": pin_acesso.turma.turno,
     }
 
 
-def _pin_valido_cozinha(pin: str) -> bool:
+def _pin_cozinha(pin: str):
     from core.models import PinAcesso
 
     pin_acesso = PinAcesso.objects.filter(
         papel=PinAcesso.COZINHA,
         ativo=True,
         pin_fingerprint=PinAcesso.gerar_fingerprint(pin),
-    ).only("pin").first()
-    return bool(pin_acesso and pin_acesso.confere_pin(pin))
+    ).only("id", "pin", "pin_fingerprint").first()
+    return pin_acesso if pin_acesso and pin_acesso.confere_pin(pin) else None
 
 
 # --------------------------------------------------------------------------
@@ -121,9 +144,16 @@ def autenticar_pin(perfil: str, pin: str) -> dict | None:
         return {"perfil": PERFIL_ALUNO, **dados}
 
     if perfil == PERFIL_COZINHA:
-        if not _pin_valido_cozinha(pin):
+        pin_acesso = _pin_cozinha(pin)
+        if not pin_acesso:
             return None
-        return {"perfil": PERFIL_COZINHA, "turma": "", "turno": ""}
+        return {
+            "perfil": PERFIL_COZINHA,
+            "turma": "",
+            "turno": "",
+            "pin_acesso_id": pin_acesso.id,
+            "pin_versao": pin_acesso.pin_fingerprint,
+        }
 
     return None
 

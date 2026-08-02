@@ -11,6 +11,7 @@ import {
   obterOperacaoPendente,
 } from './api.js'
 import { ArrowsClockwise } from '@phosphor-icons/react/ArrowsClockwise'
+import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank'
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle'
 import { Drop } from '@phosphor-icons/react/Drop'
 import { ForkKnife } from '@phosphor-icons/react/ForkKnife'
@@ -246,6 +247,7 @@ export default function ProducaoView() {
   const [erroPlano, setErroPlano] = useState('')
   const [ultimaSincronizacao, setUltimaSincronizacao] = useState('')
   const [statusRefeicoes, setStatusRefeicoes] = useState({})
+  const [historicoRecente, setHistoricoRecente] = useState([])
   const [modalAberto, setModalAberto] = useState(false)
   const [loadingBaixa, setLoadingBaixa] = useState(false)
   const [resultado, setResultado] = useState(null)
@@ -279,6 +281,7 @@ export default function ProducaoView() {
       setStatusRefeicoes(Object.fromEntries(
         statusDia.refeicoes.map((item) => [item.refeicao, item]),
       ))
+      setHistoricoRecente(statusDia.historico_recente ?? [])
       setUltimaSincronizacao(new Date(statusDia.sincronizado_em).toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit',
@@ -476,6 +479,26 @@ export default function ProducaoView() {
               <CardProduto key={item.produto_id} item={item} />
             ))}
           </div>
+        )}
+
+        {!loadingPlano && historicoRecente.length > 0 && (
+          <details className="mt-5 rounded-2xl border border-line bg-surface p-4">
+            <summary className="flex cursor-pointer list-none items-center gap-2 font-bold text-brand">
+              <CalendarBlank size={20} weight="duotone" /> Histórico de baixas
+            </summary>
+            <div className="mt-3 flex flex-col gap-2">
+              {historicoRecente.map((registro) => (
+                <div key={`${registro.data}-${registro.refeicao}`} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-ink-soft">
+                    {formatarData(registro.data)} · {registro.refeicao_label}
+                  </span>
+                  <strong className={registro.status === 'CONCLUIDA' ? 'text-ok' : 'text-warn'}>
+                    {registro.status === 'CONCLUIDA' ? 'Concluída' : 'Parcial'}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </details>
         )}
       </main>
 

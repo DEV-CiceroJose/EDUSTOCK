@@ -198,4 +198,26 @@ describe('ProducaoView (app-cozinha)', () => {
     expect(screen.getByRole('button', { name: 'Lanche da tarde' })).toHaveClass('completed')
     expect(screen.getByRole('button', { name: 'Almoço' })).not.toHaveClass('completed')
   })
+
+  it('oferece o histórico recente de baixas para consulta', async () => {
+    getStatusDoDia.mockResolvedValue({
+      sincronizado_em: '2026-08-02T12:00:00-03:00',
+      refeicoes: [],
+      historico_recente: [
+        {
+          data: '2026-08-01',
+          refeicao: 'ALMOCO',
+          refeicao_label: 'Almoço',
+          status: 'CONCLUIDA',
+        },
+      ],
+    })
+
+    renderView()
+
+    expect(await screen.findByText('Histórico de baixas')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Histórico de baixas'))
+    expect(screen.getByText('01/08/2026 · Almoço')).toBeInTheDocument()
+    expect(screen.getByText('Concluída')).toBeInTheDocument()
+  })
 })
