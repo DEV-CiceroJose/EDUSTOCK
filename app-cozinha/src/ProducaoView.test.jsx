@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import ProducaoView from './ProducaoView.jsx'
-import { baixaProducao, consultarBaixa, getPlano } from './api.js'
+import { baixaProducao, consultarBaixa, getPlano, getStatusDoDia } from './api.js'
 
 vi.mock('./api.js', () => ({
   getPlano: vi.fn(),
+  getStatusDoDia: vi.fn(),
   baixaProducao: vi.fn(),
   consultarBaixa: vi.fn(),
   obterOperacaoPendente: vi.fn(() => '11111111-1111-4111-8111-111111111111'),
@@ -48,6 +49,14 @@ describe('ProducaoView (app-cozinha)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     getPlano.mockResolvedValue(PLANO_BASE)
+    getStatusDoDia.mockResolvedValue({
+      sincronizado_em: '2026-08-02T12:00:00-03:00',
+      refeicoes: [
+        { refeicao: 'CAFE_MANHA', baixa_realizada: false, status: null },
+        { refeicao: 'ALMOCO', baixa_realizada: false, status: null },
+        { refeicao: 'LANCHE_TARDE', baixa_realizada: false, status: null },
+      ],
+    })
     const naoEncontrada = new Error('Operação não encontrada')
     naoEncontrada.status = 404
     consultarBaixa.mockRejectedValue(naoEncontrada)
@@ -171,5 +180,22 @@ describe('ProducaoView (app-cozinha)', () => {
     renderView()
 
     expect(await screen.findByRole('button', { name: 'Baixa já realizada' })).toBeDisabled()
+  })
+
+  it('marca visualmente todas as refeições já concluídas no dia', async () => {
+    getStatusDoDia.mockResolvedValue({
+      sincronizado_em: '2026-08-02T12:00:00-03:00',
+      refeicoes: [
+        { refeicao: 'CAFE_MANHA', baixa_realizada: true, status: 'CONCLUIDA' },
+        { refeicao: 'ALMOCO', baixa_realizada: false, status: null },
+        { refeicao: 'LANCHE_TARDE', baixa_realizada: true, status: 'PARCIAL' },
+      ],
+    })
+
+    renderView()
+
+    expect(await screen.findByRole('button', { name: 'Café da manhã' })).toHaveClass('completed')
+    expect(screen.getByRole('button', { name: 'Lanche da tarde' })).toHaveClass('completed')
+    expect(screen.getByRole('button', { name: 'Almoço' })).not.toHaveClass('completed')
   })
 })

@@ -47,12 +47,18 @@ def _chave_sessao(token: str) -> str:
     return f"{CHAVE_SESSAO_PREFIXO}{digest}"
 
 
-def criar_token(perfil: str, turma: str = "", turno: str = "") -> str:
+def criar_token(
+    perfil: str,
+    turma: str = "",
+    turno: str = "",
+    turma_id: int | None = None,
+) -> str:
     token = str(uuid.uuid4())
     cache.set(_chave_sessao(token), {
         "perfil": perfil,
         "turma": turma,
         "turno": turno,
+        "turma_id": turma_id,
     }, timeout=TOKEN_TTL_SEGUNDOS)
     return token
 
@@ -82,6 +88,7 @@ def _dados_pin_aluno(pin: str) -> dict | None:
     if not pin_acesso or not pin_acesso.confere_pin(pin):
         return None
     return {
+        "turma_id": pin_acesso.turma_id,
         "turma": pin_acesso.turma.nome,
         "turno": pin_acesso.turma.turno,
     }

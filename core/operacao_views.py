@@ -1,12 +1,14 @@
 from datetime import datetime
 import hashlib
 import logging
+from types import SimpleNamespace
 
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.db.models import Sum
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,7 +18,7 @@ from rest_framework.throttling import BaseThrottle
 from plataforma.authentication import TokenAcessoAuthentication
 from plataforma.permissions import RequerModuloAtivo
 
-from .models import FrequenciaDiaria, OperacaoBaixaProducao
+from .models import FrequenciaDiaria, OperacaoBaixaProducao, Turma
 from .operacao import (
     OperacaoIdReutilizado,
     RefeicaoJaBaixada,
@@ -37,6 +39,20 @@ from .serializers import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _turma_ativa_da_sessao(sessao):
+    """Resolve o cadastro atual para refletir renomes e desativações."""
+    consulta = Turma.objects.filter(ativo=True)
+    if sessao.get("turma_id"):
+        return consulta.filter(pk=sessao["turma_id"]).first()
+    turma = consulta.filter(nome=sessao.get("turma", "")).first()
+    if turma:
+        return turma
+    # Compatibilidade temporária com sessões emitidas antes do vínculo por ID.
+    if sessao.get("turma") and sessao.get("turno"):
+        return SimpleNamespace(nome=sessao["turma"], turno=sessao["turno"])
+    return None
 
 
 def _identificador_cliente(request):
@@ -154,6 +170,7 @@ class OperacaoLoginView(APIView):
             perfil=dados["perfil"],
             turma=dados.get("turma", ""),
             turno=dados.get("turno", ""),
+            turma_id=dados.get("turma_id"),
         )
         return Response({
             "token": token,
@@ -197,9 +214,19 @@ class ContagemView(APIView):
     @requer_perfil_operacao(PERFIL_ALUNO)
     def post(self, request):
         sessao = request.sessao_operacao
-        # turma e turno vêm da sessão autenticada pelo PIN
-        turma = sessao["turma"]
-        turno = sessao["turno"]
+        turma_atual = _turma_ativa_da_sessao(sessao)
+        if not turma_atual:
+            return Response(
+                {
+                    "codigo": "turma_inativa",
+                    "detail": "Esta turma não está ativa. Solicite a atualização do cadastro.",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # A turma vem do cadastro atual, inclusive após renome.
+        turma = turma_atual.nome
+        turno = turma_atual.turno
 
         quantidade_alunos = request.data.get("quantidade_alunos")
         data, err = _parse_date(request.data.get("data"), default_today=True)
@@ -287,6 +314,72 @@ class ContagemView(APIView):
             "total_alunos": total,
             "turmas": list(detalhes),
         })
+
+
+class StatusDoDiaView(APIView):
+    """Estado sincronizado do dia para os dois aplicativos operacionais."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
+
+    @requer_perfil_operacao(PERFIL_ALUNO, PERFIL_COZINHA)
+    def get(self, request):
+        data, err = _parse_date(request.query_params.get("data"), default_today=True)
+        if err:
+            return err
+
+        sessao = request.sessao_operacao
+        resposta = {
+            "data": data.isoformat(),
+            "perfil": sessao["perfil"],
+            "sincronizado_em": timezone.now().isoformat(),
+        }
+
+        if sessao["perfil"] == PERFIL_ALUNO:
+            turma = _turma_ativa_da_sessao(sessao)
+            if not turma:
+                return Response(
+                    {
+                        "codigo": "turma_inativa",
+                        "detail": "Esta turma não está ativa. Solicite a atualização do cadastro.",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            frequencia = FrequenciaDiaria.objects.filter(
+                data=data,
+                turno=turma.turno,
+                turma=turma.nome,
+            ).first()
+            resposta.update({
+                "turma": turma.nome,
+                "turno": turma.turno,
+                "frequencia_registrada": bool(frequencia),
+                "frequencia": None if not frequencia else {
+                    "id": frequencia.id,
+                    "quantidade_alunos": frequencia.quantidade_alunos,
+                    "registrada_em": frequencia.criado_em.isoformat(),
+                },
+            })
+            return Response(resposta)
+
+        operacoes = {
+            item.refeicao: item
+            for item in OperacaoBaixaProducao.objects.filter(data=data)
+        }
+        resposta["refeicoes"] = [
+            {
+                "refeicao": chave,
+                "label": label,
+                "baixa_realizada": chave in operacoes,
+                "status": operacoes[chave].status if chave in operacoes else None,
+                "atualizada_em": (
+                    operacoes[chave].atualizado_em.isoformat()
+                    if chave in operacoes else None
+                ),
+            }
+            for chave, label in OperacaoBaixaProducao.REFEICAO_CHOICES
+        ]
+        return Response(resposta)
 
 
 # --------------------------------------------------------------------------

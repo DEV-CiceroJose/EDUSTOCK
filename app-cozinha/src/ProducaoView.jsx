@@ -5,6 +5,7 @@ import {
   concluirOperacaoPendente,
   consultarBaixa,
   getPlano,
+  getStatusDoDia,
   limparSessao,
   logout,
   obterOperacaoPendente,
@@ -244,6 +245,7 @@ export default function ProducaoView() {
   const [loadingPlano, setLoadingPlano] = useState(false)
   const [erroPlano, setErroPlano] = useState('')
   const [ultimaSincronizacao, setUltimaSincronizacao] = useState('')
+  const [statusRefeicoes, setStatusRefeicoes] = useState({})
   const [modalAberto, setModalAberto] = useState(false)
   const [loadingBaixa, setLoadingBaixa] = useState(false)
   const [resultado, setResultado] = useState(null)
@@ -269,9 +271,15 @@ export default function ProducaoView() {
     setLoadingPlano(true)
     setErroPlano('')
     try {
-      const p = await getPlano(data, refeicao)
+      const [p, statusDia] = await Promise.all([
+        getPlano(data, refeicao),
+        getStatusDoDia(data),
+      ])
       setPlano(p)
-      setUltimaSincronizacao(new Date().toLocaleTimeString('pt-BR', {
+      setStatusRefeicoes(Object.fromEntries(
+        statusDia.refeicoes.map((item) => [item.refeicao, item]),
+      ))
+      setUltimaSincronizacao(new Date(statusDia.sincronizado_em).toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
@@ -392,9 +400,12 @@ export default function ProducaoView() {
               type="button"
               key={itemRefeicao.key}
               onClick={() => setRefeicao(itemRefeicao.key)}
-              className={`refeicao-chip${refeicao === itemRefeicao.key ? ' active' : ''}`}
+              className={`refeicao-chip${refeicao === itemRefeicao.key ? ' active' : ''}${statusRefeicoes[itemRefeicao.key]?.baixa_realizada ? ' completed' : ''}`}
               aria-pressed={refeicao === itemRefeicao.key}
             >
+              {statusRefeicoes[itemRefeicao.key]?.baixa_realizada && (
+                <CheckCircle size={16} weight="fill" aria-hidden="true" />
+              )}
               {itemRefeicao.label}
             </button>
           ))}

@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Backspace } from '@phosphor-icons/react/Backspace'
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle'
+import { SpinnerGap } from '@phosphor-icons/react/SpinnerGap'
 import { Warning } from '@phosphor-icons/react/Warning'
-import { getSessao, registrarContagem, limparSessao, logout } from './api.js'
+import { getSessao, getStatusDoDia, registrarContagem, limparSessao, logout } from './api.js'
 
 const MAX_ALUNOS_POR_TURMA = 45
 
@@ -25,9 +26,10 @@ export default function ContagemView() {
   const sessao = getSessao()
 
   const [numero, setNumero] = useState('')    // string de dígitos do teclado
-  const [estado, setEstado] = useState('idle') // 'idle' | 'loading' | 'sucesso' | 'erro'
+  const [estado, setEstado] = useState('carregando') // carregando | idle | loading | sucesso | erro
   const [resultado, setResultado] = useState(null)
   const [mensagemErro, setMensagemErro] = useState('')
+  const [ultimaSincronizacao, setUltimaSincronizacao] = useState('')
   const enviandoRef = useRef(false)
 
   const pressKey = useCallback((val) => {
@@ -38,6 +40,50 @@ export default function ContagemView() {
       setNumero((n) => n + val)
     }
   }, [estado, numero])
+
+  const carregarStatus = useCallback(async () => {
+    if (!sessao) return
+    setEstado('carregando')
+    setMensagemErro('')
+    try {
+      const statusDia = await getStatusDoDia()
+      setUltimaSincronizacao(new Date(statusDia.sincronizado_em).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }))
+      if (statusDia.frequencia_registrada) {
+        setResultado({
+          turma: statusDia.turma,
+          turno: statusDia.turno,
+          quantidade_alunos: statusDia.frequencia.quantidade_alunos,
+          registrada_em: statusDia.frequencia.registrada_em,
+          recuperado: true,
+        })
+        setEstado('sucesso')
+      } else {
+        setEstado('idle')
+      }
+    } catch (erro) {
+      if (erro.status === 401) {
+        limparSessao()
+        navigate('/login', {
+          replace: true,
+          state: { message: 'Sua sessão expirou. Digite o PIN novamente.' },
+        })
+        return
+      }
+      setMensagemErro(
+        erro.status === 403
+          ? erro.message
+          : 'Não foi possível confirmar o registro do dia. Verifique a conexão e tente novamente.'
+      )
+      setEstado('erro')
+    }
+  }, [navigate, sessao?.turma])
+
+  useEffect(() => {
+    void carregarStatus()
+  }, [carregarStatus])
 
   // Mantém a ordem dos hooks e redireciona se a sessão expirou.
   if (!sessao) {
@@ -54,6 +100,10 @@ export default function ContagemView() {
     try {
       const data = await registrarContagem(qtd)
       setResultado(data)
+      setUltimaSincronizacao(new Date().toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }))
       setEstado('sucesso')
     } catch (e) {
       if (e.status === 401) {
@@ -78,16 +128,18 @@ export default function ContagemView() {
     }
   }
 
-  function reiniciar() {
-    setNumero('')
-    setEstado('idle')
-    setResultado(null)
-    setMensagemErro('')
-  }
-
   function sair() {
     void logout()
     navigate('/login', { replace: true })
+  }
+
+  if (estado === 'carregando') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6 text-center">
+        <SpinnerGap size={36} weight="bold" className="mb-4 animate-spin text-brand" />
+        <p className="font-semibold text-ink-soft">Sincronizando o registro de hoje…</p>
+      </div>
+    )
   }
 
   /* ---- Tela de Sucesso ---- */
@@ -111,6 +163,12 @@ export default function ContagemView() {
           <p style={{ fontSize: '1rem', color: 'var(--color-ink-soft)', margin: 0 }}>
             Turma {resultado.turma} — Período integral
           </p>
+
+          {resultado.recuperado && (
+            <p className="mt-3 font-semibold text-ok">
+              A frequência desta turma já foi enviada hoje.
+            </p>
+          )}
 
           <div
             style={{
@@ -149,6 +207,12 @@ export default function ContagemView() {
             >
               Frequência abaixo de 50% da média histórica
             </div>
+          )}
+
+          {ultimaSincronizacao && (
+            <p className="mt-4 text-sm text-ink-faint">
+              Sincronizado às {ultimaSincronizacao}
+            </p>
           )}
         </div>
 
@@ -198,7 +262,7 @@ export default function ContagemView() {
 
         <button
           type="button"
-          onClick={reiniciar}
+          onClick={carregarStatus}
           className="mt-6 w-full rounded-2xl py-4"
           style={{
             background: 'var(--color-brand)',
@@ -245,7 +309,7 @@ export default function ContagemView() {
     <div
       className="flex min-h-screen flex-col bg-white px-6 pb-8 pt-6"
       style={{ maxWidth: 420, margin: '0 auto' }}
-      aria-busy={estado === 'loading'}
+      aria-busy={estado === 'loading' || estado === 'carregando'}
     >
       <div className="mb-6 flex items-center justify-between">
         <div>
@@ -280,6 +344,12 @@ export default function ContagemView() {
       >
         Quantos alunos estão presentes?
       </p>
+
+      {ultimaSincronizacao && (
+        <p className="mb-2 text-center text-xs text-ink-faint">
+          Sincronizado às {ultimaSincronizacao}
+        </p>
+      )}
 
       <div
         className="pin-display mb-6 flex items-center justify-center"

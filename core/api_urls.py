@@ -7,7 +7,7 @@ from .api_views import (
 )
 from .operacao_views import (
     ContagemView, ResumoFrequenciaView, PlanoDoDiaView, BaixaProducaoView,
-    OperacaoLoginView, OperacaoLogoutView,
+    OperacaoLoginView, OperacaoLogoutView, StatusDoDiaView,
 )
 
 router = DefaultRouter()
@@ -30,6 +30,7 @@ urlpatterns = [
 
     # app-alunos — contagem de frequência (POST: ALUNO_REP / GET: ALUNO_REP + COZINHA)
     path("operacao/contagem/", ContagemView.as_view(), name="operacao-contagem"),
+    path("operacao/status-do-dia/", StatusDoDiaView.as_view(), name="operacao-status-dia"),
 
     # Dashboard admin — resumo sem autenticação de perfil
     path("operacao/resumo/", ResumoFrequenciaView.as_view(), name="operacao-resumo"),

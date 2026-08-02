@@ -81,3 +81,8 @@ export async function registrarContagem(quantidade_alunos, data) {
     { retry: true },
   )
 }
+
+export async function getStatusDoDia(data) {
+  const query = data ? `?data=${encodeURIComponent(data)}` : ""
+  return http.request("GET", `/api/operacao/status-do-dia/${query}`)
+}
