@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">EasyStock Alunos</title>
+  <rect width="512" height="512" fill="#214d3f"/>
+  <circle cx="256" cy="256" r="166" fill="#f3efe4"/>
+  <path d="M130 224 256 153l126 71-126 71-126-71Z" fill="#2f7a5b" stroke="#214d3f" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M177 255v69c0 22 36 42 79 42s79-20 79-42v-69" fill="none" stroke="#214d3f" stroke-width="20" stroke-linecap="round"/>
+  <path d="M382 225v87" fill="none" stroke="#e07a3e" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="382" cy="329" r="13" fill="#e07a3e"/>
+</svg>

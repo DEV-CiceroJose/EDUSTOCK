@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useCallback, useRef } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { CheckCircle2, AlertTriangle, Delete } from 'lucide-react'
-import { getSessao, registrarContagem, logout } from './api.js'
+import { getSessao, registrarContagem, limparSessao, logout } from './api.js'
 
-const TURNO_LABEL = { MANHA: 'Manhã', TARDE: 'Tarde', INTEGRAL: 'Integral' }
+const MAX_ALUNOS_POR_TURMA = 45
 
 /**
  * Formata a variação percentual em relação à média histórica.
@@ -28,25 +28,23 @@ export default function ContagemView() {
   const [mensagemErro, setMensagemErro] = useState('')
   const enviandoRef = useRef(false)
 
-  // Redireciona se sessão expirou
-  if (!sessao) {
-    navigate('/login', { replace: true })
-    return null
-  }
-
   const pressKey = useCallback((val) => {
     if (estado !== 'idle') return
     if (val === 'back') {
       setNumero((n) => n.slice(0, -1))
-    } else if (numero.length < 4) {
-      // Limita a 4 dígitos para evitar números absurdos (max 9999 alunos)
+    } else if (numero.length < 2) {
       setNumero((n) => n + val)
     }
   }, [estado, numero])
 
+  // Mantém a ordem dos hooks e redireciona se a sessão expirou.
+  if (!sessao) {
+    return <Navigate to="/login" replace />
+  }
+
   async function confirmar() {
     const qtd = parseInt(numero, 10)
-    if (!qtd || qtd <= 0) return
+    if (!qtd || qtd <= 0 || qtd > MAX_ALUNOS_POR_TURMA) return
     if (enviandoRef.current) return
     enviandoRef.current = true
 
@@ -56,8 +54,19 @@ export default function ContagemView() {
       setResultado(data)
       setEstado('sucesso')
     } catch (e) {
+      if (e.status === 401) {
+        limparSessao()
+        navigate('/login', {
+          replace: true,
+          state: { message: 'Sua sessão expirou. Digite o PIN novamente.' },
+        })
+        return
+      }
+
       if (e.status === 409) {
         setMensagemErro('Frequência já registrada hoje para esta turma.')
+      } else if (e instanceof TypeError || !e.status) {
+        setMensagemErro('Sem conexão com o sistema. Verifique a internet e tente novamente.')
       } else {
         setMensagemErro(e.message ?? 'Erro ao registrar. Tente novamente.')
       }
@@ -75,7 +84,7 @@ export default function ContagemView() {
   }
 
   function sair() {
-    logout()
+    void logout()
     navigate('/login', { replace: true })
   }
 
@@ -89,7 +98,7 @@ export default function ContagemView() {
         className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
         style={{ maxWidth: 420, margin: '0 auto' }}
       >
-        <div className="result-card w-full">
+        <div className="result-card w-full" role="status" aria-live="polite">
           <div
             className="mx-auto mb-5 grid place-items-center rounded-full text-ok"
             style={{ width: 80, height: 80, background: 'var(--color-ok-tint)' }}
@@ -98,7 +107,7 @@ export default function ContagemView() {
           </div>
 
           <p style={{ fontSize: '1rem', color: 'var(--color-ink-soft)', margin: 0 }}>
-            Turma {resultado.turma} — {TURNO_LABEL[resultado.turno] ?? resultado.turno}
+            Turma {resultado.turma} — Período integral
           </p>
 
           <div
@@ -142,6 +151,7 @@ export default function ContagemView() {
         </div>
 
         <button
+          type="button"
           onClick={sair}
           className="mt-8 w-full rounded-2xl py-4"
           style={{
@@ -165,7 +175,7 @@ export default function ContagemView() {
         className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
         style={{ maxWidth: 420, margin: '0 auto' }}
       >
-        <div className="result-card w-full">
+        <div className="result-card w-full" role="alert">
           <div
             className="mx-auto mb-5 grid place-items-center rounded-full text-err"
             style={{ width: 80, height: 80, background: 'var(--color-err-tint)' }}
@@ -185,6 +195,7 @@ export default function ContagemView() {
         </div>
 
         <button
+          type="button"
           onClick={reiniciar}
           className="mt-6 w-full rounded-2xl py-4"
           style={{
@@ -200,6 +211,7 @@ export default function ContagemView() {
         </button>
 
         <button
+          type="button"
           onClick={sair}
           className="mt-3 w-full rounded-2xl py-4"
           style={{
@@ -217,13 +229,21 @@ export default function ContagemView() {
   }
 
   /* ---- Tela Principal de Registro ---- */
-  const podeConfirmar = numero.length > 0 && parseInt(numero, 10) > 0 && estado === 'idle'
+  const quantidadeInformada = parseInt(numero, 10)
+  const limiteExcedido = numero.length > 0 && quantidadeInformada > MAX_ALUNOS_POR_TURMA
+  const podeConfirmar = (
+    numero.length > 0
+    && quantidadeInformada > 0
+    && !limiteExcedido
+    && estado === 'idle'
+  )
   const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back']
 
   return (
     <div
       className="flex min-h-screen flex-col bg-white px-6 pb-8 pt-6"
       style={{ maxWidth: 420, margin: '0 auto' }}
+      aria-busy={estado === 'loading'}
     >
       <div className="mb-6 flex items-center justify-between">
         <div>
@@ -231,10 +251,11 @@ export default function ContagemView() {
             Turma {sessao.turma}
           </div>
           <div style={{ color: 'var(--color-ink-soft)', fontSize: '0.95rem', marginTop: 2 }}>
-            {TURNO_LABEL[sessao.turno] ?? sessao.turno}
+            Período integral
           </div>
         </div>
         <button
+          type="button"
           onClick={sair}
           style={{
             background: 'var(--color-canvas)',
@@ -261,6 +282,8 @@ export default function ContagemView() {
       <div
         className="pin-display mb-6 flex items-center justify-center"
         style={{ minHeight: '5rem' }}
+        aria-label="Quantidade de alunos informada"
+        aria-live="polite"
       >
         {numero ? (
           <span style={{ color: 'var(--color-brand)' }}>{numero}</span>
@@ -269,18 +292,33 @@ export default function ContagemView() {
         )}
       </div>
 
+      <p
+        className="mb-4 text-center"
+        role={limiteExcedido ? 'alert' : undefined}
+        style={{
+          color: limiteExcedido ? 'var(--color-err)' : 'var(--color-ink-soft)',
+          fontSize: '0.9rem',
+          fontWeight: limiteExcedido ? 700 : 500,
+        }}
+      >
+        {limiteExcedido
+          ? 'O limite permitido é 45 alunos.'
+          : 'Máximo permitido: 45 alunos.'}
+      </p>
+
       <div
         className="grid flex-1 gap-3"
         style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}
       >
         {teclas.map((t, i) => {
           if (t === '') {
-            return <div key={i} />
+            return <div key={`empty-${i}`} />
           }
           if (t === 'back') {
             return (
               <button
                 key="back"
+                type="button"
                 onClick={() => pressKey('back')}
                 className="numkey numkey-back"
                 aria-label="Apagar"
@@ -292,6 +330,7 @@ export default function ContagemView() {
           return (
             <button
               key={t}
+              type="button"
               onClick={() => pressKey(t)}
               className="numkey"
             >
@@ -302,6 +341,7 @@ export default function ContagemView() {
       </div>
 
       <button
+        type="button"
         onClick={confirmar}
         disabled={!podeConfirmar}
         className="numkey-confirm mt-4 w-full rounded-2xl py-5"

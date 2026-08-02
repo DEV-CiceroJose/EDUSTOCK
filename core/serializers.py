@@ -1,5 +1,73 @@
+from decimal import Decimal
+
+from django.utils import timezone
 from rest_framework import serializers
-from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
+
+from .models import (
+    BemPermanente,
+    Categoria,
+    Entrada,
+    Fornecedor,
+    Grupo,
+    Movimentacao,
+    OperacaoBaixaProducao,
+    Produto,
+)
+
+
+class BaixaProducaoItemSerializer(serializers.Serializer):
+    produto_id = serializers.IntegerField(min_value=1)
+    quantidade_override = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        min_value=Decimal("0.001"),
+        required=False,
+    )
+
+    def validate(self, attrs):
+        campos_extras = set(self.initial_data) - {"produto_id", "quantidade_override"}
+        if campos_extras:
+            raise serializers.ValidationError(
+                f"Campos não reconhecidos: {', '.join(sorted(campos_extras))}."
+            )
+        return attrs
+
+
+class BaixaProducaoRequestSerializer(serializers.Serializer):
+    operacao_id = serializers.UUIDField()
+    data = serializers.DateField(default=timezone.localdate)
+    refeicao = serializers.ChoiceField(choices=OperacaoBaixaProducao.REFEICAO_CHOICES)
+    itens = BaixaProducaoItemSerializer(many=True, required=False)
+
+    def validate_data(self, value):
+        if value != timezone.localdate():
+            raise serializers.ValidationError(
+                "A baixa de produção só pode ser registrada na data atual."
+            )
+        return value
+
+    def validate(self, attrs):
+        campos_extras = set(self.initial_data) - {"operacao_id", "data", "refeicao", "itens"}
+        if campos_extras:
+            raise serializers.ValidationError({
+                "campos": f"Campos não reconhecidos: {', '.join(sorted(campos_extras))}."
+            })
+
+        ids = [item["produto_id"] for item in attrs.get("itens", [])]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError({
+                "itens": "Cada produto pode aparecer apenas uma vez."
+            })
+        return attrs
+
+
+class ConsultaBaixaProducaoSerializer(serializers.Serializer):
+    operacao_id = serializers.UUIDField()
+
+
+class PlanoProducaoQuerySerializer(serializers.Serializer):
+    data = serializers.DateField(default=timezone.localdate)
+    refeicao = serializers.ChoiceField(choices=OperacaoBaixaProducao.REFEICAO_CHOICES)
 
 
 class CategoriaSerializer(serializers.ModelSerializer):

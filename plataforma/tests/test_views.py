@@ -88,44 +88,51 @@ class ModuloViewSetTest(APITestCase):
             defaults={"nome": "Merenda", "ativo": True, "depende_de": self.inventario},
         )
 
-    def _autenticar(self, is_staff):
+    def _autenticar(self, papel, *, is_staff=False):
         user = User.objects.create_user(
-            username=f"user-staff-{is_staff}", password="x", is_staff=is_staff
+            username=f"user-{papel}-{is_staff}", password="x", is_staff=is_staff
         )
+        Perfil.objects.create(user=user, papel=papel)
         token = TokenAcesso.objects.create(
             user=user, expira_em=timezone.now() + timedelta(hours=1)
         )
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.token}")
 
     def test_admin_lista_modulos(self):
-        self._autenticar(True)
+        self._autenticar(Perfil.ADMIN)
         resp = self.client.get("/api/modulos/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data["results"]), 2)
 
     def test_admin_desativa_modulo_sem_dependentes(self):
-        self._autenticar(True)
+        self._autenticar(Perfil.ADMIN)
         resp = self.client.patch(f"/api/modulos/{self.merenda.slug}/", {"ativo": False}, format="json")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.merenda.refresh_from_db()
         self.assertFalse(self.merenda.ativo)
 
     def test_nao_desativa_modulo_com_dependente_ativo(self):
-        self._autenticar(True)
+        self._autenticar(Perfil.ADMIN)
         resp = self.client.patch(f"/api/modulos/{self.inventario.slug}/", {"ativo": False}, format="json")
         self.assertEqual(resp.status_code, 400)
         self.inventario.refresh_from_db()
         self.assertTrue(self.inventario.ativo)
 
-    def test_usuario_sem_staff_nao_pode_togglear(self):
-        self._autenticar(False)
+    def test_operador_staff_nao_pode_togglear(self):
+        self._autenticar(Perfil.OPERADOR, is_staff=True)
         resp = self.client.patch(f"/api/modulos/{self.merenda.slug}/", {"ativo": False}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_operador_staff_nao_pode_listar_modulos(self):
+        self._autenticar(Perfil.OPERADOR, is_staff=True)
+        resp = self.client.get("/api/modulos/")
         self.assertEqual(resp.status_code, 403)
 
 
 class UsuarioViewSetTest(APITestCase):
     def _autenticar_admin(self):
-        admin = User.objects.create_user(username="admin1", password="x", is_staff=True)
+        admin = User.objects.create_user(username="admin1", password="x")
+        Perfil.objects.create(user=admin, papel=Perfil.ADMIN)
         token = TokenAcesso.objects.create(
             user=admin, expira_em=timezone.now() + timedelta(hours=1)
         )
@@ -150,7 +157,7 @@ class UsuarioViewSetTest(APITestCase):
         self.assertEqual(u.perfil.papel, "ADMIN")
 
     def test_operador_nao_pode_criar_usuario(self):
-        operador = User.objects.create_user(username="op1", password="x")
+        operador = User.objects.create_user(username="op1", password="x", is_staff=True)
         Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
         token = TokenAcesso.objects.create(
             user=operador, expira_em=timezone.now() + timedelta(hours=1)
@@ -159,6 +166,18 @@ class UsuarioViewSetTest(APITestCase):
         resp = self.client.post("/api/usuarios/", {
             "username": "outro", "password": "senha-boa-123", "papel": "OPERADOR",
         }, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_operador_staff_nao_pode_listar_usuarios(self):
+        operador = User.objects.create_user(username="op-lista", password="x", is_staff=True)
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        token = TokenAcesso.objects.create(
+            user=operador, expira_em=timezone.now() + timedelta(hours=1)
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.token}")
+
+        resp = self.client.get("/api/usuarios/")
+
         self.assertEqual(resp.status_code, 403)
 
     def test_admin_cria_usuario_sem_senha(self):

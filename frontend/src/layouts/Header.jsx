@@ -1,5 +1,6 @@
 import { Icon } from "../lib/icons.jsx"
 import { Link } from "react-router-dom"
+import { getNome, getPapel, getUsername } from "../lib/auth"
 
 export default function Header({
   search,
@@ -10,6 +11,10 @@ export default function Header({
   menuOpen = false,
   canManage = true,
 }) {
+  const nomeUsuario = getNome()?.trim() || getUsername()?.trim() || "Usuário"
+  const papelUsuario = getPapel() === "ADMIN" ? "Administrador" : "Operador"
+  const inicialUsuario = nomeUsuario.charAt(0).toUpperCase()
+
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur-md">
       <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
@@ -64,11 +69,11 @@ export default function Header({
             className="ml-1 flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-3 transition-colors hover:bg-surface-2 cursor-pointer"
           >
             <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-tint font-display text-sm font-bold text-brand">
-              A
+              {inicialUsuario}
             </span>
             <div className="hidden leading-none sm:block">
-              <div className="text-sm font-semibold">Administrador</div>
-              <div className="text-[0.66rem] text-ink-faint">Almoxarife-chefe</div>
+              <div className="max-w-36 truncate text-sm font-semibold">{nomeUsuario}</div>
+              <div className="text-[0.66rem] text-ink-faint">{papelUsuario}</div>
             </div>
           </Link>
         </div>

@@ -1,13 +1,31 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getPlano, baixaProducao, logout } from './api.js'
-import { UtensilsCrossed, Droplets, Package, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import {
+  baixaProducao,
+  concluirOperacaoPendente,
+  consultarBaixa,
+  getPlano,
+  limparSessao,
+  logout,
+  obterOperacaoPendente,
+} from './api.js'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Droplets,
+  Package,
+  RefreshCw,
+  UtensilsCrossed,
+} from 'lucide-react'
 
-const TURNOS = [
-  { key: 'MANHA', label: 'Manhã' },
-  { key: 'TARDE', label: 'Tarde' },
-  { key: 'INTEGRAL', label: 'Integral' },
+const REFEICOES = [
+  { key: 'CAFE_MANHA', label: 'Café da manhã' },
+  { key: 'ALMOCO', label: 'Almoço' },
+  { key: 'LANCHE_TARDE', label: 'Lanche da tarde' },
 ]
+const REFEICAO_LABEL = Object.fromEntries(
+  REFEICOES.map((refeicao) => [refeicao.key, refeicao.label]),
+)
 
 /** Formata YYYY-MM-DD para dd/mm/aaaa */
 function formatarData(iso) {
@@ -23,12 +41,12 @@ function hoje() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-/** Determina o turno padrão pelo horário atual */
-function turnoAtual() {
+/** Determina a refeição sugerida pelo horário atual. */
+function refeicaoAtual() {
   const h = new Date().getHours()
-  if (h < 12) return 'MANHA'
-  if (h < 18) return 'TARDE'
-  return 'INTEGRAL'
+  if (h < 10) return 'CAFE_MANHA'
+  if (h < 15) return 'ALMOCO'
+  return 'LANCHE_TARDE'
 }
 
 /* ─── Ícone por categoria ────────────────────────────────────────────── */
@@ -58,28 +76,21 @@ function CardProduto({ item }) {
         <IconeCategoria nome={item.categoria_nome} />
       </div>
 
-      <div className="min-w-0 flex-1">
-        <div style={{ fontSize: '1.05rem', fontWeight: 700, lineHeight: 1.2 }}>
+      <div className="recipe-info">
+        <div className="recipe-name">
           {item.produto_nome}
         </div>
-        <div style={{ color: 'var(--color-ink-soft)', fontSize: '0.85rem', marginTop: 2 }}>
+        <div className="recipe-category">
           {item.categoria_nome}
         </div>
       </div>
 
-      <div className="text-right shrink-0">
-        <div
-          style={{
-            fontSize: '1.4rem',
-            fontWeight: 800,
-            color: item.estoque_insuficiente ? 'var(--color-err)' : 'var(--color-brand)',
-            lineHeight: 1,
-          }}
-        >
+      <div className="recipe-amount">
+        <div className={item.estoque_insuficiente ? 'recipe-quantity insufficient' : 'recipe-quantity'}>
           {item.quantidade_legivel ?? `${item.quantidade} ${item.unidade}`}
         </div>
         {item.estoque_insuficiente && (
-          <div className="mt-1 flex items-center justify-end gap-1 text-[0.78rem] font-bold text-err">
+          <div className="stock-warning">
             <AlertTriangle size={14} /> Estoque insuficiente
           </div>
         )}
@@ -91,23 +102,44 @@ function CardProduto({ item }) {
 /* ─── Modal de confirmação da baixa ─────────────────────────────────── */
 function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
   const itensDisponiveis = plano.itens.filter((i) => !i.estoque_insuficiente)
+  const confirmarRef = useRef(null)
+
+  useEffect(() => {
+    confirmarRef.current?.focus()
+    const fecharComEscape = (event) => {
+      if (event.key === 'Escape' && !loading) onCancelar()
+    }
+    document.addEventListener('keydown', fecharComEscape)
+    return () => document.removeEventListener('keydown', fecharComEscape)
+  }, [loading, onCancelar])
 
   return (
-    <div className="modal-overlay" onClick={onCancelar}>
-      <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
-        <h2 className="m-0 mb-1 text-[1.3rem] font-extrabold">
+    <div className="modal-overlay" onClick={loading ? undefined : onCancelar}>
+      <div
+        className="modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-confirmacao-baixa"
+        aria-describedby="descricao-confirmacao-baixa"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="titulo-confirmacao-baixa" className="m-0 mb-1 text-[1.3rem] font-extrabold">
           Confirmar baixa de produção
         </h2>
-        <p className="m-0 mb-5 text-[0.9rem] text-ink-soft">
-          Serão registradas saídas de estoque para os itens abaixo.
+        <p id="descricao-confirmacao-baixa" className="m-0 mb-5 text-[0.9rem] text-ink-soft">
+          {formatarData(plano.data)} · {REFEICAO_LABEL[plano.refeicao] ?? plano.refeicao}
         </p>
 
         <div className="mb-6 flex flex-col gap-2">
-          {itensDisponiveis.map((item) => (
-            <div key={item.produto_id} className="flex items-center justify-between rounded-[14px] bg-canvas px-4 py-3">
+          {plano.itens.map((item) => (
+            <div
+              key={item.produto_id}
+              className={`flex items-center justify-between rounded-[14px] px-4 py-3 ${item.estoque_insuficiente ? 'bg-err-tint text-err' : 'bg-canvas'}`}
+            >
               <span className="text-[0.95rem] font-semibold">{item.produto_nome}</span>
-              <span className="text-base font-extrabold text-brand">
+              <span className={`text-base font-extrabold ${item.estoque_insuficiente ? 'text-err' : 'text-brand'}`}>
                 {item.quantidade_legivel ?? `${item.quantidade} ${item.unidade}`}
+                {item.estoque_insuficiente && ' · insuficiente'}
               </span>
             </div>
           ))}
@@ -115,11 +147,13 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
 
         {plano.itens.some((i) => i.estoque_insuficiente) && (
           <div className="mb-5 rounded-[14px] bg-warn-tint px-4 py-3 text-[0.88rem] font-semibold text-warn">
-            Itens com estoque insuficiente serão ignorados.
+            A baixa é parcial: itens disponíveis serão processados e os insuficientes aparecerão como falha.
           </div>
         )}
 
         <button
+          ref={confirmarRef}
+          type="button"
           className="btn-action btn-primary"
           onClick={onConfirmar}
           disabled={loading || itensDisponiveis.length === 0}
@@ -131,6 +165,7 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
           )}
         </button>
         <button
+          type="button"
           onClick={onCancelar}
           className="mt-3 w-full cursor-pointer border-none bg-transparent p-[0.9rem] text-[0.95rem] font-semibold text-ink-soft"
         >
@@ -145,14 +180,35 @@ function ModalBaixa({ plano, onConfirmar, onCancelar, loading }) {
 function ModalResultado({ resultado, onFechar }) {
   const IconeResultado = resultado.falhas === 0 ? CheckCircle2 : AlertTriangle
   const corIcone = resultado.falhas === 0 ? 'text-ok' : 'text-warn'
+  const fecharRef = useRef(null)
+
+  useEffect(() => {
+    fecharRef.current?.focus()
+    const fecharComEscape = (event) => {
+      if (event.key === 'Escape') onFechar()
+    }
+    document.addEventListener('keydown', fecharComEscape)
+    return () => document.removeEventListener('keydown', fecharComEscape)
+  }, [onFechar])
 
   return (
     <div className="modal-overlay">
-      <div className="modal-sheet text-center">
+      <div
+        className="modal-sheet text-center"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-resultado-baixa"
+      >
         <IconeResultado size={48} className={`mx-auto mb-2 ${corIcone}`} data-testid="icone-resultado" />
-        <h2 className="m-0 mb-2 text-[1.3rem] font-extrabold">
+        <h2 id="titulo-resultado-baixa" className="m-0 mb-2 text-[1.3rem] font-extrabold">
           Baixa concluída
         </h2>
+
+        {resultado.repetida && (
+          <p className="m-0 text-[0.85rem] font-semibold text-ink-soft">
+            Resultado recuperado sem repetir movimentações.
+          </p>
+        )}
 
         <div className="my-4 flex justify-center gap-6">
           <div>
@@ -173,7 +229,7 @@ function ModalResultado({ resultado, onFechar }) {
           </div>
         ))}
 
-        <button className="btn-action btn-primary mt-4" onClick={onFechar}>
+        <button ref={fecharRef} type="button" className="btn-action btn-primary mt-4" onClick={onFechar}>
           Fechar
         </button>
       </div>
@@ -184,33 +240,51 @@ function ModalResultado({ resultado, onFechar }) {
 /* ─── View principal ─────────────────────────────────────────────────── */
 export default function ProducaoView() {
   const navigate = useNavigate()
-  const [turno, setTurno] = useState(turnoAtual)
+  const [refeicao, setRefeicao] = useState(refeicaoAtual)
   const [data] = useState(hoje)
   const [plano, setPlano] = useState(null)
   const [loadingPlano, setLoadingPlano] = useState(false)
   const [erroPlano, setErroPlano] = useState('')
+  const [ultimaSincronizacao, setUltimaSincronizacao] = useState('')
   const [modalAberto, setModalAberto] = useState(false)
   const [loadingBaixa, setLoadingBaixa] = useState(false)
   const [resultado, setResultado] = useState(null)
   const enviandoRef = useRef(false)
+  const abrirBaixaRef = useRef(null)
+
+  const redirecionarErroDeAcesso = useCallback((erro) => {
+    if (erro.status !== 401 && erro.status !== 403) return false
+
+    limparSessao()
+    navigate('/login', {
+      replace: true,
+      state: {
+        message: erro.status === 403
+          ? 'O módulo de merenda está indisponível para este acesso.'
+          : 'Sua sessão expirou. Digite o PIN novamente.',
+      },
+    })
+    return true
+  }, [navigate])
 
   const carregarPlano = useCallback(async () => {
     setLoadingPlano(true)
     setErroPlano('')
     try {
-      const p = await getPlano(data, turno)
+      const p = await getPlano(data, refeicao)
       setPlano(p)
+      setUltimaSincronizacao(new Date().toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }))
     } catch (e) {
-      if (e.status === 401 || e.status === 403) {
-        logout()
-        navigate('/login', { replace: true })
-        return
-      }
+      if (redirecionarErroDeAcesso(e)) return
       setErroPlano(e.message ?? 'Erro ao carregar plano.')
     } finally {
       setLoadingPlano(false)
     }
-  }, [data, turno, navigate])
+  }, [data, refeicao, redirecionarErroDeAcesso])
 
   useEffect(() => {
     carregarPlano()
@@ -220,22 +294,39 @@ export default function ProducaoView() {
     if (enviandoRef.current) return
     enviandoRef.current = true
     setLoadingBaixa(true)
+    const operacaoId = obterOperacaoPendente(data, refeicao)
     try {
-      const res = await baixaProducao(data, turno)
+      const res = await baixaProducao(data, refeicao, undefined, operacaoId)
+      concluirOperacaoPendente(data, refeicao, operacaoId)
       setResultado(res)
       setModalAberto(false)
     } catch (e) {
-      const semResposta = e.status === undefined
+      if (redirecionarErroDeAcesso(e)) return
+
+      const semResposta = !e.status
       setModalAberto(false)
       if (semResposta) {
-        // Sem resposta do servidor: não sabemos se a baixa foi registrada.
-        // Recarrega o plano primeiro (isso zera erroPlano internamente) e só
-        // então define o aviso, para que carregarPlano não o sobrescreva.
-        await carregarPlano()
-        setErroPlano(
-          'Não foi possível confirmar se a baixa foi registrada. O plano foi recarregado — confira o saldo antes de tentar de novo.'
-        )
+        try {
+          const resultadoConsultado = await consultarBaixa(operacaoId)
+          concluirOperacaoPendente(data, refeicao, operacaoId)
+          setResultado(resultadoConsultado)
+        } catch (erroConsulta) {
+          if (redirecionarErroDeAcesso(erroConsulta)) return
+          await carregarPlano()
+          setErroPlano(
+            erroConsulta.status === 404
+              ? 'A baixa não foi encontrada no servidor. Você pode tentar novamente com segurança.'
+              : 'Não foi possível confirmar a baixa. O identificador foi preservado para uma nova tentativa segura.'
+          )
+        }
       } else {
+        if (e.status === 409) {
+          concluirOperacaoPendente(data, refeicao, operacaoId)
+          if (e.data?.codigo === 'refeicao_ja_baixada' && e.data?.resultado) {
+            setResultado(e.data.resultado)
+            return
+          }
+        }
         setErroPlano(e.message ?? 'Erro ao registrar baixa.')
       }
     } finally {
@@ -246,11 +337,18 @@ export default function ProducaoView() {
 
   function fecharResultado() {
     setResultado(null)
-    carregarPlano()
+    abrirBaixaRef.current?.focus()
+    void carregarPlano()
+  }
+
+  function cancelarBaixa() {
+    if (loadingBaixa) return
+    setModalAberto(false)
+    abrirBaixaRef.current?.focus()
   }
 
   function sair() {
-    logout()
+    void logout()
     navigate('/login', { replace: true })
   }
 
@@ -269,7 +367,7 @@ export default function ProducaoView() {
     >
       <header className="sticky top-0 z-20 bg-accent px-5 py-4 text-white">
         {plano?.previsao?.alerta_reducao && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl bg-warn px-4 py-2.5 text-[0.9rem] font-bold text-white">
+          <div role="status" className="mb-3 flex items-center gap-2 rounded-xl bg-warn px-4 py-2.5 text-[0.9rem] font-bold text-white">
             <AlertTriangle size={18} />
             Frequência abaixo de 50% da média — considere reduzir a produção
           </div>
@@ -290,28 +388,51 @@ export default function ProducaoView() {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          {TURNOS.map((t) => (
+        <div className="refeicao-tabs" role="group" aria-label="Refeição da baixa">
+          {REFEICOES.map((itemRefeicao) => (
             <button
-              key={t.key}
-              onClick={() => setTurno(t.key)}
-              className={`turno-chip${turno === t.key ? ' active' : ' border-white/30 bg-white/10 text-white/75'}`}
+              type="button"
+              key={itemRefeicao.key}
+              onClick={() => setRefeicao(itemRefeicao.key)}
+              className={`refeicao-chip${refeicao === itemRefeicao.key ? ' active' : ''}`}
+              aria-pressed={refeicao === itemRefeicao.key}
             >
-              {t.label}
+              {itemRefeicao.label}
             </button>
           ))}
         </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3 text-[0.8rem] text-white/80">
+          <span>
+            {ultimaSincronizacao
+              ? `Última atualização: ${ultimaSincronizacao}`
+              : 'Aguardando atualização do plano'}
+          </span>
+          <button
+            type="button"
+            onClick={carregarPlano}
+            disabled={loadingPlano}
+            className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3 py-2 font-bold text-white disabled:cursor-wait disabled:opacity-60"
+          >
+            <RefreshCw size={15} className={loadingPlano ? 'animate-spin' : ''} />
+            Atualizar
+          </button>
+        </div>
       </header>
 
-      <main style={{ flex: 1, padding: '1.25rem', paddingBottom: '7rem' }}>
+      <main
+        style={{ flex: 1, padding: '1.25rem', paddingBottom: '7rem' }}
+        aria-busy={loadingPlano}
+      >
         {loadingPlano && (
-          <div style={{ textAlign: 'center', color: 'var(--color-ink-faint)', paddingTop: '3rem', fontSize: '1rem' }}>
+          <div role="status" style={{ textAlign: 'center', color: 'var(--color-ink-faint)', paddingTop: '3rem', fontSize: '1rem' }}>
             Carregando plano…
           </div>
         )}
 
         {erroPlano && !loadingPlano && (
           <div
+            role="alert"
             style={{
               background: 'var(--color-err-tint)',
               color: 'var(--color-err)',
@@ -324,6 +445,7 @@ export default function ProducaoView() {
           >
             {erroPlano}
             <button
+              type="button"
               onClick={carregarPlano}
               style={{ display: 'block', margin: '0.75rem auto 0', fontWeight: 700, cursor: 'pointer', background: 'none', border: 'none', color: 'var(--color-err)', textDecoration: 'underline' }}
             >
@@ -334,7 +456,7 @@ export default function ProducaoView() {
 
         {!loadingPlano && plano && plano.itens.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--color-ink-faint)', paddingTop: '3rem', fontSize: '1rem' }}>
-            Nenhum item de produção para este turno.<br />
+            Nenhum item de produção para esta refeição.<br />
             <span style={{ fontSize: '0.85rem' }}>Verifique se as frequências foram registradas.</span>
           </div>
         )}
@@ -351,17 +473,20 @@ export default function ProducaoView() {
       <footer className="fixed inset-x-0 bottom-0 mx-auto max-w-[640px] border-t-[1.5px] border-line bg-surface px-5 py-4">
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={sair}
             className="shrink-0 cursor-pointer rounded-2xl border-[1.5px] border-line bg-canvas px-4 py-3.5 text-[0.9rem] font-semibold text-ink-soft"
           >
             Sair
           </button>
           <button
+            ref={abrirBaixaRef}
+            type="button"
             className="btn-action btn-primary flex-1"
-            disabled={!plano || itensDisponiveis.length === 0 || loadingPlano}
+            disabled={!plano || itensDisponiveis.length === 0 || loadingPlano || plano.baixa_realizada}
             onClick={() => setModalAberto(true)}
           >
-            Dar Baixa de Produção
+            {plano?.baixa_realizada ? 'Baixa já realizada' : 'Dar Baixa de Produção'}
           </button>
         </div>
       </footer>
@@ -370,7 +495,7 @@ export default function ProducaoView() {
         <ModalBaixa
           plano={plano}
           onConfirmar={executarBaixa}
-          onCancelar={() => setModalAberto(false)}
+          onCancelar={cancelarBaixa}
           loading={loadingBaixa}
         />
       )}

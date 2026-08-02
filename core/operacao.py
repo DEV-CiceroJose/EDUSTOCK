@@ -1,12 +1,28 @@
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
-from .models import FatorConsumo, Produto
+from .models import (
+    FatorConsumo,
+    FrequenciaDiaria,
+    Movimentacao,
+    OperacaoBaixaProducao,
+    Produto,
+)
 from .services import calcular_previsao_producao, registrar_movimentacao, total_frequencia
-from .models import Movimentacao
 
 UNIDADES_EM_GRAMAS = {"KG", "L"}
+
+
+class OperacaoIdReutilizado(Exception):
+    pass
+
+
+class RefeicaoJaBaixada(Exception):
+    def __init__(self, operacao):
+        self.operacao = operacao
+        super().__init__("A baixa desta refeição já foi realizada hoje.")
 
 
 def _money_qty(val):
@@ -37,6 +53,7 @@ def gerar_plano_do_dia(*, data, turno):
     fatores = (
         FatorConsumo.objects.filter(ativo=True)
         .select_related("produto", "produto__grupo__categoria")
+        .order_by("produto_id")
     )
     itens = []
     for f in fatores:
@@ -77,6 +94,15 @@ def baixa_de_producao(*, data, turno, itens_override=None, user=None):
     if itens_override:
         overrides = {int(i["produto_id"]): i for i in itens_override}
 
+    ids_plano = {item["produto_id"] for item in plano["itens"]}
+    ids_desconhecidos = sorted(set(overrides) - ids_plano)
+    if ids_desconhecidos:
+        raise ValidationError(
+            "Os produtos informados não fazem parte do plano atual: "
+            + ", ".join(str(produto_id) for produto_id in ids_desconhecidos)
+            + "."
+        )
+
     resultados = []
     for item in plano["itens"]:
         pid = item["produto_id"]
@@ -115,3 +141,80 @@ def baixa_de_producao(*, data, turno, itens_override=None, user=None):
         "sucesso": sum(1 for r in resultados if r["ok"]),
         "falhas": sum(1 for r in resultados if not r["ok"]),
     }
+
+
+def _normalizar_itens_solicitados(itens):
+    normalizados = []
+    for item in itens or []:
+        normalizado = {"produto_id": int(item["produto_id"])}
+        if "quantidade_override" in item:
+            normalizado["quantidade_override"] = str(item["quantidade_override"])
+        normalizados.append(normalizado)
+    return sorted(normalizados, key=lambda item: item["produto_id"])
+
+
+@transaction.atomic
+def executar_baixa_idempotente(*, operacao_id, data, refeicao, itens=None, user=None):
+    itens_normalizados = _normalizar_itens_solicitados(itens)
+    operacao_existente = (
+        OperacaoBaixaProducao.objects.select_for_update()
+        .filter(operacao_id=operacao_id)
+        .first()
+    )
+
+    if operacao_existente:
+        mesma_requisicao = (
+            operacao_existente.data == data
+            and operacao_existente.refeicao == refeicao
+            and operacao_existente.itens_solicitados == itens_normalizados
+        )
+        if not mesma_requisicao:
+            raise OperacaoIdReutilizado(
+                "Este identificador já foi usado em outra baixa de produção."
+            )
+
+        resultado_anterior = dict(operacao_existente.resultado)
+        resultado_anterior["repetida"] = True
+        return resultado_anterior
+
+    operacao, criada = OperacaoBaixaProducao.objects.select_for_update().get_or_create(
+        data=data,
+        refeicao=refeicao,
+        defaults={
+            "operacao_id": operacao_id,
+            "itens_solicitados": itens_normalizados,
+            "status": OperacaoBaixaProducao.CONCLUIDA,
+            "resultado": {},
+        },
+    )
+
+    if not criada:
+        if operacao.operacao_id == operacao_id:
+            resultado_anterior = dict(operacao.resultado)
+            resultado_anterior["repetida"] = True
+            return resultado_anterior
+        raise RefeicaoJaBaixada(operacao)
+
+    resultado = baixa_de_producao(
+        data=data,
+        turno=FrequenciaDiaria.INTEGRAL,
+        itens_override=itens_normalizados,
+        user=user,
+    )
+    status_operacao = (
+        OperacaoBaixaProducao.PARCIAL
+        if resultado["falhas"] > 0
+        else OperacaoBaixaProducao.CONCLUIDA
+    )
+    resultado.update({
+        "operacao_id": str(operacao_id),
+        "refeicao": refeicao,
+        "refeicao_label": operacao.get_refeicao_display(),
+        "status_operacao": status_operacao,
+        "repetida": False,
+    })
+
+    operacao.status = status_operacao
+    operacao.resultado = resultado
+    operacao.save(update_fields=["status", "resultado", "atualizado_em"])
+    return resultado

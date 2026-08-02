@@ -262,15 +262,53 @@ class FatorConsumo(models.Model):
         return f"{self.produto.nome}: {self.gramas_por_aluno}/aluno"
 
 
+class OperacaoBaixaProducao(models.Model):
+    CAFE_MANHA = "CAFE_MANHA"
+    ALMOCO = "ALMOCO"
+    LANCHE_TARDE = "LANCHE_TARDE"
+    REFEICAO_CHOICES = [
+        (CAFE_MANHA, "Café da manhã"),
+        (ALMOCO, "Almoço"),
+        (LANCHE_TARDE, "Lanche da tarde"),
+    ]
+    CONCLUIDA = "CONCLUIDA"
+    PARCIAL = "PARCIAL"
+    STATUS_CHOICES = [
+        (CONCLUIDA, "Concluída"),
+        (PARCIAL, "Parcial"),
+    ]
+
+    operacao_id = models.UUIDField(unique=True, editable=False)
+    data = models.DateField(db_index=True)
+    refeicao = models.CharField(max_length=12, choices=REFEICAO_CHOICES)
+    itens_solicitados = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    resultado = models.JSONField(default=dict)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data", "refeicao"],
+                name="unique_baixa_producao_por_refeicao_dia",
+            )
+        ]
+        verbose_name = "Operação de baixa de produção"
+        verbose_name_plural = "Operações de baixa de produção"
+
+    def __str__(self):
+        return f"{self.operacao_id} — {self.data} {self.get_refeicao_display()}"
+
+
 class Turma(models.Model):
     DS = "DS"
     TET = "TET"
     CURSO_CHOICES = [(DS, "Desenvolvimento de Sistemas"), (TET, "Eletrotécnica")]
 
-    MANHA = "MANHA"
-    TARDE = "TARDE"
     INTEGRAL = "INTEGRAL"
-    TURNO_CHOICES = [(MANHA, "Manhã"), (TARDE, "Tarde"), (INTEGRAL, "Integral")]
+    TURNO_CHOICES = [(INTEGRAL, "Integral")]
 
     nome = models.CharField(max_length=50, unique=True)
     curso = models.CharField(max_length=3, choices=CURSO_CHOICES)

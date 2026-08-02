@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">EasyStock Cozinha</title>
+  <rect width="512" height="512" fill="#214d3f"/>
+  <circle cx="256" cy="256" r="166" fill="#f3efe4"/>
+  <path d="M190 291c-34 0-61-27-61-61 0-31 23-57 53-61 10-37 43-64 83-64 39 0 72 27 82 64 29 5 52 30 52 61 0 34-27 61-61 61" fill="#fff" stroke="#214d3f" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M178 274v98h156v-98M212 322v50M300 322v50" fill="none" stroke="#e07a3e" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

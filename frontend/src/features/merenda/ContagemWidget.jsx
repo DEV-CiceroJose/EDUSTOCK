@@ -21,6 +21,7 @@ export default function ContagemWidget({ refreshKey = 0, onOpenContagem }) {
   const variacaoLabel = variacao == null
     ? "Sem histórico"
     : `${variacao > 0 ? "+" : ""}${variacao}% vs média`
+  const turmas = Array.isArray(resumo.turmas) ? resumo.turmas : []
 
   return (
     <div className="card overflow-hidden">
@@ -53,6 +54,28 @@ export default function ContagemWidget({ refreshKey = 0, onOpenContagem }) {
           <button type="button" onClick={onOpenContagem} className="btn btn-accent mt-4 w-full">
             {Icon.plus(18)} Registrar contagem
           </button>
+        )}
+      </div>
+      <div className="border-t border-line bg-surface-2/45 px-5 py-4 text-left">
+        <h3 className="font-display text-sm font-bold text-ink">Turmas registradas hoje</h3>
+        {turmas.length > 0 ? (
+          <ul className="mt-3 flex flex-col gap-2" aria-label="Histórico diário por turma">
+            {turmas.map((registro) => (
+              <li
+                key={registro.turma}
+                className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3.5 py-2.5"
+              >
+                <span className="min-w-0 truncate text-sm font-semibold text-ink">
+                  {registro.turma}
+                </span>
+                <strong className="shrink-0 text-sm text-brand">
+                  {registro.quantidade_alunos} {registro.quantidade_alunos === 1 ? "aluno" : "alunos"}
+                </strong>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-ink-faint">Nenhuma turma registrou presença hoje.</p>
         )}
       </div>
     </div>

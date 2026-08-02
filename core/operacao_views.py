@@ -4,6 +4,7 @@ import logging
 
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
 from django.db.models import Sum
 from rest_framework import status
@@ -15,14 +16,24 @@ from rest_framework.throttling import BaseThrottle
 from plataforma.authentication import TokenAcessoAuthentication
 from plataforma.permissions import RequerModuloAtivo
 
-from .models import FrequenciaDiaria
-from .operacao import baixa_de_producao, gerar_plano_do_dia
+from .models import FrequenciaDiaria, OperacaoBaixaProducao
+from .operacao import (
+    OperacaoIdReutilizado,
+    RefeicaoJaBaixada,
+    executar_baixa_idempotente,
+    gerar_plano_do_dia,
+)
 from .operacao_auth import (
     PERFIL_ALUNO, PERFIL_COZINHA,
     autenticar_pin, criar_token, invalidar_token,
     requer_perfil_operacao,
 )
 from .services import calcular_previsao_producao, calcular_resumo_dia, total_frequencia
+from .serializers import (
+    BaixaProducaoRequestSerializer,
+    ConsultaBaixaProducaoSerializer,
+    PlanoProducaoQuerySerializer,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -169,6 +180,9 @@ class OperacaoLogoutView(APIView):
 # Contagem de frequência
 # --------------------------------------------------------------------------
 
+MAX_ALUNOS_POR_TURMA = 45
+
+
 class ContagemView(APIView):
     """
     POST — registra frequência de uma turma (app-alunos, perfil ALUNO_REP).
@@ -203,11 +217,16 @@ class ContagemView(APIView):
             return Response({"detail": "Turno inválido."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             quantidade_alunos = int(quantidade_alunos)
-            if quantidade_alunos <= 0:
+            if not 1 <= quantidade_alunos <= MAX_ALUNOS_POR_TURMA:
                 raise ValueError
         except (TypeError, ValueError):
             return Response(
-                {"detail": "quantidade_alunos deve ser um inteiro maior que zero."},
+                {
+                    "detail": (
+                        "quantidade_alunos deve ser um inteiro entre "
+                        f"1 e {MAX_ALUNOS_POR_TURMA}."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -223,6 +242,7 @@ class ContagemView(APIView):
         except IntegrityError:
             return Response(
                 {
+                    "codigo": "frequencia_duplicada",
                     "detail": (
                         f"Frequência já registrada hoje para esta turma "
                         f"(turma '{turma}', turno {turno}, data {data.isoformat()})."
@@ -294,16 +314,33 @@ class PlanoDoDiaView(APIView):
 
     @requer_perfil_operacao(PERFIL_COZINHA)
     def get(self, request):
-        data, err = _parse_date(request.query_params.get("data"), default_today=True)
-        if err:
-            return err
-        turno = request.query_params.get("turno")
-        if turno not in dict(FrequenciaDiaria.TURNO_CHOICES):
+        serializer = PlanoProducaoQuerySerializer(data=request.query_params)
+        if not serializer.is_valid():
             return Response(
-                {"detail": "Parâmetro 'turno' é obrigatório. Use MANHA, TARDE ou INTEGRAL."},
+                {
+                    "codigo": "consulta_invalida",
+                    "detail": "Informe uma data e refeição válidas.",
+                    "campos": serializer.errors,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response(gerar_plano_do_dia(data=data, turno=turno))
+
+        dados = serializer.validated_data
+        plano = gerar_plano_do_dia(
+            data=dados["data"],
+            turno=FrequenciaDiaria.INTEGRAL,
+        )
+        operacao = OperacaoBaixaProducao.objects.filter(
+            data=dados["data"],
+            refeicao=dados["refeicao"],
+        ).first()
+        plano.update({
+            "refeicao": dados["refeicao"],
+            "refeicao_label": dict(OperacaoBaixaProducao.REFEICAO_CHOICES)[dados["refeicao"]],
+            "baixa_realizada": bool(operacao),
+            "status_baixa": operacao.status if operacao else None,
+        })
+        return Response(plano)
 
 
 # --------------------------------------------------------------------------
@@ -316,15 +353,77 @@ class BaixaProducaoView(APIView):
 
     @requer_perfil_operacao(PERFIL_COZINHA)
     def post(self, request):
-        data, err = _parse_date(request.data.get("data"), default_today=True)
-        if err:
-            return err
-        turno = request.data.get("turno")
-        if turno not in dict(FrequenciaDiaria.TURNO_CHOICES):
-            return Response({"detail": "Turno inválido."}, status=status.HTTP_400_BAD_REQUEST)
-        itens = request.data.get("itens")
-        # user=None — baixa feita pelo app-cozinha, sem vínculo a User Django
-        return Response(
-            baixa_de_producao(data=data, turno=turno, itens_override=itens, user=None),
-            status=status.HTTP_200_OK,
-        )
+        serializer = BaixaProducaoRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "codigo": "payload_invalido",
+                    "detail": "Dados inválidos para a baixa de produção.",
+                    "campos": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        dados = serializer.validated_data
+        try:
+            resultado = executar_baixa_idempotente(
+                operacao_id=dados["operacao_id"],
+                data=dados["data"],
+                refeicao=dados["refeicao"],
+                itens=dados.get("itens"),
+                user=None,
+            )
+        except OperacaoIdReutilizado as exc:
+            return Response(
+                {"codigo": "operacao_id_reutilizado", "detail": str(exc)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except RefeicaoJaBaixada as exc:
+            resultado_anterior = dict(exc.operacao.resultado)
+            resultado_anterior["repetida"] = True
+            return Response(
+                {
+                    "codigo": "refeicao_ja_baixada",
+                    "detail": str(exc),
+                    "resultado": resultado_anterior,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        except DjangoValidationError as exc:
+            mensagem = exc.messages[0] if exc.messages else str(exc)
+            return Response(
+                {"codigo": "plano_invalido", "detail": mensagem},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(resultado, status=status.HTTP_200_OK)
+
+    @requer_perfil_operacao(PERFIL_COZINHA)
+    def get(self, request):
+        serializer = ConsultaBaixaProducaoSerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "codigo": "consulta_invalida",
+                    "detail": "Informe um identificador de operação válido.",
+                    "campos": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        operacao = OperacaoBaixaProducao.objects.filter(
+            operacao_id=serializer.validated_data["operacao_id"]
+        ).first()
+        if not operacao:
+            return Response(
+                {
+                    "codigo": "operacao_nao_encontrada",
+                    "detail": "A baixa de produção ainda não foi registrada.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        resultado = dict(operacao.resultado)
+        resultado["repetida"] = True
+        resultado["consultada"] = True
+        return Response(resultado, status=status.HTTP_200_OK)

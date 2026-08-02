@@ -9,6 +9,7 @@ export default function OperationPinLogin({
   iconClassName = "bg-brand",
   login,
   onSuccess,
+  notice = "",
   fallbackError = "PIN inválido. Tente novamente.",
 }) {
   const [pin, setPin] = useState("")
@@ -44,11 +45,15 @@ export default function OperationPinLogin({
   }, [confirmar])
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-[420px] flex-col items-center justify-center bg-white px-6 py-10">
+    <main
+      className="mx-auto flex min-h-screen max-w-[420px] flex-col items-center justify-center bg-white px-6 py-10"
+      aria-busy={loading}
+    >
       <div className="mb-8 text-center">
         <div
           className={`mx-auto mb-4 grid place-items-center rounded-3xl text-white ${iconClassName}`}
           style={{ width: 72, height: 72 }}
+          aria-hidden="true"
         >
           {icon}
         </div>
@@ -56,14 +61,25 @@ export default function OperationPinLogin({
         <p className="mt-1.5 text-base text-ink-soft">{subtitle}</p>
       </div>
 
-      <div className="mb-6 flex items-center justify-center" aria-label={`${pin.length} de 4 dígitos informados`}>
+      <div
+        className="mb-6 flex items-center justify-center"
+        aria-label={`${pin.length} de 4 dígitos informados`}
+        aria-live="polite"
+        aria-atomic="true"
+      >
         {[0, 1, 2, 3].map((index) => (
           <span key={index} className={`pin-dot${index < pin.length ? " filled" : ""}`} />
         ))}
       </div>
 
+      {notice && !erro && (
+        <div role="status" aria-live="polite" className="mb-4 w-full rounded-2xl bg-warn-tint px-4 py-3 text-center text-[0.95rem] font-semibold text-warn">
+          {notice}
+        </div>
+      )}
+
       {erro && (
-        <div role="alert" className="mb-4 w-full rounded-2xl bg-err-tint px-4 py-3 text-center text-[0.95rem] font-semibold text-err">
+        <div role="alert" aria-live="assertive" className="mb-4 w-full rounded-2xl bg-err-tint px-4 py-3 text-center text-[0.95rem] font-semibold text-err">
           {erro}
         </div>
       )}
@@ -79,7 +95,7 @@ export default function OperationPinLogin({
                 onClick={() => pressKey("back")}
                 className="numkey numkey-back"
                 aria-label="Apagar"
-                disabled={loading}
+                disabled={loading || pin.length === 0}
               >
                 ⌫
               </button>
@@ -100,8 +116,8 @@ export default function OperationPinLogin({
       </div>
 
       {loading && (
-        <p className="mt-6 text-center text-[0.95rem] text-ink-soft">Verificando…</p>
+        <p role="status" aria-live="polite" className="mt-6 text-center text-[0.95rem] text-ink-soft">Verificando…</p>
       )}
-    </div>
+    </main>
   )
 }

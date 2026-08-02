@@ -1,5 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
+from uuid import uuid4
 
 from django.test import TestCase
 from django.utils import timezone
@@ -103,7 +104,7 @@ class ContagemApiTest(APITestCase):
         from core.operacao_auth import criar_token, PERFIL_ALUNO, PERFIL_COZINHA
         self.client_aluno = APIClient()
         self.client_aluno.credentials(
-            HTTP_X_OPERACAO_TOKEN=criar_token(PERFIL_ALUNO, turma="6A", turno="MANHA")
+            HTTP_X_OPERACAO_TOKEN=criar_token(PERFIL_ALUNO, turma="6A", turno="INTEGRAL")
         )
         self.client_cozinha = APIClient()
         self.client_cozinha.credentials(
@@ -123,6 +124,15 @@ class ContagemApiTest(APITestCase):
         resp = self.client_aluno.post("/api/operacao/contagem/", payload, format="json")
         self.assertEqual(resp.status_code, 409)
         self.assertIn("Frequência já registrada", resp.data["detail"])
+        self.assertEqual(resp.data["codigo"], "frequencia_duplicada")
+
+    def test_rejeita_quantidade_acima_do_limite(self):
+        resp = self.client_aluno.post("/api/operacao/contagem/", {
+            "quantidade_alunos": 46,
+        }, format="json")
+
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertIn("entre 1 e 45", resp.data["detail"])
 
     def test_resumo_dia(self):
         from django.contrib.auth.models import User
@@ -155,6 +165,13 @@ class ContagemApiTest(APITestCase):
         resp = client_admin.get("/api/operacao/resumo/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["total_alunos"], 50)
+        self.assertEqual(
+            resp.data["turmas"],
+            [
+                {"turma": "6A", "quantidade_alunos": 30},
+                {"turma": "7B", "quantidade_alunos": 20},
+            ],
+        )
 
     def test_plano_do_dia(self):
         cat = Categoria.objects.create(name="Alimentos")
@@ -163,9 +180,11 @@ class ContagemApiTest(APITestCase):
         FatorConsumo.objects.create(produto=p, gramas_por_aluno=Decimal("100"))
         hoje = timezone.localdate().isoformat()
         self.client_aluno.post("/api/operacao/contagem/", {
-            "quantidade_alunos": 50,
+            "quantidade_alunos": 40,
         }, format="json")
-        resp = self.client_cozinha.get(f"/api/operacao/plano-do-dia/?data={hoje}&turno=MANHA")
+        resp = self.client_cozinha.get(
+            f"/api/operacao/plano-do-dia/?data={hoje}&refeicao=ALMOCO"
+        )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data["itens"]), 1)
 
@@ -176,12 +195,12 @@ class ContagemApiTest(APITestCase):
         FatorConsumo.objects.create(produto=p, gramas_por_aluno=Decimal("100"))
         hoje = timezone.localdate().isoformat()
         self.client_aluno.post("/api/operacao/contagem/", {
-            "quantidade_alunos": 100,
+            "quantidade_alunos": 40,
         }, format="json")
         resp = self.client_cozinha.post("/api/operacao/baixa-de-producao/", {
-            "data": hoje, "turno": "MANHA",
+            "operacao_id": str(uuid4()), "data": hoje, "refeicao": "ALMOCO",
         }, format="json")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.data["sucesso"], 1)
         p.refresh_from_db()
-        self.assertEqual(p.quantidade, Decimal("10.000"))
+        self.assertEqual(p.quantidade, Decimal("16.000"))

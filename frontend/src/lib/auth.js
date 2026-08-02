@@ -41,11 +41,11 @@ export function estaAutenticado() {
 }
 
 export function ehAdmin() {
-  return sessionStorage.getItem(IS_STAFF_KEY) === "true"
+  return getPapel() === "ADMIN"
 }
 
 export function podeGerenciarCadastros() {
-  return ehAdmin() || getPapel() === "ADMIN"
+  return sessionStorage.getItem(IS_STAFF_KEY) === "true" || ehAdmin()
 }
 
 export function getUsername() {

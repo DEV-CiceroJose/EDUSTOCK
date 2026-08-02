@@ -22,6 +22,7 @@ describe('PinLogin (app-cozinha)', () => {
 
     expect(screen.getByTestId('icone-cabecalho')).toBeInTheDocument()
     expect(screen.queryByText('🍽️')).not.toBeInTheDocument()
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'false')
   })
 
   it('chama login ao completar os 4 dígitos do PIN', () => {

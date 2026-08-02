@@ -17,15 +17,22 @@ describe("auth", () => {
     expect(ehAdmin()).toBe(true)
   })
 
-  it("ehAdmin depende de is_staff, não do papel da aplicação", () => {
+  it("papel ADMIN libera as áreas administrativas mesmo sem is_staff", () => {
     salvarSessao({ token: "abc-123", papel: "ADMIN", is_staff: false, modulos_ativos: [] })
-    expect(ehAdmin()).toBe(false)
+    expect(ehAdmin()).toBe(true)
     expect(podeGerenciarCadastros()).toBe(true)
   })
 
-  it("operador nao pode gerenciar cadastros", () => {
+  it("operador comum não pode gerenciar cadastros", () => {
     salvarSessao({ token: "abc-123", papel: "OPERADOR", is_staff: false, modulos_ativos: [] })
+    expect(ehAdmin()).toBe(false)
     expect(podeGerenciarCadastros()).toBe(false)
+  })
+
+  it("operador staff gerencia estoque sem acessar áreas de sistema", () => {
+    salvarSessao({ token: "abc-123", papel: "OPERADOR", is_staff: true, modulos_ativos: [] })
+    expect(ehAdmin()).toBe(false)
+    expect(podeGerenciarCadastros()).toBe(true)
   })
 
   it("limparSessao remove tudo", () => {
