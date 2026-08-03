@@ -2,6 +2,7 @@ from datetime import datetime
 import hashlib
 import logging
 from types import SimpleNamespace
+from uuid import UUID, uuid4
 
 from django.conf import settings
 from django.core.cache import cache
@@ -294,12 +295,47 @@ class ContagemView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        operacao_bruta = request.data.get("operacao_id")
+        try:
+            operacao_id = UUID(str(operacao_bruta)) if operacao_bruta else uuid4()
+        except (TypeError, ValueError, AttributeError):
+            return Response(
+                {"detail": "operacao_id deve ser um UUID válido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        existente = FrequenciaDiaria.objects.filter(operacao_id=operacao_id).first()
+        if existente:
+            mesma_operacao = (
+                existente.data == data
+                and existente.turno == turno
+                and existente.turma == turma
+                and existente.quantidade_alunos == quantidade_alunos
+            )
+            if not mesma_operacao:
+                return Response(
+                    {"codigo": "operacao_id_reutilizado", "detail": "Este identificador já foi usado em outro registro."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            previsao = calcular_previsao_producao(data, turno)
+            return Response({
+                "id": existente.id,
+                "operacao_id": str(operacao_id),
+                "data": data.isoformat(),
+                "turno": turno,
+                "turma": turma,
+                "quantidade_alunos": quantidade_alunos,
+                "previsao": previsao,
+                "repetida": True,
+            })
+
         try:
             freq = FrequenciaDiaria.objects.create(
                 data=data,
                 turno=turno,
                 turma=turma,
                 quantidade_alunos=quantidade_alunos,
+                operacao_id=operacao_id,
                 registrado_por_turma=sessao.get("turma", turma),
                 registrado_por=None,  # app-alunos não usa User Django
             )
@@ -319,11 +355,13 @@ class ContagemView(APIView):
         return Response(
             {
                 "id": freq.id,
+                "operacao_id": str(operacao_id),
                 "data": data.isoformat(),
                 "turno": turno,
                 "turma": turma,
                 "quantidade_alunos": quantidade_alunos,
                 "previsao": previsao,
+                "repetida": False,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -474,6 +512,7 @@ class PlanoDoDiaView(APIView):
         plano = gerar_plano_do_dia(
             data=dados["data"],
             turno=FrequenciaDiaria.INTEGRAL,
+            refeicao=dados["refeicao"],
         )
         operacao = OperacaoBaixaProducao.objects.filter(
             data=dados["data"],

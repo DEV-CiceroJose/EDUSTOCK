@@ -4,6 +4,7 @@ from .api_views import (
     ProdutoViewSet, CategoriaViewSet, GrupoViewSet,
     BemPermanenteViewSet, FornecedorViewSet,
     MovimentacaoViewSet, EntradaViewSet, AlertasView, PrestacaoContasView,
+    LoteEstoqueViewSet, ReceitaViewSet, CardapioViewSet,
 )
 from .operacao_views import (
     ContagemView, ResumoFrequenciaView, PlanoDoDiaView, BaixaProducaoView,
@@ -18,6 +19,9 @@ router.register(r"bens-permanentes", BemPermanenteViewSet, basename="bempermanen
 router.register(r"fornecedores", FornecedorViewSet, basename="fornecedor")
 router.register(r"movimentacoes", MovimentacaoViewSet, basename="movimentacao")
 router.register(r"entradas", EntradaViewSet, basename="entrada")
+router.register(r"lotes", LoteEstoqueViewSet, basename="lote")
+router.register(r"receitas", ReceitaViewSet, basename="receita")
+router.register(r"cardapios", CardapioViewSet, basename="cardapio")
 
 urlpatterns = [
     path("health/", HealthCheckView.as_view(), name="health-check"),

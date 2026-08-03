@@ -9,6 +9,7 @@ const PAPEIS = [
   { value: "OPERADOR", label: "Operador" },
   { value: "ADMIN", label: "Administrador" },
 ]
+const MODULOS = ["inventario", "movimentacoes", "fornecedores", "alertas", "relatorios", "merenda", "financeiro"]
 
 export default function AdminUsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
@@ -46,6 +47,23 @@ export default function AdminUsuariosPage() {
     }
   }
 
+  async function trocarModulo(usuario, slug) {
+    const anteriores = usuario.modulos ?? []
+    const novos = anteriores.includes(slug)
+      ? anteriores.filter((item) => item !== slug)
+      : [...anteriores, slug]
+    setUsuarios((lista) => lista.map((u) => (u.id === usuario.id ? { ...u, modulos: novos } : u)))
+    const resp = await fetch(`${BASE}/usuarios/${usuario.id}/`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
+      body: JSON.stringify({ modulos: novos }),
+    })
+    if (!resp.ok) {
+      setUsuarios((lista) => lista.map((u) => (u.id === usuario.id ? { ...u, modulos: anteriores } : u)))
+      toast("Não foi possível alterar os módulos.", "danger")
+    }
+  }
+
   function aoCriar(novoUsuario) {
     setUsuarios((lista) => [...lista, novoUsuario].sort((a, b) => a.username.localeCompare(b.username)))
     toast("Usuário criado")
@@ -66,8 +84,9 @@ export default function AdminUsuariosPage() {
       </div>
       <div className="flex flex-col gap-2">
         {usuarios.map((u) => (
-          <div key={u.id} className="card flex items-center justify-between p-4">
-            <p className="font-semibold">{u.username}</p>
+          <div key={u.id} className="card p-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="font-semibold">{u.username}</p>
             <select
               value={u.papel}
               onChange={(e) => trocarPapel(u, e.target.value)}
@@ -77,6 +96,22 @@ export default function AdminUsuariosPage() {
                 <option key={p.value} value={p.value}>{p.label}</option>
               ))}
             </select>
+            </div>
+            {u.papel === "OPERADOR" && (
+              <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
+                {MODULOS.map((slug) => (
+                  <label key={slug} className="flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={(u.modulos ?? []).includes(slug)}
+                      onChange={() => trocarModulo(u, slug)}
+                    />
+                    {slug}
+                  </label>
+                ))}
+                {(u.modulos ?? []).length === 0 && <span className="text-xs text-ink-faint">Todos os módulos ativos</span>}
+              </div>
+            )}
           </div>
         ))}
       </div>

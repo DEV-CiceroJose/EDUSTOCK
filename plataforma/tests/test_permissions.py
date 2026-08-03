@@ -27,10 +27,10 @@ class RequerModuloAtivoTest(TestCase):
         request = self.factory.get("/api/produtos/")
         self.assertFalse(permission.has_permission(request, None))
 
-    def test_permite_quando_modulo_nao_existe(self):
+    def test_bloqueia_quando_modulo_nao_existe(self):
         permission = RequerModuloAtivo("modulo-inexistente")()
         request = self.factory.get("/api/produtos/")
-        self.assertTrue(permission.has_permission(request, None))
+        self.assertFalse(permission.has_permission(request, None))
 
 
 class EhAdminTest(TestCase):

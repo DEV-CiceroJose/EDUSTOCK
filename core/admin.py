@@ -2,6 +2,7 @@ from django.contrib import admin
 from django import forms
 from .models import (
     BemPermanente,
+    Cardapio,
     Categoria,
     ConfiguracaoAlertas,
     Entrada,
@@ -9,10 +10,13 @@ from .models import (
     Fornecedor,
     FrequenciaDiaria,
     Grupo,
+    LoteEstoque,
     Movimentacao,
     OperacaoBaixaProducao,
     PinAcesso,
     Produto,
+    Receita,
+    ReceitaIngrediente,
     Turma,
 )
 
@@ -235,6 +239,45 @@ class FatorConsumoAdmin(admin.ModelAdmin):
     list_filter = ("ativo", "produto__grupo__categoria")
     search_fields = ("produto__nome",)
     autocomplete_fields = ("produto",)
+
+
+class ReceitaIngredienteInline(admin.TabularInline):
+    model = ReceitaIngrediente
+    extra = 1
+    autocomplete_fields = ("produto",)
+
+
+@admin.register(Receita)
+class ReceitaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "refeicao", "ativa")
+    list_filter = ("refeicao", "ativa")
+    search_fields = ("nome",)
+    inlines = (ReceitaIngredienteInline,)
+
+
+@admin.register(Cardapio)
+class CardapioAdmin(admin.ModelAdmin):
+    list_display = ("data", "refeicao", "receita")
+    list_filter = ("refeicao", "data")
+    date_hierarchy = "data"
+    autocomplete_fields = ("receita",)
+
+
+@admin.register(LoteEstoque)
+class LoteEstoqueAdmin(admin.ModelAdmin):
+    list_display = ("codigo", "produto", "validade", "quantidade", "entrada")
+    list_filter = ("validade", "produto__grupo__categoria")
+    search_fields = ("codigo", "produto__nome", "entrada__numero_nota_fiscal")
+    readonly_fields = ("produto", "entrada", "codigo", "validade", "quantidade", "preco_unitario", "criado_em")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(OperacaoBaixaProducao)

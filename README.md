@@ -185,6 +185,9 @@ para detalhes da landing, migração de dados e testes E2E.
 - ✅ Sistema de alertas (validade e estoque crítico)
 - ✅ Gestão de fornecedores
 - ✅ Relatórios personalizáveis
+- ✅ Controle de lotes com baixa FEFO
+- ✅ Cardápios e receitas específicos por refeição
+- ✅ Permissões por usuário e trilha de auditoria
 - ✅ Sidebar colapsável com hover
 - ✅ Busca global de produtos
 - ✅ Navegação rápida entre páginas
@@ -194,6 +197,7 @@ para detalhes da landing, migração de dados e testes E2E.
 - 📋 Visualização do plano do dia
 - 🔐 Autenticação por PIN único
 - 📲 Instalável pelo navegador como aplicativo (PWA)
+- 📴 Fila offline com sincronização idempotente
 
 ### App Alunos
 - 👨‍🎓 Registro de contagem de presença por turma
@@ -201,6 +205,7 @@ para detalhes da landing, migração de dados e testes E2E.
 - 🔐 Autenticação por PIN de turma
 - ⏰ Registro simplificado para turmas de período integral
 - 📲 Instalável pelo navegador como aplicativo (PWA)
+- 📴 Fila offline com sincronização idempotente
 
 ## 🤝 Contribuindo
 

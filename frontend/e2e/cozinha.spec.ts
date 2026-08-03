@@ -58,6 +58,13 @@ test("cozinha entra, confere a ordem e conclui uma baixa parcial", async ({ page
         body: JSON.stringify(plano),
       })
     }
+    if (path.endsWith("/status-do-dia/")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ sincronizado_em: new Date().toISOString(), refeicoes: [], historico_recente: [] }),
+      })
+    }
 
     const body = request.postDataJSON()
     operacaoId = body.operacao_id
@@ -117,6 +124,13 @@ test("resposta perdida é reconciliada sem repetir a baixa", async ({ page }) =>
     if (path.endsWith("/plano-do-dia/")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(plano) })
     }
+    if (path.endsWith("/status-do-dia/")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ sincronizado_em: new Date().toISOString(), refeicoes: [], historico_recente: [] }),
+      })
+    }
     if (request.method() === "POST") return route.abort("connectionfailed")
     return route.fulfill({
       status: 200,
@@ -164,5 +178,5 @@ test("sessão expirada ao carregar o plano retorna ao PIN com orientação", asy
   await informarPin(page)
 
   await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByRole("status")).toContainText("Sua sessão expirou")
+  await expect(page.getByText(/Sua sessão expirou/)).toBeVisible()
 })

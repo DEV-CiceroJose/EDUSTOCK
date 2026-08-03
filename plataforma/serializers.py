@@ -14,24 +14,39 @@ class ModuloSerializer(serializers.ModelSerializer):
 class UsuarioSerializer(serializers.ModelSerializer):
     papel = serializers.ChoiceField(choices=Perfil.PAPEL_CHOICES, source="perfil.papel")
     password = serializers.CharField(write_only=True, required=False)
+    modulos = serializers.SlugRelatedField(
+        source="perfil.modulos",
+        slug_field="slug",
+        queryset=Modulo.objects.all(),
+        many=True,
+        required=False,
+    )
 
     class Meta:
         model = User
-        fields = ["id", "username", "password", "papel"]
+        fields = ["id", "username", "password", "papel", "modulos"]
 
     def create(self, validated_data):
-        papel = validated_data.pop("perfil")["papel"]
+        perfil_data = validated_data.pop("perfil")
+        papel = perfil_data["papel"]
+        modulos = perfil_data.get("modulos", [])
         # password é required=False: se omitido, create_user recebe None e
         # define uma senha inutilizável (conta criada pelo admin que definirá
         # a própria senha depois), em vez de levantar KeyError → HTTP 500.
         password = validated_data.pop("password", None)
         user = User.objects.create_user(username=validated_data["username"], password=password)
-        Perfil.objects.create(user=user, papel=papel)
+        perfil = Perfil.objects.create(user=user, papel=papel)
+        if modulos:
+            perfil.modulos.set(modulos)
         return user
 
     def update(self, instance, validated_data):
         papel_data = validated_data.pop("perfil", None)
         if papel_data:
-            instance.perfil.papel = papel_data["papel"]
-            instance.perfil.save(update_fields=["papel"])
+            perfil = instance.perfil
+            if "papel" in papel_data:
+                perfil.papel = papel_data["papel"]
+                perfil.save(update_fields=["papel"])
+            if "modulos" in papel_data:
+                perfil.modulos.set(papel_data["modulos"])
         return instance

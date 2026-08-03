@@ -22,6 +22,9 @@ class AutenticadoAPITestCase(APITestCase):
             modulo, _ = Modulo.objects.get_or_create(
                 slug=slug, defaults={"nome": slug.capitalize(), "ativo": True}
             )
+            if not modulo.ativo:
+                modulo.ativo = True
+                modulo.save(update_fields=["ativo"])
             if slug == "inventario":
                 inventario = modulo
         Modulo.objects.filter(slug="merenda").update(depende_de=inventario)

@@ -149,8 +149,9 @@ não é possível:
 - consultar ou registrar frequência de alunos;
 - sincronizar alterações com o EduStock.
 
-O cache atual evita uma tela totalmente indisponível, mas não implementa coleta
-offline nem sincronização posterior de dados.
+Além do cache do aplicativo, registros feitos durante falhas de rede entram em
+uma fila local e são reenviados quando a conexão retorna. Frequência e baixa de
+produção usam identificadores idempotentes, evitando duplicação no reenvio.
 
 ## Compatibilidade com o deploy atual
 
@@ -201,9 +202,8 @@ Foram executadas as seguintes verificações:
 
 - Adicionar screenshots aos manifestos para enriquecer a caixa de instalação em
   navegadores que suportam esse recurso.
-- Implementar, somente se houver requisito operacional, uma fila offline com
-  sincronização posterior. Isso exige regras para conflitos, expiração da
-  sessão, segurança dos dados e prevenção de registros duplicados.
+- Acompanhar em campo o volume de operações offline e definir uma política de
+  expiração para itens que permaneçam pendentes por vários dias.
 - Automatizar uma auditoria PWA em CI com navegador real, além dos testes e
   builds já executados.
 

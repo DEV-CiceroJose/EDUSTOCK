@@ -107,6 +107,16 @@ export default function ContagemView() {
     setEstado('loading')
     try {
       const data = await registrarContagem(qtd)
+      if (data.pendente) {
+        setResultado({
+          turma: sessao.turma,
+          turno: sessao.turno,
+          quantidade_alunos: qtd,
+          pendente: true,
+        })
+        setEstado('sucesso')
+        return
+      }
       const statusAtualizado = await getStatusDoDia()
       setResultado({
         ...data,
@@ -179,6 +189,11 @@ export default function ContagemView() {
           {resultado.recuperado && (
             <p className="mt-3 font-semibold text-ok">
               A frequência desta turma já foi enviada hoje.
+            </p>
+          )}
+          {resultado.pendente && (
+            <p className="mt-3 font-semibold text-warn">
+              Salvo neste dispositivo. O envio será feito automaticamente quando a conexão voltar.
             </p>
           )}
 

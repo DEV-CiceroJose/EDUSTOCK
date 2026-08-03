@@ -43,3 +43,14 @@ class TokenAcessoModelTest(TestCase):
         )
         self.assertFalse(token_valido.expirado)
         self.assertTrue(token_vencido.expirado)
+
+    def test_token_claro_nao_e_persistido(self):
+        user = User.objects.create_user(username="seguro", password="senha123")
+        token = TokenAcesso.objects.create(
+            user=user, expira_em=timezone.now() + timedelta(hours=1)
+        )
+        valor_claro = token.token
+        persistido = TokenAcesso.objects.get(pk=token.pk)
+        self.assertFalse(hasattr(persistido, "token"))
+        self.assertNotEqual(persistido.token_hash, valor_claro)
+        self.assertEqual(persistido.token_hash, TokenAcesso.calcular_hash(valor_claro))

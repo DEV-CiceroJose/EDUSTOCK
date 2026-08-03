@@ -22,6 +22,7 @@ function respostaJson(status, data) {
 describe('api.js — retry de rede', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -55,6 +56,21 @@ describe('api.js — retry de rede', () => {
       'Sem conexão com o sistema. Verifique a internet e tente novamente.',
     )
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserva uma baixa em fila local quando a rede está indisponível', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+
+    await expect(baixaProducao(
+      '2026-07-17',
+      'ALMOCO',
+      undefined,
+      '11111111-1111-4111-8111-111111111111',
+    )).rejects.toMatchObject({ enfileirada: true })
+
+    const fila = JSON.parse(localStorage.getItem('edustock:cozinha:fila-baixas'))
+    expect(fila).toHaveLength(1)
+    expect(fila[0]).toMatchObject({ refeicao: 'ALMOCO' })
   })
 
   it('erro HTTP de aplicação (4xx) nunca é reenviado, mesmo em endpoint com retry:true', async () => {

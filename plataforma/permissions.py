@@ -1,6 +1,21 @@
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
-from .models import Modulo
+from .models import Modulo, Perfil
+
+
+def slugs_modulos_do_usuario(user):
+    ativos = Modulo.objects.filter(ativo=True)
+    if not user or not user.is_authenticated:
+        return set(ativos.values_list("slug", flat=True))
+    try:
+        perfil = user.perfil
+    except Perfil.DoesNotExist:
+        return set()
+    if perfil.papel == Perfil.ADMIN or not perfil.modulos.exists():
+        return set(ativos.values_list("slug", flat=True))
+    return set(
+        ativos.filter(perfis_autorizados=perfil).values_list("slug", flat=True)
+    )
 
 
 def RequerModuloAtivo(slug):
@@ -16,10 +31,16 @@ def RequerModuloAtivo(slug):
             try:
                 modulo = Modulo.objects.get(slug=slug)
             except Modulo.DoesNotExist:
-                return True
+                self.message = f"Módulo obrigatório '{slug}' não está configurado."
+                return False
             if not modulo.ativo:
                 self.message = f"Módulo '{modulo.nome}' está desativado."
                 return False
+            user = getattr(request, "user", None)
+            if user and user.is_authenticated:
+                if slug not in slugs_modulos_do_usuario(user):
+                    self.message = "Seu usuário não possui acesso a este módulo."
+                    return False
             return True
 
     return _RequerModuloAtivo

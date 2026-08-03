@@ -323,7 +323,9 @@ export default function ProducaoView() {
           if (redirecionarErroDeAcesso(erroConsulta)) return
           await carregarPlano()
           setErroPlano(
-            erroConsulta.status === 404
+            e.enfileirada
+              ? 'A baixa foi salva neste dispositivo e será enviada automaticamente quando a conexão voltar.'
+              : erroConsulta.status === 404
               ? 'A baixa não foi encontrada no servidor. Você pode tentar novamente com segurança.'
               : 'Não foi possível confirmar a baixa. O identificador foi preservado para uma nova tentativa segura.'
           )

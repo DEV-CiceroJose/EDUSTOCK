@@ -3,12 +3,24 @@
  * política de retry ficam no pacote compartilhado dos apps operacionais.
  */
 
-import { createOperacaoHttpClient } from "@edustock/operacao-shared"
+import { createOfflineQueue, createOperacaoHttpClient } from "@edustock/operacao-shared"
 
 const SESSION_KEY = "operacao_sessao"
 const http = createOperacaoHttpClient({
   baseUrl: import.meta.env.VITE_API_BASE ?? "",
   tokenKey: "operacao_token",
+})
+const filaContagens = createOfflineQueue({
+  storageKey: "edustock:alunos:fila-contagens",
+  send: (body) => {
+    const { _turma, ...payload } = body
+    if (getSessao()?.turma !== _turma) {
+      const error = new Error("Aguardando a sessão da turma que criou este registro.")
+      error.status = 401
+      throw error
+    }
+    return http.request("POST", "/api/operacao/contagem/", payload, { retry: false })
+  },
 })
 
 export async function login(pin) {
@@ -32,6 +44,7 @@ export async function login(pin) {
     turno: data.turno,
     perfil: data.perfil,
   }))
+  void sincronizarContagensPendentes()
   return data
 }
 
@@ -72,14 +85,21 @@ export function getSessao() {
 }
 
 export async function registrarContagem(quantidade_alunos, data) {
-  const body = { quantidade_alunos }
+  const body = { quantidade_alunos, operacao_id: globalThis.crypto.randomUUID() }
   if (data) body.data = data
-  return http.request(
-    "POST",
-    "/api/operacao/contagem/",
-    body,
-    { retry: true },
-  )
+  try {
+    return await http.request("POST", "/api/operacao/contagem/", body, { retry: true })
+  } catch (error) {
+    if (error.status) throw error
+    filaContagens.add({ ...body, _turma: getSessao()?.turma })
+    return { ...body, pendente: true }
+  }
+}
+
+export const sincronizarContagensPendentes = () => filaContagens.flush()
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => void sincronizarContagensPendentes())
 }
 
 export async function getStatusDoDia(data) {
