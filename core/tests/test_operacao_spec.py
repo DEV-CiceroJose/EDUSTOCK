@@ -494,6 +494,24 @@ class TestLoginPorPin(APITestCase):
         self.assertEqual(bloqueado.status_code, 429, bloqueado.content)
         self.assertIn("Retry-After", bloqueado.headers)
 
+    def test_falhas_do_app_alunos_nao_bloqueiam_a_cozinha(self):
+        for tentativa in range(5):
+            resposta = self.client.post(
+                "/api/operacao/auth/",
+                {"pin": f"8{tentativa:03d}", "perfil": "ALUNO_REP"},
+                format="json",
+            )
+            self.assertEqual(resposta.status_code, 401, resposta.content)
+
+        cozinha = self.client.post(
+            "/api/operacao/auth/",
+            {"pin": "0099", "perfil": "COZINHA"},
+            format="json",
+        )
+
+        self.assertEqual(cozinha.status_code, 200, cozinha.content)
+        self.assertEqual(cozinha.data["perfil"], "COZINHA")
+
     def test_login_pin_inativo_retorna_401(self):
         resp = self.client.post("/api/operacao/auth/", {
             "pin": "0003", "perfil": "ALUNO_REP",
