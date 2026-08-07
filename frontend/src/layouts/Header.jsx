@@ -1,6 +1,7 @@
 import { Icon } from "../lib/icons.jsx"
 import { Link } from "react-router-dom"
 import { getNome, getPapel, getUsername } from "../lib/auth"
+import { getRuntimeMode } from "../lib/runtimeMode"
 
 export default function Header({
   search,
@@ -14,6 +15,7 @@ export default function Header({
   const nomeUsuario = getNome()?.trim() || getUsername()?.trim() || "Usuário"
   const papelUsuario = getPapel() === "ADMIN" ? "Administrador" : "Operador"
   const inicialUsuario = nomeUsuario.charAt(0).toUpperCase()
+  const runtimeMode = getRuntimeMode(false)
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur-md">
@@ -38,7 +40,7 @@ export default function Header({
             <div className="font-mono text-[0.58rem] uppercase tracking-[0.18em] text-ink-faint">
               Estoque & Refeitório
             </div>
-            {import.meta.env.VITE_DEMO_MODE === "true" && (
+            {runtimeMode.demo && (
               <span className="font-mono text-[0.58rem] uppercase tracking-[0.18em] text-brand">
                 Demonstração
               </span>

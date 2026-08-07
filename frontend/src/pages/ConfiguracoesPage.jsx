@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { getConfig, setConfig as persistConfig } from "../lib/config"
+import { getRuntimeMode } from "../lib/runtimeMode"
 
 const DENSITY_OPTIONS = [
   { value: "confortavel", label: "Confortável" },
@@ -9,6 +10,7 @@ const DENSITY_OPTIONS = [
 
 export default function ConfiguracoesPage() {
   const [config, setConfig] = useState(() => getConfig())
+  const mockControlMode = getRuntimeMode(true)
 
   // Persist config using helper function
   const updateConfig = (updates) => {
@@ -48,7 +50,7 @@ export default function ConfiguracoesPage() {
       </div>
 
       <div className="space-y-6">
-        {!import.meta.env.PROD && (
+        {mockControlMode.useMock && (
           <section className="rounded-2xl border border-line bg-surface p-6">
             <div className="mb-4">
               <h2 className="font-display text-lg font-bold leading-tight">Dados de Demonstração</h2>

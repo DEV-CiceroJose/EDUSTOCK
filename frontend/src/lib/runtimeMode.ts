@@ -10,3 +10,11 @@ export function resolveRuntimeMode(input: {
     demo: input.demo,
   }
 }
+
+export function getRuntimeMode(requestedMock: boolean): RuntimeMode {
+  return resolveRuntimeMode({
+    production: import.meta.env.PROD,
+    demo: import.meta.env.VITE_DEMO_MODE === "true",
+    requestedMock,
+  })
+}

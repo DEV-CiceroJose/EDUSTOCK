@@ -1,14 +1,10 @@
 import { mockProdutos, mockGrupos, mockCategorias, mockFornecedores, mockMovimentacoes, mockEntradas, mockAlertas, mockRelatorios, mockOperacao } from "./mock"
 import { httpProdutos, httpGrupos, httpCategorias, httpBensPermanentes, httpFornecedores, httpMovimentacoes, httpEntradas, httpAlertas, httpRelatorios, httpOperacao } from "./http"
 import { getConfig } from "../lib/config"
-import { resolveRuntimeMode } from "../lib/runtimeMode"
+import { getRuntimeMode } from "../lib/runtimeMode"
 import type { Alertas, Categoria, Fornecedor, Grupo, Movimentacao, Produto } from "./types"
 
-const runtimeMode = resolveRuntimeMode({
-  production: import.meta.env.PROD,
-  demo: import.meta.env.VITE_DEMO_MODE === "true",
-  requestedMock: (getConfig() as { useMock: boolean }).useMock,
-})
+const runtimeMode = getRuntimeMode((getConfig() as { useMock: boolean }).useMock)
 const USE_MOCK = runtimeMode.useMock
 
 type DashboardListApi<T> = { list: (...args: any[]) => Promise<T[]> }

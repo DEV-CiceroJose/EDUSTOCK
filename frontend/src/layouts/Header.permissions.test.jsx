@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { salvarSessao } from "../lib/auth"
 import Header from "./Header"
+
+const { getRuntimeMode } = vi.hoisted(() => ({ getRuntimeMode: vi.fn() }))
+
+vi.mock("../lib/runtimeMode", () => ({ getRuntimeMode }))
 
 function renderHeader() {
   render(
@@ -18,7 +22,12 @@ function renderHeader() {
 }
 
 describe("identificação do usuário no Header", () => {
-  beforeEach(() => sessionStorage.clear())
+  beforeEach(() => {
+    sessionStorage.clear()
+    getRuntimeMode.mockReturnValue({ useMock: false, demo: false })
+  })
+
+  afterEach(() => getRuntimeMode.mockReset())
 
   it("identifica corretamente uma sessão de operador", () => {
     salvarSessao({
@@ -51,5 +60,19 @@ describe("identificação do usuário no Header", () => {
 
     expect(screen.getByText("Admin Teste")).toBeInTheDocument()
     expect(screen.getByText("Administrador")).toBeInTheDocument()
+  })
+
+  it("mostra o selo somente quando o modo resolvido é de demonstração", () => {
+    getRuntimeMode.mockReturnValue({ useMock: false, demo: true })
+
+    renderHeader()
+
+    expect(screen.getByText("Demonstração")).toBeInTheDocument()
+  })
+
+  it("não mostra o selo fora do modo de demonstração", () => {
+    renderHeader()
+
+    expect(screen.queryByText("Demonstração")).not.toBeInTheDocument()
   })
 })
