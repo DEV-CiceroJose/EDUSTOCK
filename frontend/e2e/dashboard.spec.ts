@@ -112,7 +112,7 @@ async function entrar(page: Page) {
   await page.goto("/")
   await page.getByRole("link", { name: "Acessar sistema" }).first().click()
   await page.getByLabel("Usuário").fill("gestor")
-  await page.getByLabel("Senha").fill("segredo")
+  await page.getByRole("textbox", { name: "Senha", exact: true }).fill("segredo")
   await page.getByRole("button", { name: "Entrar" }).click()
   await expect(page).toHaveURL(/\/inventario$/)
   await expect(page.getByRole("heading", { name: "Inventário" })).toBeVisible()
