@@ -26,14 +26,24 @@ class CardapioPorRefeicaoTest(AutenticadoAPITestCase):
     def test_cada_refeicao_usa_a_propria_receita(self):
         hoje = timezone.localdate()
         grupo = Grupo.objects.create(nome="Ingredientes", categoria=Categoria.objects.create(name="Alimentos"))
-        leite = Produto.objects.create(nome="Leite", grupo=grupo, unidade="L", quantidade=20)
-        arroz = Produto.objects.create(nome="Arroz", grupo=grupo, unidade="KG", quantidade=20)
+        leite = Produto.objects.create(
+            nome="Leite", grupo=grupo, unidade="L", quantidade=20,
+            unidade_consumo="ML", conteudo_por_unidade=Decimal("1000"),
+        )
+        arroz = Produto.objects.create(
+            nome="Arroz", grupo=grupo, unidade="KG", quantidade=20,
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
+        )
         FrequenciaDiaria.objects.create(data=hoje, turno="INTEGRAL", turma="1A", quantidade_alunos=100)
 
         cafe = Receita.objects.create(nome="Leite matinal", refeicao="CAFE_MANHA")
-        ReceitaIngrediente.objects.create(receita=cafe, produto=leite, gramas_por_aluno=Decimal("200"))
+        ReceitaIngrediente.objects.create(
+            receita=cafe, produto=leite, quantidade_por_aluno=Decimal("200")
+        )
         almoco = Receita.objects.create(nome="Arroz do almoço", refeicao="ALMOCO")
-        ReceitaIngrediente.objects.create(receita=almoco, produto=arroz, gramas_por_aluno=Decimal("100"))
+        ReceitaIngrediente.objects.create(
+            receita=almoco, produto=arroz, quantidade_por_aluno=Decimal("100")
+        )
         Cardapio.objects.create(data=hoje, refeicao="CAFE_MANHA", receita=cafe)
         Cardapio.objects.create(data=hoje, refeicao="ALMOCO", receita=almoco)
 

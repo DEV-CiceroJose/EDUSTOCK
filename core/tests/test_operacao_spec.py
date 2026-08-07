@@ -151,7 +151,7 @@ class TestPrevisaoAlertaReducao(TestCase):
 class TestPlanoDoDiaCalculaQuantidades(TestCase):
     """
     gerar_plano_do_dia deve calcular:
-      quantidade_necessaria = gramas_por_aluno × total_alunos / 1000  (para KG)
+      quantidade_necessaria = quantidade_por_aluno × total_alunos / conteudo_por_unidade
     e sinalizar estoque_insuficiente quando saldo < quantidade_necessaria.
     """
 
@@ -161,15 +161,17 @@ class TestPlanoDoDiaCalculaQuantidades(TestCase):
         grupo = Grupo.objects.create(nome="Geral", categoria=cat)
 
         self.arroz = Produto.objects.create(
-            nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50")
+            nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.arroz, gramas_por_aluno=Decimal("80"))
+        FatorConsumo.objects.create(produto=self.arroz, quantidade_por_aluno=Decimal("80"))
 
         # Produto com estoque insuficiente
         self.feijao = Produto.objects.create(
-            nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1")
+            nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.feijao, gramas_por_aluno=Decimal("60"))
+        FatorConsumo.objects.create(produto=self.feijao, quantidade_por_aluno=Decimal("60"))
 
         FrequenciaDiaria.objects.create(
             data=self.hoje, turno="INTEGRAL", turma="Total", quantidade_alunos=100
@@ -224,15 +226,17 @@ class TestBaixaProducaoAtomicaPorItem(TestCase):
 
         # Arroz: saldo suficiente (100g × 100 = 10 kg, saldo=50)
         self.arroz = Produto.objects.create(
-            nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50")
+            nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.arroz, gramas_por_aluno=Decimal("100"))
+        FatorConsumo.objects.create(produto=self.arroz, quantidade_por_aluno=Decimal("100"))
 
         # Feijão: saldo INSUFICIENTE (60g × 100 = 6 kg, saldo=1)
         self.feijao = Produto.objects.create(
-            nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1")
+            nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.feijao, gramas_por_aluno=Decimal("60"))
+        FatorConsumo.objects.create(produto=self.feijao, quantidade_por_aluno=Decimal("60"))
 
         FrequenciaDiaria.objects.create(
             data=self.hoje, turno="INTEGRAL", turma="Total", quantidade_alunos=100

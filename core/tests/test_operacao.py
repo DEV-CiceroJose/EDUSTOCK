@@ -49,8 +49,9 @@ class PlanoProducaoTest(TestCase):
         grupo = Grupo.objects.create(nome="Geral", categoria=cat)
         self.arroz = Produto.objects.create(
             nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.arroz, gramas_por_aluno=Decimal("80"))
+        FatorConsumo.objects.create(produto=self.arroz, quantidade_por_aluno=Decimal("80"))
         FrequenciaDiaria.objects.create(
             data=self.hoje, turno="MANHA", turma="Total", quantidade_alunos=100
         )
@@ -77,12 +78,14 @@ class BaixaProducaoTest(TestCase):
         grupo = Grupo.objects.create(nome="Geral", categoria=cat)
         self.arroz = Produto.objects.create(
             nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
         self.feijao = Produto.objects.create(
             nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.arroz, gramas_por_aluno=Decimal("80"))
-        FatorConsumo.objects.create(produto=self.feijao, gramas_por_aluno=Decimal("50"))
+        FatorConsumo.objects.create(produto=self.arroz, quantidade_por_aluno=Decimal("80"))
+        FatorConsumo.objects.create(produto=self.feijao, quantidade_por_aluno=Decimal("50"))
         FrequenciaDiaria.objects.create(
             data=self.hoje, turno="MANHA", turma="Total", quantidade_alunos=100
         )
@@ -176,8 +179,11 @@ class ContagemApiTest(APITestCase):
     def test_plano_do_dia(self):
         cat = Categoria.objects.create(name="Alimentos")
         grupo = Grupo.objects.create(nome="Geral", categoria=cat)
-        p = Produto.objects.create(nome="Arroz", grupo=grupo, unidade="KG", quantidade=10)
-        FatorConsumo.objects.create(produto=p, gramas_por_aluno=Decimal("100"))
+        p = Produto.objects.create(
+            nome="Arroz", grupo=grupo, unidade="KG", quantidade=10,
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
+        )
+        FatorConsumo.objects.create(produto=p, quantidade_por_aluno=Decimal("100"))
         hoje = timezone.localdate().isoformat()
         self.client_aluno.post("/api/operacao/contagem/", {
             "quantidade_alunos": 40,
@@ -191,8 +197,11 @@ class ContagemApiTest(APITestCase):
     def test_baixa_producao_api(self):
         cat = Categoria.objects.create(name="Alimentos")
         grupo = Grupo.objects.create(nome="Geral", categoria=cat)
-        p = Produto.objects.create(nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("20"))
-        FatorConsumo.objects.create(produto=p, gramas_por_aluno=Decimal("100"))
+        p = Produto.objects.create(
+            nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("20"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
+        )
+        FatorConsumo.objects.create(produto=p, quantidade_por_aluno=Decimal("100"))
         hoje = timezone.localdate().isoformat()
         self.client_aluno.post("/api/operacao/contagem/", {
             "quantidade_alunos": 40,

@@ -56,6 +56,11 @@ class Produto(models.Model):
         ("CX", "Caixa"),
         ("PC", "Pacote"),
     ]
+    UNIDADE_CONSUMO_CHOICES = [
+        ("G", "Grama"),
+        ("ML", "Mililitro"),
+        ("UN", "Unidade"),
+    ]
     PERIODICIDADE_CHOICES = [
         ("SEMANAL", "Semanal"),
         ("MENSAL", "Mensal"),
@@ -69,6 +74,19 @@ class Produto(models.Model):
     )
     quantidade = models.DecimalField("Quantidade", max_digits=10, decimal_places=3, default=0)
     unidade = models.CharField(max_length=2, choices=UNIDADE_CHOICES)
+    unidade_consumo = models.CharField(
+        max_length=2,
+        choices=UNIDADE_CONSUMO_CHOICES,
+        null=True,
+        blank=True,
+    )
+    conteudo_por_unidade = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
     estoque_minimo = models.DecimalField(
         "Estoque mínimo", max_digits=10, decimal_places=3, default=0
     )
@@ -91,6 +109,17 @@ class Produto(models.Model):
 
     def __str__(self):
         return self.nome
+
+    def clean(self):
+        super().clean()
+        if self.unidade_consumo and self.conteudo_por_unidade is None:
+            raise ValidationError(
+                {"conteudo_por_unidade": "Informe o conteúdo por unidade de estoque."}
+            )
+        if self.conteudo_por_unidade is not None and not self.unidade_consumo:
+            raise ValidationError(
+                {"unidade_consumo": "Informe a unidade usada no consumo."}
+            )
 
 
 class Fornecedor(models.Model):
@@ -317,7 +346,7 @@ class FatorConsumo(models.Model):
     produto = models.OneToOneField(
         Produto, on_delete=models.CASCADE, related_name="fator_consumo"
     )
-    gramas_por_aluno = models.DecimalField(max_digits=6, decimal_places=2)
+    quantidade_por_aluno = models.DecimalField(max_digits=6, decimal_places=2)
     ativo = models.BooleanField(default=True)
 
     class Meta:
@@ -325,7 +354,17 @@ class FatorConsumo(models.Model):
         verbose_name_plural = "Fatores de consumo"
 
     def __str__(self):
-        return f"{self.produto.nome}: {self.gramas_por_aluno}/aluno"
+        return f"{self.produto.nome}: {self.quantidade_por_aluno}/aluno"
+
+    def clean(self):
+        super().clean()
+        if self.produto_id and (
+            not self.produto.unidade_consumo
+            or self.produto.conteudo_por_unidade is None
+        ):
+            raise ValidationError(
+                {"produto": "Configure a conversão de unidade do produto."}
+            )
 
 
 class Receita(models.Model):
@@ -344,7 +383,7 @@ class Receita(models.Model):
 class ReceitaIngrediente(models.Model):
     receita = models.ForeignKey(Receita, on_delete=models.CASCADE, related_name="ingredientes")
     produto = models.ForeignKey(Produto, on_delete=models.PROTECT, related_name="usos_em_receitas")
-    gramas_por_aluno = models.DecimalField(
+    quantidade_por_aluno = models.DecimalField(
         max_digits=8,
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0.01"))],
@@ -361,6 +400,16 @@ class ReceitaIngrediente(models.Model):
 
     def __str__(self):
         return f"{self.receita}: {self.produto}"
+
+    def clean(self):
+        super().clean()
+        if self.produto_id and (
+            not self.produto.unidade_consumo
+            or self.produto.conteudo_por_unidade is None
+        ):
+            raise ValidationError(
+                {"produto": "Configure a conversão de unidade do produto."}
+            )
 
 
 class Cardapio(models.Model):

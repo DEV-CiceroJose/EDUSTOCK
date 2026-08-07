@@ -89,6 +89,8 @@ class ProdutoAdmin(admin.ModelAdmin):
         'grupo',
         'quantidade',
         'unidade',
+        'unidade_consumo',
+        'conteudo_por_unidade',
         'validade',
         'criado_por',
         'atualizado_por',
@@ -120,7 +122,10 @@ class ProdutoAdmin(admin.ModelAdmin):
     # 🧩 Organização dos campos no formulário
     fieldsets = (
         ('Informações do Produto', {
-            'fields': ('nome', 'grupo', 'fornecedor', 'quantidade', 'unidade')
+            'fields': (
+                'nome', 'grupo', 'fornecedor', 'quantidade', 'unidade',
+                'unidade_consumo', 'conteudo_por_unidade',
+            )
         }),
         ('Detalhes', {
             'fields': ('estoque_minimo', 'perecivel', 'periodicidade', 'validade')
@@ -235,7 +240,7 @@ class FrequenciaDiariaAdmin(admin.ModelAdmin):
 
 @admin.register(FatorConsumo)
 class FatorConsumoAdmin(admin.ModelAdmin):
-    list_display = ("produto", "gramas_por_aluno", "ativo")
+    list_display = ("produto", "quantidade_por_aluno", "ativo")
     list_filter = ("ativo", "produto__grupo__categoria")
     search_fields = ("produto__nome",)
     autocomplete_fields = ("produto",)

@@ -13,9 +13,6 @@ from .models import (
 )
 from .services import calcular_previsao_producao, registrar_movimentacao, total_frequencia
 
-UNIDADES_EM_GRAMAS = {"KG", "L"}
-
-
 class OperacaoIdReutilizado(Exception):
     pass
 
@@ -30,11 +27,17 @@ def _money_qty(val):
     return str(val.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP))
 
 
-def _calcular_quantidade_producao(*, fator, total_alunos, unidade):
-    base = fator.gramas_por_aluno * Decimal(total_alunos)
-    if unidade in UNIDADES_EM_GRAMAS:
-        return base / Decimal("1000")
-    return base
+def converter_consumo_para_estoque(produto, quantidade_consumo):
+    if not produto.unidade_consumo or not produto.conteudo_por_unidade:
+        raise ValidationError(
+            f"Configure a conversão de unidade de '{produto.nome}'."
+        )
+    return Decimal(quantidade_consumo) / produto.conteudo_por_unidade
+
+
+def _calcular_quantidade_producao(*, fator, total_alunos):
+    quantidade_consumo = fator.quantidade_por_aluno * Decimal(total_alunos)
+    return converter_consumo_para_estoque(fator.produto, quantidade_consumo)
 
 
 def _unidade_legivel(unidade, quantidade):
@@ -69,9 +72,7 @@ def gerar_plano_do_dia(*, data, turno, refeicao=None):
     itens = []
     for f in fatores:
         p = f.produto
-        qtd = _calcular_quantidade_producao(
-            fator=f, total_alunos=total_alunos, unidade=p.unidade
-        )
+        qtd = _calcular_quantidade_producao(fator=f, total_alunos=total_alunos)
         if qtd <= 0:
             continue
         estoque_insuficiente = p.quantidade < qtd
@@ -84,7 +85,7 @@ def gerar_plano_do_dia(*, data, turno, refeicao=None):
             "quantidade_legivel": _unidade_legivel(p.unidade, qtd),
             "saldo_atual": _money_qty(p.quantidade),
             "estoque_insuficiente": estoque_insuficiente,
-            "gramas_por_aluno": str(f.gramas_por_aluno),
+            "quantidade_por_aluno": str(f.quantidade_por_aluno),
         })
     return {
         "data": data.isoformat(),

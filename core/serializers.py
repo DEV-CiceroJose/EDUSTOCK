@@ -118,11 +118,31 @@ class ProdutoSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSeria
             "id", "nome",
             "grupo", "grupo_nome", "fornecedor", "fornecedor_nome",
             "categoria", "categoria_nome",
-            "quantidade", "unidade", "estoque_minimo", "perecivel", "periodicidade",
+            "quantidade", "unidade", "unidade_consumo", "conteudo_por_unidade",
+            "estoque_minimo", "perecivel", "periodicidade",
             "validade", "ultimo_preco",
             "criado_por_nome", "criado_em", "atualizado_em",
         ]
         read_only_fields = ["quantidade", "criado_por_nome", "criado_em", "atualizado_em"]
+
+    def validate(self, attrs):
+        unidade_consumo = attrs.get(
+            "unidade_consumo",
+            getattr(self.instance, "unidade_consumo", None),
+        )
+        conteudo_por_unidade = attrs.get(
+            "conteudo_por_unidade",
+            getattr(self.instance, "conteudo_por_unidade", None),
+        )
+        if unidade_consumo and conteudo_por_unidade is None:
+            raise serializers.ValidationError({
+                "conteudo_por_unidade": "Informe o conteúdo por unidade de estoque."
+            })
+        if conteudo_por_unidade is not None and not unidade_consumo:
+            raise serializers.ValidationError({
+                "unidade_consumo": "Informe a unidade usada no consumo."
+            })
+        return attrs
 
 
 class GrupoSerializer(serializers.ModelSerializer):
@@ -231,7 +251,15 @@ class ReceitaIngredienteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReceitaIngrediente
-        fields = ["id", "produto", "produto_nome", "gramas_por_aluno"]
+        fields = ["id", "produto", "produto_nome", "quantidade_por_aluno"]
+
+    def validate(self, attrs):
+        produto = attrs.get("produto", getattr(self.instance, "produto", None))
+        if not produto.unidade_consumo or produto.conteudo_por_unidade is None:
+            raise serializers.ValidationError({
+                "produto": "Configure a conversão de unidade do produto."
+            })
+        return attrs
 
 
 class ReceitaSerializer(serializers.ModelSerializer):
