@@ -1,4 +1,5 @@
 export { default as OperationPinLogin } from "./OperationPinLogin.jsx"
 export { createOperacaoHttpClient } from "./operacaoHttpClient.js"
 export { createOfflineQueue } from "./offlineQueue.js"
+export { OfflineQueueStatus } from "./OfflineQueueStatus.jsx"
 export { usePwaLifecycle } from "./usePwaLifecycle.js"

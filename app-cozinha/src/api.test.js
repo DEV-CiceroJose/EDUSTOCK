@@ -69,8 +69,9 @@ describe('api.js — retry de rede', () => {
     )).rejects.toMatchObject({ enfileirada: true })
 
     const fila = JSON.parse(localStorage.getItem('edustock:cozinha:fila-baixas'))
-    expect(fila).toHaveLength(1)
-    expect(fila[0]).toMatchObject({ refeicao: 'ALMOCO' })
+    expect(fila).toMatchObject({ version: 1 })
+    expect(fila.entries).toHaveLength(1)
+    expect(fila.entries[0].payload).toMatchObject({ refeicao: 'ALMOCO' })
   })
 
   it('erro HTTP de aplicação (4xx) nunca é reenviado, mesmo em endpoint com retry:true', async () => {

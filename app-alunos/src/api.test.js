@@ -64,8 +64,9 @@ describe('api.js — ciclo de sessão', () => {
 
     expect(resultado.pendente).toBe(true)
     const fila = JSON.parse(localStorage.getItem('edustock:alunos:fila-contagens'))
-    expect(fila).toHaveLength(1)
-    expect(fila[0]).toMatchObject({ quantidade_alunos: 25 })
+    expect(fila).toMatchObject({ version: 1 })
+    expect(fila.entries).toHaveLength(1)
+    expect(fila.entries[0].payload).toMatchObject({ quantidade_alunos: 25 })
   })
 
   afterEach(() => {

@@ -10,7 +10,7 @@ const http = createOperacaoHttpClient({
   baseUrl: import.meta.env.VITE_API_BASE ?? "",
   tokenKey: "cozinha_token",
 })
-const filaBaixas = createOfflineQueue({
+export const filaBaixas = createOfflineQueue({
   storageKey: "edustock:cozinha:fila-baixas",
   send: (body) => http.request("POST", "/api/operacao/baixa-de-producao/", body, { retry: false }),
 })

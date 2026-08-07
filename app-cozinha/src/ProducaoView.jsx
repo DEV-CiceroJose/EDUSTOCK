@@ -4,6 +4,7 @@ import {
   baixaProducao,
   concluirOperacaoPendente,
   consultarBaixa,
+  filaBaixas,
   getPlano,
   getStatusDoDia,
   limparSessao,
@@ -17,6 +18,7 @@ import { Drop } from '@phosphor-icons/react/Drop'
 import { ForkKnife } from '@phosphor-icons/react/ForkKnife'
 import { Package } from '@phosphor-icons/react/Package'
 import { Warning } from '@phosphor-icons/react/Warning'
+import { OfflineQueueStatus } from '@edustock/operacao-shared'
 
 const REFEICOES = [
   { key: 'CAFE_MANHA', label: 'Café da manhã' },
@@ -251,6 +253,7 @@ export default function ProducaoView() {
   const [modalAberto, setModalAberto] = useState(false)
   const [loadingBaixa, setLoadingBaixa] = useState(false)
   const [resultado, setResultado] = useState(null)
+  const [offlineEntries, setOfflineEntries] = useState(() => filaBaixas.list())
   const enviandoRef = useRef(false)
   const abrirBaixaRef = useRef(null)
 
@@ -298,6 +301,14 @@ export default function ProducaoView() {
   useEffect(() => {
     carregarPlano()
   }, [carregarPlano])
+
+  useEffect(() => filaBaixas.subscribe(setOfflineEntries), [])
+
+  function removerPendente(id) {
+    if (window.confirm('Remover este registro rejeitado da fila?')) {
+      filaBaixas.remove(id)
+    }
+  }
 
   async function executarBaixa() {
     if (enviandoRef.current) return
@@ -438,6 +449,11 @@ export default function ProducaoView() {
         style={{ flex: 1, padding: '1.25rem', paddingBottom: '7rem' }}
         aria-busy={loadingPlano}
       >
+        <OfflineQueueStatus
+          entries={offlineEntries}
+          onRetry={() => void filaBaixas.retry()}
+          onRemove={removerPendente}
+        />
         {loadingPlano && (
           <div role="status" style={{ textAlign: 'center', color: 'var(--color-ink-faint)', paddingTop: '3rem', fontSize: '1rem' }}>
             Carregando plano…

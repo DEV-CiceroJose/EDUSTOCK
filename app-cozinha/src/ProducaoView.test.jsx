@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import ProducaoView from './ProducaoView.jsx'
-import { baixaProducao, consultarBaixa, getPlano, getStatusDoDia } from './api.js'
+import { baixaProducao, consultarBaixa, filaBaixas, getPlano, getStatusDoDia } from './api.js'
 
 vi.mock('./api.js', () => ({
   getPlano: vi.fn(),
@@ -13,6 +13,12 @@ vi.mock('./api.js', () => ({
   concluirOperacaoPendente: vi.fn(),
   limparSessao: vi.fn(),
   logout: vi.fn(),
+  filaBaixas: {
+    list: vi.fn(),
+    subscribe: vi.fn(),
+    retry: vi.fn(),
+    remove: vi.fn(),
+  },
 }))
 
 const PLANO_BASE = {
@@ -48,6 +54,9 @@ function renderView() {
 describe('ProducaoView (app-cozinha)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    filaBaixas.list.mockReturnValue([])
+    filaBaixas.subscribe.mockReturnValue(() => {})
+    filaBaixas.retry.mockResolvedValue({ completed: [], remaining: [] })
     getPlano.mockResolvedValue(PLANO_BASE)
     getStatusDoDia.mockResolvedValue({
       sincronizado_em: '2026-08-02T12:00:00-03:00',
@@ -219,5 +228,26 @@ describe('ProducaoView (app-cozinha)', () => {
     fireEvent.click(screen.getByText('Histórico de baixas'))
     expect(screen.getByText('01/08/2026 · Almoço')).toBeInTheDocument()
     expect(screen.getByText('Concluída')).toBeInTheDocument()
+  })
+
+  it('mostra a fila e confirma antes de remover uma baixa rejeitada', async () => {
+    filaBaixas.list.mockReturnValue([
+      { id: 'pendente-1', payload: {}, status: 'pending' },
+      { id: 'rejeitada-1', payload: {}, status: 'attention' },
+    ])
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    renderView()
+
+    expect(await screen.findByRole('region', { name: 'Sincronização pendente' })).toHaveTextContent(
+      '1 pendente(s) · 1 requer(em) atenção',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remover registro rejeitado' }))
+
+    expect(filaBaixas.retry).toHaveBeenCalledTimes(1)
+    expect(confirmar).toHaveBeenCalledTimes(1)
+    expect(filaBaixas.remove).toHaveBeenCalledWith('rejeitada-1')
+    confirmar.mockRestore()
   })
 })

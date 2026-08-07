@@ -10,7 +10,7 @@ const http = createOperacaoHttpClient({
   baseUrl: import.meta.env.VITE_API_BASE ?? "",
   tokenKey: "operacao_token",
 })
-const filaContagens = createOfflineQueue({
+export const filaContagens = createOfflineQueue({
   storageKey: "edustock:alunos:fila-contagens",
   send: (body) => {
     const { _turma, ...payload } = body

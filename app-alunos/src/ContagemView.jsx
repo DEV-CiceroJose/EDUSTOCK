@@ -5,7 +5,8 @@ import { CalendarBlank } from '@phosphor-icons/react/CalendarBlank'
 import { CheckCircle } from '@phosphor-icons/react/CheckCircle'
 import { SpinnerGap } from '@phosphor-icons/react/SpinnerGap'
 import { Warning } from '@phosphor-icons/react/Warning'
-import { getSessao, getStatusDoDia, registrarContagem, limparSessao, logout } from './api.js'
+import { OfflineQueueStatus } from '@edustock/operacao-shared'
+import { filaContagens, getSessao, getStatusDoDia, registrarContagem, limparSessao, logout } from './api.js'
 
 const MAX_ALUNOS_POR_TURMA = 45
 
@@ -37,6 +38,7 @@ export default function ContagemView() {
   const [resultado, setResultado] = useState(null)
   const [mensagemErro, setMensagemErro] = useState('')
   const [ultimaSincronizacao, setUltimaSincronizacao] = useState('')
+  const [offlineEntries, setOfflineEntries] = useState(() => filaContagens.list())
   const enviandoRef = useRef(false)
 
   const pressKey = useCallback((val) => {
@@ -92,6 +94,22 @@ export default function ContagemView() {
   useEffect(() => {
     void carregarStatus()
   }, [carregarStatus])
+
+  useEffect(() => filaContagens.subscribe(setOfflineEntries), [])
+
+  function removerPendente(id) {
+    if (window.confirm('Remover este registro rejeitado da fila?')) {
+      filaContagens.remove(id)
+    }
+  }
+
+  const offlineQueueStatus = (
+    <OfflineQueueStatus
+      entries={offlineEntries}
+      onRetry={() => void filaContagens.retry()}
+      onRemove={removerPendente}
+    />
+  )
 
   // Mantém a ordem dos hooks e redireciona se a sessão expirou.
   if (!sessao) {
@@ -174,6 +192,7 @@ export default function ContagemView() {
         className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
         style={{ maxWidth: 420, margin: '0 auto' }}
       >
+        {offlineQueueStatus}
         <div className="result-card w-full" role="status" aria-live="polite">
           <div
             className="mx-auto mb-5 grid place-items-center rounded-full text-ok"
@@ -284,6 +303,7 @@ export default function ContagemView() {
         className="flex min-h-screen flex-col items-center justify-center bg-white px-6 py-10"
         style={{ maxWidth: 420, margin: '0 auto' }}
       >
+        {offlineQueueStatus}
         <div className="result-card w-full" role="alert">
           <div
             className="mx-auto mb-5 grid place-items-center rounded-full text-err"
@@ -354,6 +374,7 @@ export default function ContagemView() {
       style={{ maxWidth: 420, margin: '0 auto' }}
       aria-busy={estado === 'loading' || estado === 'carregando'}
     >
+      {offlineQueueStatus}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>
