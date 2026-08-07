@@ -13,9 +13,10 @@ export function createOfflineQueue({ storageKey, send, now = Date.now }) {
   let flushRequested = false
 
   function createEntry(payload) {
+    const operationId = payload.operacao_id ?? globalThis.crypto.randomUUID()
     return {
-      id: payload.operacao_id ?? globalThis.crypto.randomUUID(),
-      payload,
+      id: operationId,
+      payload: payload.operacao_id ? payload : { ...payload, operacao_id: operationId },
       status: "pending",
       attempts: 0,
       createdAt: now(),
@@ -24,8 +25,24 @@ export function createOfflineQueue({ storageKey, send, now = Date.now }) {
     }
   }
 
-  function normalizeEntry(value) {
-    if (value?.payload && value?.id) {
+  function createAttentionEntry(payload, id, lastError) {
+    return {
+      id,
+      payload,
+      status: "attention",
+      attempts: 0,
+      createdAt: now(),
+      retryAt: null,
+      lastError,
+    }
+  }
+
+  function isObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+  }
+
+  function normalizeEntry(value, index) {
+    if (isObject(value?.payload) && value?.id) {
       return {
         id: value.id,
         payload: value.payload,
@@ -36,21 +53,36 @@ export function createOfflineQueue({ storageKey, send, now = Date.now }) {
         lastError: value.lastError ?? null,
       }
     }
-    return createEntry(value)
+    if (isObject(value) && !("payload" in value)) return createEntry(value)
+    return createAttentionEntry(
+      value,
+      `invalid:${storageKey}:${index}`,
+      "Entrada offline persistida inválida",
+    )
   }
 
   function read() {
+    const raw = localStorage.getItem(storageKey)
+    if (raw === null) return []
     try {
-      const stored = JSON.parse(localStorage.getItem(storageKey) ?? "null")
-      const values = Array.isArray(stored)
-        ? stored
-        : stored?.version === STORAGE_VERSION && Array.isArray(stored.entries)
-          ? stored.entries
-          : []
+      const stored = JSON.parse(raw)
+      const hasValidEnvelope = stored?.version === STORAGE_VERSION
+        && Array.isArray(stored.entries)
+      if (!Array.isArray(stored) && !hasValidEnvelope) {
+        return [createAttentionEntry(
+          stored,
+          `invalid:${storageKey}:storage`,
+          "Conteúdo offline persistido inválido",
+        )]
+      }
+      const values = Array.isArray(stored) ? stored : stored.entries
       return values.map(normalizeEntry)
     } catch {
-      localStorage.removeItem(storageKey)
-      return []
+      return [createAttentionEntry(
+        raw,
+        `invalid:${storageKey}:storage`,
+        "Armazenamento offline corrompido",
+      )]
     }
   }
 
@@ -65,7 +97,9 @@ export function createOfflineQueue({ storageKey, send, now = Date.now }) {
 
   function add(payload) {
     const entries = read()
-    if (!entries.some((entry) => entry.payload.operacao_id === payload.operacao_id)) {
+    if (!payload.operacao_id || !entries.some(
+      (entry) => entry.payload?.operacao_id === payload.operacao_id,
+    )) {
       entries.push(createEntry(payload))
       write(entries)
     }
@@ -109,9 +143,9 @@ export function createOfflineQueue({ storageKey, send, now = Date.now }) {
     return { completed, remaining: read() }
   }
 
-  function flush() {
+  function requestFlush(requestAnotherPass = false) {
     if (flushInFlight) {
-      flushRequested = true
+      if (requestAnotherPass) flushRequested = true
     } else {
       flushInFlight = (async () => {
         const completed = []
@@ -128,6 +162,10 @@ export function createOfflineQueue({ storageKey, send, now = Date.now }) {
     return flushInFlight
   }
 
+  function flush() {
+    return requestFlush()
+  }
+
   async function retry(id) {
     const entries = read().map((entry) => (
       !id || entry.id === id
@@ -135,7 +173,7 @@ export function createOfflineQueue({ storageKey, send, now = Date.now }) {
         : entry
     ))
     write(entries)
-    return flush()
+    return requestFlush(true)
   }
 
   function remove(id) {

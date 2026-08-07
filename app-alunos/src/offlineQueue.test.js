@@ -54,6 +54,85 @@ describe("fila offline", () => {
     expect(queue.list()).toEqual([])
   })
 
+  it("atribui UUIDs distintos a payloads sem operacao_id e preserva ambos", () => {
+    const queue = createOfflineQueue({ storageKey: "fila", send: vi.fn() })
+
+    queue.add({ quantidade_alunos: 20 })
+    queue.add({ quantidade_alunos: 30 })
+
+    const entries = queue.list()
+    expect(entries).toHaveLength(2)
+    expect(entries[0].payload.operacao_id).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(entries[1].payload.operacao_id).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(entries[0].payload.operacao_id).not.toBe(entries[1].payload.operacao_id)
+    expect(entries.map((entry) => entry.id)).toEqual(
+      entries.map((entry) => entry.payload.operacao_id),
+    )
+  })
+
+  it("preserva entradas válidas quando encontra uma entrada persistida inválida", () => {
+    localStorage.setItem("fila", JSON.stringify({
+      version: 1,
+      entries: [
+        {
+          id: "operacao-1",
+          payload: { operacao_id: "operacao-1" },
+          status: "pending",
+          attempts: 0,
+          createdAt: 1000,
+          retryAt: null,
+          lastError: null,
+        },
+        null,
+      ],
+    }))
+    const queue = createOfflineQueue({ storageKey: "fila", send: vi.fn() })
+
+    expect(queue.list()).toEqual([
+      expect.objectContaining({ id: "operacao-1", status: "pending" }),
+      expect.objectContaining({
+        payload: null,
+        status: "attention",
+        lastError: "Entrada offline persistida inválida",
+      }),
+    ])
+    expect(localStorage.getItem("fila")).not.toBeNull()
+  })
+
+  it("mantém JSON corrompido como atenção até remoção explícita", () => {
+    const raw = "{conteudo-corrompido"
+    localStorage.setItem("fila", raw)
+    const queue = createOfflineQueue({ storageKey: "fila", send: vi.fn() })
+
+    const entries = queue.list()
+
+    expect(entries).toEqual([
+      expect.objectContaining({
+        payload: raw,
+        status: "attention",
+        lastError: "Armazenamento offline corrompido",
+      }),
+    ])
+    expect(localStorage.getItem("fila")).toBe(raw)
+
+    queue.remove(entries[0].id)
+    expect(queue.list()).toEqual([])
+  })
+
+  it("expõe envelope persistido inválido como atenção", () => {
+    const stored = { version: 1, entries: "inválidas" }
+    localStorage.setItem("fila", JSON.stringify(stored))
+    const queue = createOfflineQueue({ storageKey: "fila", send: vi.fn() })
+
+    expect(queue.list()).toEqual([
+      expect.objectContaining({
+        payload: stored,
+        status: "attention",
+        lastError: "Conteúdo offline persistido inválido",
+      }),
+    ])
+  })
+
   it("pausa após erro de autenticação e preserva a fila como pendente", async () => {
     const send = vi.fn(async () => {
       const error = new Error("sessão expirada")
@@ -148,6 +227,29 @@ describe("fila offline", () => {
 
     expect(send).toHaveBeenCalledTimes(1)
     expect(queue.list()).toEqual([])
+  })
+
+  it("não repete após erro de autenticação por causa de outro flush simultâneo", async () => {
+    let rejeitarPrimeiroEnvio
+    const authError = Object.assign(new Error("sessão expirada"), { status: 401 })
+    const send = vi.fn()
+      .mockImplementationOnce(() => new Promise((resolve, reject) => {
+        rejeitarPrimeiroEnvio = reject
+      }))
+      .mockRejectedValue(authError)
+    const queue = createOfflineQueue({ storageKey: "fila", send })
+    queue.add({ operacao_id: "operacao-1" })
+
+    const primeiro = queue.flush()
+    await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+    const segundo = queue.flush()
+    rejeitarPrimeiroEnvio(authError)
+    await Promise.all([primeiro, segundo])
+
+    expect(send).toHaveBeenCalledTimes(1)
+    expect(queue.list()).toEqual([
+      expect.objectContaining({ id: "operacao-1", status: "pending", attempts: 1 }),
+    ])
   })
 
   it("agenda uma nova passagem quando retry ocorre durante um flush", async () => {
