@@ -48,40 +48,41 @@ export default function ConfiguracoesPage() {
       </div>
 
       <div className="space-y-6">
-        {/* Dados Mock Section */}
-        <section className="rounded-2xl border border-line bg-surface p-6">
-          <div className="mb-4">
-            <h2 className="font-display text-lg font-bold leading-tight">Dados de Demonstração</h2>
-            <p className="mt-1 text-sm text-ink-faint">
-              Ativar dados simulados para testes e demonstrações
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <label htmlFor="mock-toggle" className="font-medium">
-                Usar dados mock
-              </label>
-              <p className="text-sm text-ink-faint">A página será recarregada após alternar</p>
+        {!import.meta.env.PROD && (
+          <section className="rounded-2xl border border-line bg-surface p-6">
+            <div className="mb-4">
+              <h2 className="font-display text-lg font-bold leading-tight">Dados de Demonstração</h2>
+              <p className="mt-1 text-sm text-ink-faint">
+                Ativar dados simulados para testes e demonstrações
+              </p>
             </div>
-            <button
-              id="mock-toggle"
-              type="button"
-              role="switch"
-              aria-checked={config.useMock}
-              onClick={handleMockToggle}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${
-                config.useMock ? "bg-brand" : "bg-line"
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-[#f4f1e7] shadow ring-0 transition duration-200 ease-in-out ${
-                  config.useMock ? "translate-x-5" : "translate-x-0"
+
+            <div className="flex items-center justify-between">
+              <div>
+                <label htmlFor="mock-toggle" className="font-medium">
+                  Usar dados mock
+                </label>
+                <p className="text-sm text-ink-faint">A página será recarregada após alternar</p>
+              </div>
+              <button
+                id="mock-toggle"
+                type="button"
+                role="switch"
+                aria-checked={config.useMock}
+                onClick={handleMockToggle}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 ${
+                  config.useMock ? "bg-brand" : "bg-line"
                 }`}
-              />
-            </button>
-          </div>
-        </section>
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-[#f4f1e7] shadow ring-0 transition duration-200 ease-in-out ${
+                    config.useMock ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* Alertas de Validade Section */}
         <section className="rounded-2xl border border-line bg-surface p-6">

@@ -38,6 +38,11 @@ export default function Header({
             <div className="font-mono text-[0.58rem] uppercase tracking-[0.18em] text-ink-faint">
               Estoque & Refeitório
             </div>
+            {import.meta.env.VITE_DEMO_MODE === "true" && (
+              <span className="font-mono text-[0.58rem] uppercase tracking-[0.18em] text-brand">
+                Demonstração
+              </span>
+            )}
           </div>
         </div>
 
