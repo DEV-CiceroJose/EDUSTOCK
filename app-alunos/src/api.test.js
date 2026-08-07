@@ -54,6 +54,18 @@ describe('api.js — retry de rede', () => {
 describe('api.js — ciclo de sessão', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    localStorage.clear()
+  })
+
+  it('salva a contagem na fila quando a rede está indisponível', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const resultado = await registrarContagem(25)
+
+    expect(resultado.pendente).toBe(true)
+    const fila = JSON.parse(localStorage.getItem('edustock:alunos:fila-contagens'))
+    expect(fila).toHaveLength(1)
+    expect(fila[0]).toMatchObject({ quantidade_alunos: 25 })
   })
 
   afterEach(() => {

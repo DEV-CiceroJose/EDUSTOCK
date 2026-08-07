@@ -227,6 +227,8 @@ OPERACAO_TOKEN_TTL_HORAS = 12
 # Autenticação da plataforma (dashboard admin)
 # ------------------------------------------------------------------
 LOGIN_TOKEN_TTL_HORAS = int(os.environ.get('LOGIN_TOKEN_TTL_HORAS', 12))
+LOGIN_MAX_TENTATIVAS = int(os.environ.get("LOGIN_MAX_TENTATIVAS", "5"))
+LOGIN_JANELA_SEGUNDOS = int(os.environ.get("LOGIN_JANELA_SEGUNDOS", "300"))
 
 # Sessões operacionais e rate limit precisam ser compartilhados entre workers.
 # Redis é preferido; o cache de banco mantém o comportamento correto sem exigir

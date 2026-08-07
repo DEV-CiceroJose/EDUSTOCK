@@ -3,6 +3,7 @@ import Modal from "../../components/ui/Modal"
 import { getToken } from "../../lib/auth"
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
+const MODULOS = ["inventario", "movimentacoes", "fornecedores", "alertas", "relatorios", "merenda", "financeiro"]
 
 export default function NewUserModal({ open, onClose, onCreated }) {
   if (!open) return null
@@ -13,6 +14,7 @@ function NewUserForm({ onClose, onCreated }) {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [papel, setPapel] = useState("OPERADOR")
+  const [modulos, setModulos] = useState([])
   const [erro, setErro] = useState("")
   const [salvando, setSalvando] = useState(false)
 
@@ -24,7 +26,7 @@ function NewUserForm({ onClose, onCreated }) {
       const resp = await fetch(`${BASE}/usuarios/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
-        body: JSON.stringify({ username, password, papel }),
+        body: JSON.stringify({ username, password, papel, modulos }),
       })
       const data = await resp.json()
       if (!resp.ok) {
@@ -52,6 +54,26 @@ function NewUserForm({ onClose, onCreated }) {
             className="field"
           />
         </label>
+        {papel === "OPERADOR" && (
+          <fieldset className="rounded-xl border border-line p-3">
+            <legend className="px-1 text-sm font-semibold">Módulos permitidos</legend>
+            <p className="mb-2 text-xs text-ink-faint">Nenhum marcado significa todos os módulos ativos.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {MODULOS.map((slug) => (
+                <label key={slug} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={modulos.includes(slug)}
+                    onChange={() => setModulos((atuais) => (
+                      atuais.includes(slug) ? atuais.filter((item) => item !== slug) : [...atuais, slug]
+                    ))}
+                  />
+                  {slug}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <label className="block">
           <span className="mb-1 block text-sm font-semibold">Senha</span>
           <input

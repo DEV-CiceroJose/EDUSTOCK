@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -9,6 +10,7 @@ from plataforma.models import Modulo, Perfil, TokenAcesso
 
 class LoginViewTest(APITestCase):
     def setUp(self):
+        cache.clear()
         self.user = User.objects.create_user(username="joao", password="senha-boa-123")
         # A migração 0002_seed_modulos já popula "inventario", "merenda" e
         # outros módulos como ativos. Ajustamos os dados existentes em vez
@@ -51,11 +53,44 @@ class LoginViewTest(APITestCase):
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertTrue(resp.data["is_staff"])
 
+    def test_login_retorna_apenas_modulos_atribuidos_ao_operador(self):
+        fornecedor = Modulo.objects.get(slug="fornecedores")
+        fornecedor.ativo = True
+        fornecedor.save(update_fields=["ativo"])
+        inventario = Modulo.objects.get(slug="inventario")
+        perfil, _ = Perfil.objects.get_or_create(user=self.user)
+        perfil.modulos.set([inventario])
+
+        resp = self.client.post(
+            "/api/auth/login/",
+            {"username": "joao", "password": "senha-boa-123"},
+            format="json",
+        )
+
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["modulos_ativos"], ["inventario"])
+
     def test_login_com_senha_errada_retorna_401(self):
         resp = self.client.post(
             "/api/auth/login/", {"username": "joao", "password": "errada"}, format="json"
         )
         self.assertEqual(resp.status_code, 401)
+
+    def test_login_bloqueia_apos_cinco_falhas(self):
+        for _ in range(5):
+            resposta = self.client.post(
+                "/api/auth/login/",
+                {"username": "joao", "password": "errada"},
+                format="json",
+            )
+            self.assertEqual(resposta.status_code, 401)
+        bloqueada = self.client.post(
+            "/api/auth/login/",
+            {"username": "joao", "password": "senha-boa-123"},
+            format="json",
+        )
+        self.assertEqual(bloqueada.status_code, 429)
+        self.assertIn("Retry-After", bloqueada.headers)
 
 
 class LogoutViewTest(APITestCase):

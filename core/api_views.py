@@ -7,15 +7,20 @@ from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import OuterRef, Subquery
 from plataforma.permissions import LeituraOuAdmin, RequerModuloAtivo
-from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
+from .models import (
+    BemPermanente, Cardapio, Categoria, Entrada, Fornecedor, Grupo,
+    LoteEstoque, Movimentacao, Produto, Receita,
+)
 from .serializers import (
     ProdutoSerializer, CategoriaSerializer, GrupoSerializer,
     BemPermanenteSerializer, FornecedorSerializer,
-    MovimentacaoSerializer, EntradaSerializer,
+    MovimentacaoSerializer, EntradaSerializer, LoteEstoqueSerializer,
+    ReceitaSerializer, CardapioSerializer,
 )
 from .services import registrar_movimentacao
 from .alerts import coletar_alertas
 from .relatorios import gerar_prestacao_contas
+from plataforma.permissions import slugs_modulos_do_usuario
 
 
 def _parse_date_param(value, label):
@@ -72,7 +77,11 @@ class PrestacaoContasView(APIView):
                 {"detail": "inicio não pode ser posterior a fim."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response(gerar_prestacao_contas(inicio=inicio, fim=fim))
+        return Response(gerar_prestacao_contas(
+            inicio=inicio,
+            fim=fim,
+            incluir_financeiro="financeiro" in slugs_modulos_do_usuario(request.user),
+        ))
 
 
 class CategoriaViewSet(viewsets.ModelViewSet):
@@ -215,3 +224,28 @@ class EntradaViewSet(viewsets.ModelViewSet):
             return Response({"detail": e.messages}, status=status.HTTP_400_BAD_REQUEST)
         out = self.get_serializer(entrada)
         return Response(out.data, status=status.HTTP_201_CREATED)
+
+
+class LoteEstoqueViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    serializer_class = LoteEstoqueSerializer
+
+    def get_queryset(self):
+        qs = LoteEstoque.objects.select_related("produto", "entrada").all()
+        if self.request.query_params.get("produto"):
+            qs = qs.filter(produto_id=self.request.query_params["produto"])
+        if self.request.query_params.get("ativos") in ("1", "true"):
+            qs = qs.filter(quantidade__gt=0)
+        return qs
+
+
+class ReceitaViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("merenda"), LeituraOuAdmin]
+    serializer_class = ReceitaSerializer
+    queryset = Receita.objects.prefetch_related("ingredientes__produto").all()
+
+
+class CardapioViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("merenda"), LeituraOuAdmin]
+    serializer_class = CardapioSerializer
+    queryset = Cardapio.objects.select_related("receita").all()

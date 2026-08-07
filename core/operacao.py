@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from .models import (
+    Cardapio,
     FatorConsumo,
     FrequenciaDiaria,
     Movimentacao,
@@ -47,11 +48,21 @@ def _unidade_legivel(unidade, quantidade):
     return f"{q} {nome}"
 
 
-def gerar_plano_do_dia(*, data, turno):
+def gerar_plano_do_dia(*, data, turno, refeicao=None):
     total_alunos = total_frequencia(data=data, turno=turno)
     previsao = calcular_previsao_producao(data, turno)
+    cardapio = None
+    if refeicao:
+        cardapio = (
+            Cardapio.objects.filter(data=data, refeicao=refeicao, receita__ativa=True)
+            .select_related("receita")
+            .prefetch_related("receita__ingredientes__produto__grupo__categoria")
+            .first()
+        )
     fatores = (
-        FatorConsumo.objects.filter(ativo=True)
+        cardapio.receita.ingredientes.all()
+        if cardapio
+        else FatorConsumo.objects.filter(ativo=True)
         .select_related("produto", "produto__grupo__categoria")
         .order_by("produto_id")
     )
@@ -81,15 +92,17 @@ def gerar_plano_do_dia(*, data, turno):
         "total_alunos": total_alunos,
         "previsao": previsao,
         "itens": itens,
+        "receita": cardapio.receita.nome if cardapio else None,
+        "origem_plano": "cardapio" if cardapio else "fatores_legados",
     }
 
 
-def baixa_de_producao(*, data, turno, itens_override=None, user=None):
+def baixa_de_producao(*, data, turno, refeicao=None, itens_override=None, user=None):
     """
     Baixa cada item da ordem de produção individualmente.
     Falha em um item não impede os demais (cada saída é transacional).
     """
-    plano = gerar_plano_do_dia(data=data, turno=turno)
+    plano = gerar_plano_do_dia(data=data, turno=turno, refeicao=refeicao)
     overrides = {}
     if itens_override:
         overrides = {int(i["produto_id"]): i for i in itens_override}
@@ -198,6 +211,7 @@ def executar_baixa_idempotente(*, operacao_id, data, refeicao, itens=None, user=
     resultado = baixa_de_producao(
         data=data,
         turno=FrequenciaDiaria.INTEGRAL,
+        refeicao=refeicao,
         itens_override=itens_normalizados,
         user=user,
     )
