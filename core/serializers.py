@@ -142,6 +142,18 @@ class ProdutoSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSeria
             raise serializers.ValidationError({
                 "unidade_consumo": "Informe a unidade usada no consumo."
             })
+        if (
+            not unidade_consumo
+            and conteudo_por_unidade is None
+            and self.instance
+            and self.instance.tem_dependencias_consumo()
+        ):
+            raise serializers.ValidationError({
+                "unidade_consumo": (
+                    "A conversão não pode ser removida enquanto o produto "
+                    "estiver em uso em fatores ou receitas."
+                )
+            })
         return attrs
 
 

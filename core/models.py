@@ -110,6 +110,11 @@ class Produto(models.Model):
     def __str__(self):
         return self.nome
 
+    def tem_dependencias_consumo(self):
+        if not self.pk:
+            return False
+        return hasattr(self, "fator_consumo") or self.usos_em_receitas.exists()
+
     def clean(self):
         super().clean()
         if self.unidade_consumo and self.conteudo_por_unidade is None:
@@ -120,6 +125,17 @@ class Produto(models.Model):
             raise ValidationError(
                 {"unidade_consumo": "Informe a unidade usada no consumo."}
             )
+        if (
+            not self.unidade_consumo
+            and self.conteudo_por_unidade is None
+            and self.tem_dependencias_consumo()
+        ):
+            raise ValidationError({
+                "unidade_consumo": (
+                    "A conversão não pode ser removida enquanto o produto "
+                    "estiver em uso em fatores ou receitas."
+                )
+            })
 
 
 class Fornecedor(models.Model):
