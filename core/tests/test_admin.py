@@ -45,3 +45,8 @@ class CoreAdminRegistrationTest(TestCase):
                 self.assertFalse(model_admin.has_add_permission(request))
                 self.assertFalse(model_admin.has_change_permission(request))
                 self.assertFalse(model_admin.has_delete_permission(request))
+
+    def test_produto_tem_saldo_e_validade_somente_leitura(self):
+        model_admin = admin.site._registry[Produto]
+        self.assertIn("quantidade", model_admin.readonly_fields)
+        self.assertIn("validade", model_admin.readonly_fields)

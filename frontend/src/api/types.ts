@@ -48,6 +48,9 @@ export interface Movimentacao {
   tipo: MovimentoTipo
   quantidade: string | number
   preco_unitario?: string | null
+  motivo?: string
+  corrige_movimentacao?: Id | null
+  estorno?: Id | null
   data: string
 }
 

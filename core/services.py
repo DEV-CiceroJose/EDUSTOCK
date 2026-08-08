@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 
 @transaction.atomic
 def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitario=None,
-                           entrada=None, data=None, user=None, lote=None):
+                           entrada=None, data=None, user=None, lote=None,
+                           corrige_movimentacao=None):
     try:
         quantidade = Decimal(str(quantidade))
     except (InvalidOperation, TypeError, ValueError):
@@ -62,6 +63,7 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
         produto=p, tipo=tipo, quantidade=quantidade, motivo=motivo,
         preco_unitario=preco_unitario, entrada=entrada,
         data=data or timezone.localdate(), criado_por=user,
+        corrige_movimentacao=corrige_movimentacao,
     )
     RegistroAuditoria.objects.create(
         user=user,
@@ -121,6 +123,77 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
         p.save(update_fields=["validade", "atualizado_em"])
 
     return movimentacao
+
+
+@transaction.atomic
+def registrar_estorno(*, movimentacao, motivo, user):
+    """Registra a correção append-only de uma movimentação, uma única vez."""
+    motivo = str(motivo or "").strip()
+    if len(motivo) < 5:
+        raise ValidationError("Informe um motivo de ao menos 5 caracteres para o estorno.")
+
+    original = (
+        Movimentacao.objects.select_for_update()
+        .select_related("produto")
+        .get(pk=movimentacao.pk)
+    )
+    produto = Produto.objects.select_for_update().get(pk=original.produto_id)
+    if Movimentacao.objects.filter(corrige_movimentacao=original).exists():
+        raise ValidationError("Esta movimentação já foi estornada.")
+
+    tipo_oposto = (
+        Movimentacao.SAIDA
+        if original.tipo == Movimentacao.ENTRADA
+        else Movimentacao.ENTRADA
+    )
+    estorno = registrar_movimentacao(
+        produto=produto,
+        tipo=tipo_oposto,
+        quantidade=original.quantidade,
+        motivo=motivo,
+        user=user,
+        corrige_movimentacao=original,
+    )
+    if original.tipo == Movimentacao.SAIDA:
+        alocacoes = list(
+            AlocacaoLoteMovimentacao.objects.select_for_update()
+            .filter(movimentacao=original)
+            .order_by("lote_id")
+        )
+        for alocacao in alocacoes:
+            lote = LoteEstoque.objects.select_for_update().get(pk=alocacao.lote_id)
+            lote.quantidade += alocacao.quantidade
+            lote.save(update_fields=["quantidade"])
+            AlocacaoLoteMovimentacao.objects.create(
+                movimentacao=estorno,
+                lote=lote,
+                quantidade=alocacao.quantidade,
+            )
+        if alocacoes:
+            menor_validade = (
+                LoteEstoque.objects.filter(
+                    produto=produto, quantidade__gt=0, validade__isnull=False
+                )
+                .order_by("validade")
+                .values_list("validade", flat=True)
+                .first()
+            )
+            produto.refresh_from_db(fields=["validade"])
+            if produto.validade != menor_validade:
+                produto.validade = menor_validade
+                produto.save(update_fields=["validade", "atualizado_em"])
+    RegistroAuditoria.objects.create(
+        user=user,
+        acao="ESTORNOU",
+        recurso="estoque",
+        objeto_id=str(estorno.pk),
+        detalhes={
+            "movimentacao_original_id": original.pk,
+            "produto_id": produto.pk,
+            "motivo": motivo,
+        },
+    )
+    return estorno
 
 
 @transaction.atomic

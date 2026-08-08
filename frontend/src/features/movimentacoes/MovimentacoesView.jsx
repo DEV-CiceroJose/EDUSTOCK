@@ -2,9 +2,15 @@ import { useMemo, useState } from "react"
 import { motion } from "motion/react"
 import { Icon } from "../../lib/icons.jsx"
 import { dataBR } from "../../lib/format"
+import { movimentacoesApi } from "../../api"
+import Modal from "../../components/ui/Modal"
+import { useToast } from "../../components/ui/useToast"
+import { ehAdmin } from "../../lib/auth"
 
-export default function MovimentacoesView({ movimentacoes, onNovaEntrada, onNovaSaida }) {
+export default function MovimentacoesView({ movimentacoes, onNovaEntrada, onNovaSaida, onAtualizar }) {
   const [tipo, setTipo] = useState("todos")
+  const [aEstornar, setAEstornar] = useState(null)
+  const admin = ehAdmin()
 
   const lista = useMemo(() => {
     if (tipo === "todos") return movimentacoes
@@ -60,6 +66,7 @@ export default function MovimentacoesView({ movimentacoes, onNovaEntrada, onNova
                 <th className="px-4 py-3">Tipo</th>
                 <th className="px-4 py-3 text-right">Qtd.</th>
                 <th className="px-4 py-3">Motivo</th>
+                {admin && <th className="px-4 py-3"><span className="sr-only">Ações</span></th>}
               </tr>
             </thead>
             <tbody>
@@ -82,12 +89,68 @@ export default function MovimentacoesView({ movimentacoes, onNovaEntrada, onNova
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono">{m.quantidade}</td>
                   <td className="px-4 py-2.5 text-ink-soft">{m.motivo || "—"}</td>
+                  {admin && (
+                    <td className="px-4 py-2.5 text-right">
+                      {!m.estorno && !m.corrige_movimentacao && (
+                        <button type="button" onClick={() => setAEstornar(m)} className="btn btn-ghost px-2 py-1 text-xs">
+                          Estornar
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </motion.tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+      <EstornoModal movimentacao={aEstornar} onClose={() => setAEstornar(null)} onSaved={onAtualizar} />
     </div>
+  )
+}
+
+function EstornoModal({ movimentacao, onClose, onSaved }) {
+  const [motivo, setMotivo] = useState("")
+  const [erro, setErro] = useState("")
+  const [salvando, setSalvando] = useState(false)
+  const toast = useToast()
+
+  async function submit(event) {
+    event.preventDefault()
+    const texto = motivo.trim()
+    if (texto.length < 5) {
+      setErro("Informe um motivo de ao menos 5 caracteres.")
+      return
+    }
+    setSalvando(true)
+    setErro("")
+    try {
+      await movimentacoesApi.estornar(movimentacao.id, texto)
+      await onSaved?.()
+      toast("Movimentação estornada")
+      onClose()
+    } catch (err) {
+      setErro(String(err.message || err))
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Modal open={Boolean(movimentacao)} onClose={onClose} title="Estornar movimentação" subtitle="Será criado um lançamento oposto, sem apagar o histórico." maxW="max-w-md">
+      <form onSubmit={submit} className="space-y-4">
+        <label className="block">
+          <span className="mb-1 block text-sm font-semibold">Motivo do estorno</span>
+          <textarea className="field min-h-24" value={motivo} onChange={(event) => setMotivo(event.target.value)} placeholder="Descreva o lançamento incorreto" />
+        </label>
+        {erro && <p className="text-xs text-out">{erro}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="btn btn-ghost">Cancelar</button>
+          <button type="submit" disabled={salvando} className="btn btn-brand disabled:opacity-60">
+            {salvando ? "Estornando…" : "Confirmar estorno"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }

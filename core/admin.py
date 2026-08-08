@@ -113,6 +113,8 @@ class ProdutoAdmin(admin.ModelAdmin):
 
     # 🧾 Campos somente leitura (auditoria)
     readonly_fields = (
+        'quantidade',
+        'validade',
         'criado_por',
         'atualizado_por',
         'criado_em',

@@ -271,6 +271,13 @@ class Movimentacao(models.Model):
     entrada = models.ForeignKey(
         Entrada, on_delete=models.CASCADE, null=True, blank=True, related_name="itens"
     )
+    corrige_movimentacao = models.OneToOneField(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="estorno",
+    )
     motivo = models.CharField(max_length=120, blank=True)
     data = models.DateField(default=timezone.localdate, db_index=True)
     criado_por = models.ForeignKey(

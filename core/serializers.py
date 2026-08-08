@@ -190,14 +190,16 @@ class FornecedorSerializer(serializers.ModelSerializer):
 class MovimentacaoSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSerializer):
     campos_financeiros = ("preco_unitario",)
     produto_nome = serializers.CharField(source="produto.nome", read_only=True)
+    estorno = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Movimentacao
         fields = [
             "id", "produto", "produto_nome", "tipo", "quantidade",
-            "preco_unitario", "entrada", "motivo", "data", "criado_em",
+            "preco_unitario", "entrada", "corrige_movimentacao", "estorno",
+            "motivo", "data", "criado_em",
         ]
-        read_only_fields = ["entrada", "criado_em"]
+        read_only_fields = ["entrada", "corrige_movimentacao", "estorno", "criado_em"]
 
 
 class EntradaItemSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSerializer):

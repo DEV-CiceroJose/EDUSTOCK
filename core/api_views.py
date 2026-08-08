@@ -1,12 +1,13 @@
 from datetime import datetime
 
 from rest_framework import viewsets, filters, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import OuterRef, Subquery
-from plataforma.permissions import LeituraOuAdmin, RequerModuloAtivo
+from plataforma.permissions import EhAdmin, LeituraOuAdmin, RequerModuloAtivo
 from .models import (
     BemPermanente, Cardapio, Categoria, Entrada, Fornecedor, Grupo,
     LoteEstoque, Movimentacao, Produto, Receita,
@@ -17,7 +18,7 @@ from .serializers import (
     MovimentacaoSerializer, EntradaSerializer, LoteEstoqueSerializer,
     ReceitaSerializer, CardapioSerializer,
 )
-from .services import registrar_movimentacao
+from .services import registrar_estorno, registrar_movimentacao
 from .alerts import coletar_alertas
 from .relatorios import gerar_prestacao_contas
 from plataforma.permissions import slugs_modulos_do_usuario
@@ -205,6 +206,18 @@ class MovimentacaoViewSet(viewsets.ModelViewSet):
             return Response({"detail": e.messages}, status=status.HTTP_400_BAD_REQUEST)
         out = self.get_serializer(mov)
         return Response(out.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, EhAdmin])
+    def estornar(self, request, pk=None):
+        try:
+            movimento = registrar_estorno(
+                movimentacao=self.get_object(),
+                motivo=str(request.data.get("motivo", "")).strip(),
+                user=request.user,
+            )
+        except DjangoValidationError as e:
+            return Response({"detail": e.messages}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self.get_serializer(movimento).data, status=status.HTTP_201_CREATED)
 
 
 class EntradaViewSet(viewsets.ModelViewSet):

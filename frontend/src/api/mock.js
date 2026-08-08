@@ -251,6 +251,28 @@ export const mockMovimentacoes = {
     save(db)
     return nova
   },
+  async estornar(id, motivo) {
+    await delay()
+    const texto = String(motivo || "").trim()
+    if (texto.length < 5) throw new Error("Informe um motivo de ao menos 5 caracteres para o estorno.")
+    const db = load()
+    const original = db.movimentacoes.find((m) => m.id === Number(id))
+    if (!original) throw new Error("Movimentação não encontrada.")
+    if (db.movimentacoes.some((m) => m.corrige_movimentacao === original.id)) {
+      throw new Error("Esta movimentação já foi estornada.")
+    }
+    const tipo = original.tipo === "ENTRADA" ? "SAIDA" : "ENTRADA"
+    ajustarSaldo(db, original.produto, tipo, original.quantidade)
+    const estorno = {
+      id: db.seqM++, produto: original.produto, tipo, quantidade: original.quantidade,
+      preco_unitario: null, entrada: null, motivo: texto,
+      corrige_movimentacao: original.id,
+      data: new Date().toISOString().slice(0, 10), criado_em: new Date().toISOString(),
+    }
+    db.movimentacoes.push(estorno)
+    save(db)
+    return estorno
+  },
 }
 
 export const mockEntradas = {

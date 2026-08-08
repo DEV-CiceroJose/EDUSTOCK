@@ -110,6 +110,7 @@ export const httpFornecedores = {
 export const httpMovimentacoes = {
   list: (qs = "") => reqRecent<Movimentacao>(`/movimentacoes/${qs ? `?${qs}` : ""}`),
   create: (data: Record<string, unknown>) => req<Movimentacao>(`/movimentacoes/`, { method: "POST", body: data }),
+  estornar: (id: Id, motivo: string) => req<Movimentacao>(`/movimentacoes/${id}/estornar/`, { method: "POST", body: { motivo } }),
 }
 
 export const httpEntradas = {

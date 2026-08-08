@@ -25,6 +25,7 @@ export default function MovimentacoesPage() {
         movimentacoes={movimentacoes}
         onNovaEntrada={() => setEntradaOpen(true)}
         onNovaSaida={() => setSaidaOpen(true)}
+        onAtualizar={carregar}
       />
 
       <EntradaFormModal
