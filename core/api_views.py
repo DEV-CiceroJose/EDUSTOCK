@@ -207,7 +207,11 @@ class MovimentacaoViewSet(viewsets.ModelViewSet):
         out = self.get_serializer(mov)
         return Response(out.data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, EhAdmin])
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsAuthenticated, RequerModuloAtivo("movimentacoes"), EhAdmin],
+    )
     def estornar(self, request, pk=None):
         try:
             movimento = registrar_estorno(

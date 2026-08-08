@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 from core.models import Categoria, Grupo, LoteEstoque, Movimentacao, Produto
 from core.services import registrar_estorno, registrar_movimentacao
 from core.tests.utils import AutenticadoAPITestCase
-from plataforma.models import Perfil, TokenAcesso
+from plataforma.models import Modulo, Perfil, TokenAcesso
 from django.utils import timezone
 from datetime import timedelta
 
@@ -46,6 +46,19 @@ class RegistrarEstornoTest(TestCase):
         with self.assertRaises(ValidationError):
             registrar_estorno(
                 movimentacao=original, motivo="nova tentativa", user=self.admin,
+            )
+
+    def test_nao_permite_estornar_um_estorno(self):
+        original = registrar_movimentacao(
+            produto=self.produto, tipo=Movimentacao.SAIDA,
+            quantidade=Decimal("2"), motivo="consumo", user=self.admin,
+        )
+        estorno = registrar_estorno(
+            movimentacao=original, motivo="lancamento incorreto", user=self.admin,
+        )
+        with self.assertRaises(ValidationError):
+            registrar_estorno(
+                movimentacao=estorno, motivo="nova tentativa", user=self.admin,
             )
 
     def test_motivo_do_estorno_precisa_ter_cinco_caracteres(self):
@@ -106,6 +119,31 @@ class EstornoApiTest(AutenticadoAPITestCase):
         response = client.post(
             f"/api/movimentacoes/{self.movimentacao.id}/estornar/",
             {"motivo": "lançamento incorreto"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403, response.content)
+
+    def test_api_nao_permite_estornar_um_estorno(self):
+        primeiro = self.client.post(
+            f"/api/movimentacoes/{self.movimentacao.id}/estornar/",
+            {"motivo": "lancamento incorreto"},
+            format="json",
+        )
+        self.assertEqual(primeiro.status_code, 201, primeiro.content)
+
+        response = self.client.post(
+            f"/api/movimentacoes/{primeiro.data['id']}/estornar/",
+            {"motivo": "nova tentativa"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.content)
+
+    def test_admin_sem_modulo_movimentacoes_ativo_nao_estorna(self):
+        Modulo.objects.filter(slug="movimentacoes").update(ativo=False)
+
+        response = self.client.post(
+            f"/api/movimentacoes/{self.movimentacao.id}/estornar/",
+            {"motivo": "lancamento incorreto"},
             format="json",
         )
         self.assertEqual(response.status_code, 403, response.content)
