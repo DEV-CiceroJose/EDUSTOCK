@@ -1,5 +1,7 @@
 from django.contrib import admin
+from django.contrib.auth.models import User
 from django.test import TestCase
+from django.test.client import RequestFactory
 
 from core.models import (
     BemPermanente,
@@ -50,3 +52,24 @@ class CoreAdminRegistrationTest(TestCase):
         model_admin = admin.site._registry[Produto]
         self.assertIn("quantidade", model_admin.readonly_fields)
         self.assertIn("validade", model_admin.readonly_fields)
+
+    def test_admin_rejeita_conversao_de_dimensoes_incompativeis(self):
+        categoria = Categoria.objects.create(name="Alimentos")
+        grupo = Grupo.objects.create(nome="Geral", categoria=categoria)
+        usuario = User.objects.create_superuser(username="admin-conversao")
+        request = RequestFactory().get("/admin/core/produto/add/")
+        request.user = usuario
+        form_class = admin.site._registry[Produto].get_form(request)
+        form = form_class(data={
+            "nome": "Arroz líquido",
+            "grupo": grupo.pk,
+            "unidade": "KG",
+            "unidade_consumo": "ML",
+            "conteudo_por_unidade": "1000",
+            "estoque_minimo": "0",
+            "perecivel": False,
+            "periodicidade": "EVENTUAL",
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("unidade_consumo", form.errors)

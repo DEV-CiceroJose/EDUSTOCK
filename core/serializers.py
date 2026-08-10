@@ -126,6 +126,10 @@ class ProdutoSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSeria
         read_only_fields = ["quantidade", "criado_por_nome", "criado_em", "atualizado_em"]
 
     def validate(self, attrs):
+        unidade = attrs.get(
+            "unidade",
+            getattr(self.instance, "unidade", None),
+        )
         unidade_consumo = attrs.get(
             "unidade_consumo",
             getattr(self.instance, "unidade_consumo", None),
@@ -141,6 +145,12 @@ class ProdutoSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSeria
         if conteudo_por_unidade is not None and not unidade_consumo:
             raise serializers.ValidationError({
                 "unidade_consumo": "Informe a unidade usada no consumo."
+            })
+        if not Produto.conversao_dimensional_compativel(unidade, unidade_consumo):
+            raise serializers.ValidationError({
+                "unidade_consumo": (
+                    "A unidade de consumo é incompatível com a unidade de estoque."
+                )
             })
         if (
             not unidade_consumo
@@ -272,6 +282,12 @@ class ReceitaIngredienteSerializer(serializers.ModelSerializer):
         if not produto.unidade_consumo or produto.conteudo_por_unidade is None:
             raise serializers.ValidationError({
                 "produto": "Configure a conversão de unidade do produto."
+            })
+        if not Produto.conversao_dimensional_compativel(
+            produto.unidade, produto.unidade_consumo
+        ):
+            raise serializers.ValidationError({
+                "produto": "A conversão de unidade do produto é incompatível."
             })
         return attrs
 

@@ -65,6 +65,36 @@ class ValidacaoConversaoConsumoTest(TestCase):
 
         self.assertIn("conteudo_por_unidade", contexto.exception.message_dict)
 
+    def test_produto_rejeita_conversao_de_dimensoes_incompativeis(self):
+        casos = (("KG", "ML"), ("L", "G"), ("UN", "G"))
+
+        for unidade, unidade_consumo in casos:
+            with self.subTest(unidade=unidade, unidade_consumo=unidade_consumo):
+                produto = Produto(
+                    nome="Conversao impossivel",
+                    grupo=self.grupo,
+                    unidade=unidade,
+                    unidade_consumo=unidade_consumo,
+                    conteudo_por_unidade=Decimal("1"),
+                )
+
+                with self.assertRaises(ValidationError) as contexto:
+                    produto.full_clean(exclude={"criado_por", "atualizado_por"})
+
+                self.assertIn("unidade_consumo", contexto.exception.message_dict)
+
+    def test_serializer_rejeita_conversao_de_dimensoes_incompativeis(self):
+        serializer = ProdutoSerializer(data={
+            "nome": "Arroz liquido",
+            "grupo": self.grupo.pk,
+            "unidade": "KG",
+            "unidade_consumo": "ML",
+            "conteudo_por_unidade": "1000",
+        })
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("unidade_consumo", serializer.errors)
+
     def test_ingrediente_rejeita_produto_sem_conversao(self):
         produto = Produto.objects.create(
             nome="Arroz em caixa",

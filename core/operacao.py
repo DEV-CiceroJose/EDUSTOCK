@@ -32,6 +32,12 @@ def converter_consumo_para_estoque(produto, quantidade_consumo):
         raise ValidationError(
             f"Configure a conversão de unidade de '{produto.nome}'."
         )
+    if not Produto.conversao_dimensional_compativel(
+        produto.unidade, produto.unidade_consumo
+    ):
+        raise ValidationError(
+            f"A conversão de unidade de '{produto.nome}' é incompatível."
+        )
     return Decimal(quantidade_consumo) / produto.conteudo_por_unidade
 
 

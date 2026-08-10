@@ -19,8 +19,8 @@ from django.utils import timezone
 from rest_framework.test import APIClient, APITestCase
 
 from core.models import (
-    Categoria, FatorConsumo, FrequenciaDiaria, Grupo, Movimentacao, PinAcesso,
-    OperacaoBaixaProducao, Produto, Turma,
+    Categoria, FatorConsumo, FrequenciaDiaria, Grupo, LoteEstoque, Movimentacao,
+    PinAcesso, OperacaoBaixaProducao, Produto, Turma,
 )
 from core.operacao import baixa_de_producao, gerar_plano_do_dia
 from core.operacao_auth import PERFIL_ALUNO, PERFIL_COZINHA, criar_token
@@ -230,6 +230,9 @@ class TestBaixaProducaoAtomicaPorItem(TestCase):
             unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
         FatorConsumo.objects.create(produto=self.arroz, quantidade_por_aluno=Decimal("100"))
+        LoteEstoque.objects.create(
+            produto=self.arroz, codigo="ARROZ-BAIXA", quantidade=Decimal("50")
+        )
 
         # Feijão: saldo INSUFICIENTE (60g × 100 = 6 kg, saldo=1)
         self.feijao = Produto.objects.create(
@@ -237,6 +240,9 @@ class TestBaixaProducaoAtomicaPorItem(TestCase):
             unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
         FatorConsumo.objects.create(produto=self.feijao, quantidade_por_aluno=Decimal("60"))
+        LoteEstoque.objects.create(
+            produto=self.feijao, codigo="FEIJAO-BAIXA", quantidade=Decimal("1")
+        )
 
         FrequenciaDiaria.objects.create(
             data=self.hoje, turno="INTEGRAL", turma="Total", quantidade_alunos=100

@@ -9,7 +9,19 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from core.models import Categoria, Entrada, Fornecedor, Grupo, PinAcesso, Produto, Turma
+from core.models import (
+    Cardapio,
+    Categoria,
+    Entrada,
+    FatorConsumo,
+    Fornecedor,
+    Grupo,
+    PinAcesso,
+    Produto,
+    Receita,
+    ReceitaIngrediente,
+    Turma,
+)
 from core.services import registrar_entrada
 from plataforma.models import Perfil, TokenAcesso
 
@@ -57,7 +69,8 @@ class Command(BaseCommand):
             is_superuser=False,
         )
         self._ensure_operational_access(values)
-        self._ensure_inventory(admin)
+        produtos = self._ensure_inventory(admin)
+        self._ensure_menu(produtos)
 
         self.stdout.write(self.style.SUCCESS("Demonstração fictícia preparada com sucesso."))
 
@@ -238,3 +251,41 @@ class Command(BaseCommand):
                 itens=items,
                 user=admin,
             )
+        return {item["produto"].nome: item["produto"] for item in items}
+
+    def _ensure_menu(self, produtos):
+        arroz = produtos["Arroz parboilizado (fictício)"]
+        feijao = produtos["Feijão carioca (fictício)"]
+        oleo = produtos["Óleo vegetal (fictício)"]
+        leite = produtos["Leite integral (fictício)"]
+
+        receita, _ = Receita.objects.get_or_create(
+            nome="Arroz com feijão da demonstração",
+            defaults={
+                "refeicao": "ALMOCO",
+                "observacao": "Receita exclusivamente fictícia e descartável.",
+            },
+        )
+        for produto, quantidade in (
+            (arroz, Decimal("80")),
+            (feijao, Decimal("50")),
+            (oleo, Decimal("8")),
+        ):
+            ReceitaIngrediente.objects.get_or_create(
+                receita=receita,
+                produto=produto,
+                defaults={"quantidade_por_aluno": quantidade},
+            )
+
+        Cardapio.objects.get_or_create(
+            data=timezone.localdate(),
+            refeicao="ALMOCO",
+            defaults={
+                "receita": receita,
+                "observacao": "Cardápio fictício da demonstração.",
+            },
+        )
+        FatorConsumo.objects.get_or_create(
+            produto=leite,
+            defaults={"quantidade_por_aluno": Decimal("200"), "ativo": True},
+        )

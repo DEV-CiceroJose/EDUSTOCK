@@ -1,4 +1,6 @@
-from core.models import Categoria, Grupo, Produto
+from decimal import Decimal
+
+from core.models import Categoria, Grupo, LoteEstoque, Produto
 from core.tests.utils import AutenticadoAPITestCase
 
 
@@ -33,6 +35,18 @@ class ProdutoApiTest(AutenticadoAPITestCase):
         self.assertEqual(resp.data["categoria_nome"], "Alimentos")
         self.assertEqual(resp.data["categoria"], self.cat.id)
         self.assertEqual(resp.data["periodicidade"], "MENSAL")
+
+    def test_rejeita_conversao_de_dimensoes_incompativeis(self):
+        resp = self.client.post("/api/produtos/", {
+            "nome": "Arroz líquido",
+            "grupo": self.grupo.id,
+            "unidade": "KG",
+            "unidade_consumo": "ML",
+            "conteudo_por_unidade": "1000",
+        }, format="json")
+
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertIn("unidade_consumo", resp.data)
 
     def test_filtra_por_categoria(self):
         Produto.objects.create(nome="Arroz", grupo=self.grupo, quantidade=1, unidade="KG")
@@ -133,6 +147,9 @@ class MovimentacaoApiTest(AutenticadoAPITestCase):
         cat = Categoria.objects.create(name="Alimentos")
         self.grupo = Grupo.objects.create(nome="Geral", categoria=cat)
         self.p = Produto.objects.create(nome="Arroz", grupo=self.grupo, quantidade=10, unidade="KG")
+        LoteEstoque.objects.create(
+            produto=self.p, codigo="LEGADO-API", quantidade=Decimal("10")
+        )
 
     def test_post_saida_atualiza_saldo(self):
         resp = self.client.post("/api/movimentacoes/", {
@@ -158,7 +175,7 @@ class MovimentacaoApiTest(AutenticadoAPITestCase):
         self.assertEqual(resp.data["results"][0]["tipo"], "SAIDA")
 
     def test_append_only(self):
-        self.client.post("/api/movimentacoes/", {"produto": self.p.id, "tipo": "ENTRADA", "quantidade": "1"}, format="json")
+        self.client.post("/api/movimentacoes/", {"produto": self.p.id, "tipo": "SAIDA", "quantidade": "1"}, format="json")
         mid = self.client.get("/api/movimentacoes/").data["results"][0]["id"]
         self.assertEqual(self.client.delete(f"/api/movimentacoes/{mid}/").status_code, 405)
         self.assertEqual(self.client.patch(f"/api/movimentacoes/{mid}/", {"quantidade": "2"}, format="json").status_code, 405)

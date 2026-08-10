@@ -6,7 +6,14 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase, APIClient
 
-from core.models import Categoria, FrequenciaDiaria, FatorConsumo, Grupo, Produto
+from core.models import (
+    Categoria,
+    FrequenciaDiaria,
+    FatorConsumo,
+    Grupo,
+    LoteEstoque,
+    Produto,
+)
 from core.operacao import baixa_de_producao, gerar_plano_do_dia
 from core.services import calcular_previsao_producao, registrar_movimentacao
 from core.models import Movimentacao
@@ -83,6 +90,12 @@ class BaixaProducaoTest(TestCase):
         self.feijao = Produto.objects.create(
             nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1"),
             unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
+        )
+        LoteEstoque.objects.create(
+            produto=self.arroz, codigo="ARROZ-TESTE", quantidade=Decimal("50")
+        )
+        LoteEstoque.objects.create(
+            produto=self.feijao, codigo="FEIJAO-TESTE", quantidade=Decimal("1")
         )
         FatorConsumo.objects.create(produto=self.arroz, quantidade_por_aluno=Decimal("80"))
         FatorConsumo.objects.create(produto=self.feijao, quantidade_por_aluno=Decimal("50"))
@@ -200,6 +213,9 @@ class ContagemApiTest(APITestCase):
         p = Produto.objects.create(
             nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("20"),
             unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
+        )
+        LoteEstoque.objects.create(
+            produto=p, codigo="ARROZ-API", quantidade=Decimal("20")
         )
         FatorConsumo.objects.create(produto=p, quantidade_por_aluno=Decimal("100"))
         hoje = timezone.localdate().isoformat()

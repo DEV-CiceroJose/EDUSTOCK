@@ -66,6 +66,7 @@ class Produto(models.Model):
         ("MENSAL", "Mensal"),
         ("EVENTUAL", "Eventual"),
     ]
+    CONVERSOES_DIMENSIONAIS_FIXAS = {"KG": "G", "L": "ML", "UN": "UN"}
 
     nome = models.CharField("Nome", max_length=200)
     grupo = models.ForeignKey("Grupo", on_delete=models.PROTECT, related_name="produtos")
@@ -115,6 +116,14 @@ class Produto(models.Model):
             return False
         return hasattr(self, "fator_consumo") or self.usos_em_receitas.exists()
 
+    @classmethod
+    def conversao_dimensional_compativel(cls, unidade, unidade_consumo):
+        """Caixas e pacotes usam a unidade do conteúdo declarada pelo cadastro."""
+        if not unidade_consumo:
+            return True
+        unidade_esperada = cls.CONVERSOES_DIMENSIONAIS_FIXAS.get(unidade)
+        return unidade_esperada is None or unidade_consumo == unidade_esperada
+
     def clean(self):
         super().clean()
         if self.unidade_consumo and self.conteudo_por_unidade is None:
@@ -125,6 +134,14 @@ class Produto(models.Model):
             raise ValidationError(
                 {"unidade_consumo": "Informe a unidade usada no consumo."}
             )
+        if not self.conversao_dimensional_compativel(
+            self.unidade, self.unidade_consumo
+        ):
+            raise ValidationError({
+                "unidade_consumo": (
+                    "A unidade de consumo é incompatível com a unidade de estoque."
+                )
+            })
         if (
             not self.unidade_consumo
             and self.conteudo_por_unidade is None
@@ -388,6 +405,12 @@ class FatorConsumo(models.Model):
             raise ValidationError(
                 {"produto": "Configure a conversão de unidade do produto."}
             )
+        if self.produto_id and not Produto.conversao_dimensional_compativel(
+            self.produto.unidade, self.produto.unidade_consumo
+        ):
+            raise ValidationError(
+                {"produto": "A conversão de unidade do produto é incompatível."}
+            )
 
 
 class Receita(models.Model):
@@ -432,6 +455,12 @@ class ReceitaIngrediente(models.Model):
         ):
             raise ValidationError(
                 {"produto": "Configure a conversão de unidade do produto."}
+            )
+        if self.produto_id and not Produto.conversao_dimensional_compativel(
+            self.produto.unidade, self.produto.unidade_consumo
+        ):
+            raise ValidationError(
+                {"produto": "A conversão de unidade do produto é incompatível."}
             )
 
 

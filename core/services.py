@@ -38,8 +38,26 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
             extra={"produto_id": getattr(produto, "pk", None), "tipo": tipo},
         )
         raise ValidationError("A quantidade deve ser maior que zero.")
+    if tipo not in {Movimentacao.ENTRADA, Movimentacao.SAIDA}:
+        raise ValidationError("O tipo da movimentação é inválido.")
 
     p = Produto.objects.select_for_update().get(pk=produto.pk)
+    lote_bloqueado = None
+    lotes_bloqueados = []
+    if tipo == Movimentacao.ENTRADA:
+        entrada_corrige_saida = (
+            corrige_movimentacao is not None
+            and corrige_movimentacao.tipo == Movimentacao.SAIDA
+            and corrige_movimentacao.produto_id == p.pk
+        )
+        if lote is None and not entrada_corrige_saida:
+            raise ValidationError(
+                "Entradas de estoque precisam ser registradas com um lote."
+            )
+        if lote is not None:
+            lote_bloqueado = LoteEstoque.objects.select_for_update().get(pk=lote.pk)
+            if lote_bloqueado.produto_id != p.pk:
+                raise ValidationError("O lote informado não pertence ao produto.")
     if tipo == Movimentacao.SAIDA:
         if quantidade > p.quantidade:
             logger.warning(
@@ -53,6 +71,20 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
             )
             raise ValidationError(
                 f"Saída de {quantidade} excede o saldo atual ({p.quantidade})."
+            )
+        lotes_bloqueados = list(
+            LoteEstoque.objects.select_for_update()
+            .filter(produto=p, quantidade__gt=0)
+            .order_by(F("validade").asc(nulls_last=True), "criado_em", "id")
+        )
+        saldo_lotes = sum(
+            (lote_atual.quantidade for lote_atual in lotes_bloqueados),
+            Decimal("0"),
+        )
+        if quantidade > saldo_lotes:
+            raise ValidationError(
+                "Os lotes disponíveis não cobrem a quantidade solicitada; "
+                "o saldo não foi alterado."
             )
         p.quantidade = p.quantidade - quantidade
     else:

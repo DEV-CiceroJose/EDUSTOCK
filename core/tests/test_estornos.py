@@ -20,6 +20,9 @@ class RegistrarEstornoTest(TestCase):
         self.produto = Produto.objects.create(
             nome="Arroz", grupo=grupo, quantidade=10, unidade="KG"
         )
+        self.lote = LoteEstoque.objects.create(
+            produto=self.produto, codigo="LEGADO-TESTE", quantidade=Decimal("10")
+        )
         self.admin = User.objects.create_user(username="admin-estorno")
 
     def test_estorno_cria_movimento_oposto_e_restaura_saldo(self):
@@ -65,14 +68,12 @@ class RegistrarEstornoTest(TestCase):
         original = registrar_movimentacao(
             produto=self.produto, tipo=Movimentacao.ENTRADA,
             quantidade=Decimal("2"), motivo="entrada", user=self.admin,
+            lote=self.lote,
         )
         with self.assertRaises(ValidationError):
             registrar_estorno(movimentacao=original, motivo="erro", user=self.admin)
 
     def test_estorno_de_saida_restaura_lotes_alocados(self):
-        lote = LoteEstoque.objects.create(
-            produto=self.produto, codigo="LT-1", quantidade=Decimal("10")
-        )
         original = registrar_movimentacao(
             produto=self.produto, tipo=Movimentacao.SAIDA,
             quantidade=Decimal("2"), motivo="consumo", user=self.admin,
@@ -80,8 +81,8 @@ class RegistrarEstornoTest(TestCase):
         registrar_estorno(
             movimentacao=original, motivo="lançamento incorreto", user=self.admin,
         )
-        lote.refresh_from_db()
-        self.assertEqual(lote.quantidade, Decimal("10"))
+        self.lote.refresh_from_db()
+        self.assertEqual(self.lote.quantidade, Decimal("10"))
 
 
 class EstornoApiTest(AutenticadoAPITestCase):
@@ -91,6 +92,9 @@ class EstornoApiTest(AutenticadoAPITestCase):
         grupo = Grupo.objects.create(nome="Geral", categoria=categoria)
         self.produto = Produto.objects.create(
             nome="Arroz", grupo=grupo, quantidade=10, unidade="KG"
+        )
+        LoteEstoque.objects.create(
+            produto=self.produto, codigo="LEGADO-API", quantidade=Decimal("10")
         )
         self.movimentacao = registrar_movimentacao(
             produto=self.produto, tipo=Movimentacao.SAIDA,

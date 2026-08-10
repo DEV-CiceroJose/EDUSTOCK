@@ -116,3 +116,46 @@ class ProtecaoPinMigrationTest(TransactionTestCase):
 
     def tearDown(self):
         self._migrate(self.migrate_to)
+
+
+class MaterializaLotesLegadosMigrationTest(TransactionTestCase):
+    migrate_from = ("core", "0023_estorno_movimentacao")
+    migrate_to = ("core", "0024_materializa_lotes_legados")
+
+    def _migrate(self, target):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate([target])
+        return executor.loader.project_state([target]).apps
+
+    def test_materializa_apenas_diferenca_entre_saldo_e_lotes(self):
+        apps = self._migrate(self.migrate_from)
+        Categoria = apps.get_model("core", "Categoria")
+        Grupo = apps.get_model("core", "Grupo")
+        Produto = apps.get_model("core", "Produto")
+        LoteEstoque = apps.get_model("core", "LoteEstoque")
+        categoria = Categoria.objects.create(name="Legado")
+        grupo = Grupo.objects.create(nome="Geral", categoria=categoria)
+        produto = Produto.objects.create(
+            nome="Arroz legado", grupo=grupo, quantidade=Decimal("10"), unidade="KG"
+        )
+        LoteEstoque.objects.create(
+            produto=produto, codigo="LOTE-EXISTENTE", quantidade=Decimal("3")
+        )
+
+        apps = self._migrate(self.migrate_to)
+        LoteEstoque = apps.get_model("core", "LoteEstoque")
+        legado = LoteEstoque.objects.get(
+            produto_id=produto.pk, codigo=f"LEGADO-0024-{produto.pk}"
+        )
+        self.assertEqual(legado.quantidade, Decimal("7.000"))
+
+        apps = self._migrate(self.migrate_from)
+        LoteEstoque = apps.get_model("core", "LoteEstoque")
+        self.assertFalse(
+            LoteEstoque.objects.filter(codigo=f"LEGADO-0024-{produto.pk}").exists()
+        )
+        self.assertTrue(LoteEstoque.objects.filter(codigo="LOTE-EXISTENTE").exists())
+
+    def tearDown(self):
+        self._migrate(self.migrate_to)

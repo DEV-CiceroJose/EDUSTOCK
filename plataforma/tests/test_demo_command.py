@@ -2,13 +2,27 @@ import os
 from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
+from uuid import uuid4
 
 from django.contrib.auth.models import User
 from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from core.models import Entrada, LoteEstoque, Movimentacao, PinAcesso, Produto, Turma
+from core.models import (
+    Cardapio,
+    Entrada,
+    FatorConsumo,
+    FrequenciaDiaria,
+    LoteEstoque,
+    Movimentacao,
+    PinAcesso,
+    Produto,
+    Receita,
+    ReceitaIngrediente,
+    Turma,
+)
+from core.operacao import executar_baixa_idempotente, gerar_plano_do_dia
 from plataforma.management.commands.preparar_demo import (
     DEMO_ADMIN_MATRICULA,
     DEMO_OPERATOR_MATRICULA,
@@ -44,7 +58,19 @@ class PrepararDemoCommandTest(TestCase):
         self.run_demo(env)
         counts = {
             model: model.objects.count()
-            for model in (User, Turma, PinAcesso, Produto, Entrada, Movimentacao, LoteEstoque)
+            for model in (
+                User,
+                Turma,
+                PinAcesso,
+                Produto,
+                Entrada,
+                Movimentacao,
+                LoteEstoque,
+                Receita,
+                ReceitaIngrediente,
+                Cardapio,
+                FatorConsumo,
+            )
         }
         self.run_demo(env)
 
@@ -68,6 +94,37 @@ class PrepararDemoCommandTest(TestCase):
         )
         self.assertTrue(Movimentacao.objects.filter(tipo=Movimentacao.ENTRADA).exists())
         self.assertTrue(LoteEstoque.objects.filter(quantidade__gt=0).exists())
+
+    @override_settings(DEMO_MODE=True)
+    def test_preparar_demo_habilita_fluxo_real_da_cozinha(self):
+        self.run_demo()
+        hoje = timezone.localdate()
+        FrequenciaDiaria.objects.create(
+            data=hoje,
+            turno=FrequenciaDiaria.INTEGRAL,
+            turma="Turma Unica - Demonstracao",
+            quantidade_alunos=30,
+        )
+
+        plano = gerar_plano_do_dia(
+            data=hoje,
+            turno=FrequenciaDiaria.INTEGRAL,
+            refeicao="ALMOCO",
+        )
+        resultado = executar_baixa_idempotente(
+            operacao_id=uuid4(),
+            data=hoje,
+            refeicao="ALMOCO",
+        )
+
+        self.assertTrue(Receita.objects.filter(refeicao="ALMOCO").exists())
+        self.assertTrue(ReceitaIngrediente.objects.exists())
+        self.assertTrue(Cardapio.objects.filter(data=hoje, refeicao="ALMOCO").exists())
+        self.assertTrue(FatorConsumo.objects.filter(ativo=True).exists())
+        self.assertEqual(plano["origem_plano"], "cardapio")
+        self.assertGreater(len(plano["itens"]), 0)
+        self.assertEqual(resultado["falhas"], 0)
+        self.assertGreater(resultado["sucesso"], 0)
 
     @override_settings(DEMO_MODE=True)
     def test_rotaciona_senhas_e_pins_sem_criar_novos_registros(self):
