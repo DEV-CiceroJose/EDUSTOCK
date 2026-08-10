@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -179,21 +180,38 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             detalhes={"campos": sorted(self.request.data.keys())},
         )
 
+    @staticmethod
+    def _usuarios_com_bloqueio():
+        return (
+            User.objects.select_related("perfil")
+            .filter(perfil__isnull=False)
+            .select_for_update(of=("self", "perfil"))
+        )
+
     def partial_update(self, request, *args, **kwargs):
-        usuario = self.get_object()
-        if (
-            request.data.get("is_active") is False
-            and usuario.is_active
-            and usuario.perfil.papel == Perfil.ADMIN
-            and not User.objects.filter(
-                is_active=True, perfil__papel=Perfil.ADMIN
-            ).exclude(pk=usuario.pk).exists()
-        ):
-            return Response(
-                {"detail": "Não é possível desativar o último administrador ativo."},
-                status=status.HTTP_400_BAD_REQUEST,
+        with transaction.atomic():
+            admins_ativos = list(
+                self._usuarios_com_bloqueio()
+                .filter(is_active=True, perfil__papel=Perfil.ADMIN)
+                .order_by("pk")
             )
-        return super().partial_update(request, *args, **kwargs)
+            usuario = self._usuarios_com_bloqueio().get(pk=kwargs["pk"])
+            serializer = self.get_serializer(usuario, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+
+            perfil_data = serializer.validated_data.get("perfil", {})
+            papel_final = perfil_data.get("papel", usuario.perfil.papel)
+            ativo_final = serializer.validated_data.get("is_active", usuario.is_active)
+            era_admin_ativo = any(admin.pk == usuario.pk for admin in admins_ativos)
+            sera_admin_ativo = ativo_final and papel_final == Perfil.ADMIN
+            if era_admin_ativo and not sera_admin_ativo and len(admins_ativos) == 1:
+                return Response(
+                    {"detail": "Não é possível remover o último administrador ativo."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            self.perform_update(serializer)
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"], url_path="senha")
     def senha(self, request, pk=None):

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -6,6 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from plataforma.models import Modulo, Perfil, RegistroAuditoria, TokenAcesso
+from plataforma.views import UsuarioViewSet
 
 
 class LoginViewTest(APITestCase):
@@ -271,6 +273,51 @@ class UsuarioViewSetTest(APITestCase):
         self.assertEqual(resposta.status_code, 400)
         admin.refresh_from_db()
         self.assertTrue(admin.is_active)
+
+    def test_nao_rebaixa_ultimo_admin_ativo_para_operador(self):
+        self._autenticar_admin()
+        admin = User.objects.get(username="admin1")
+
+        resposta = self.client.patch(
+            f"/api/usuarios/{admin.pk}/", {"papel": "OPERADOR"}, format="json"
+        )
+
+        self.assertEqual(resposta.status_code, 400)
+        admin.perfil.refresh_from_db()
+        self.assertEqual(admin.perfil.papel, Perfil.ADMIN)
+
+    def test_permite_transicao_de_admin_quando_ha_outro_admin_ativo(self):
+        self._autenticar_admin()
+        admin = User.objects.get(username="admin1")
+        outro_admin = User.objects.create_user(username="admin2", password="x")
+        Perfil.objects.create(user=outro_admin, papel=Perfil.ADMIN)
+
+        resposta = self.client.patch(
+            f"/api/usuarios/{admin.pk}/", {"papel": "OPERADOR"}, format="json"
+        )
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        admin.perfil.refresh_from_db()
+        self.assertEqual(admin.perfil.papel, Perfil.OPERADOR)
+        self.assertTrue(outro_admin.is_active)
+        self.assertEqual(outro_admin.perfil.papel, Perfil.ADMIN)
+
+    def test_transicao_critica_bloqueia_conjunto_de_admins_em_transacao(self):
+        self._autenticar_admin()
+        admin = User.objects.get(username="admin1")
+
+        with patch("plataforma.views.transaction.atomic") as atomic, patch.object(
+            UsuarioViewSet,
+            "_usuarios_com_bloqueio",
+            wraps=UsuarioViewSet._usuarios_com_bloqueio,
+        ) as usuarios_com_bloqueio:
+            resposta = self.client.patch(
+                f"/api/usuarios/{admin.pk}/", {"is_active": False}, format="json"
+            )
+
+        self.assertEqual(resposta.status_code, 400)
+        atomic.assert_called_once_with()
+        self.assertGreaterEqual(usuarios_com_bloqueio.call_count, 2)
 
     def test_admin_redefine_senha_sem_auditar_segredo_e_revoga_sessoes(self):
         self._autenticar_admin()
