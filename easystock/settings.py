@@ -12,8 +12,10 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 import dj_database_url
-from django.core.exceptions import ImproperlyConfigured
+from django.utils.csp import CSP
 from pathlib import Path
+
+from easystock.security import TRUE_VALUES, csv_env, validate_production_env
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,19 +26,28 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
 IS_PRODUCTION = APP_ENV == "production"
+PRODUCTION_ENV = validate_production_env(os.environ) if IS_PRODUCTION else None
 
 # Produção deve falhar cedo se a chave não estiver configurada. A chave abaixo
 # existe apenas para desenvolvimento/testes locais e nunca deve ser usada em deploy.
-SECRET_KEY = os.environ.get("SECRET_KEY")
-if not SECRET_KEY:
-    if IS_PRODUCTION:
-        raise ImproperlyConfigured("SECRET_KEY é obrigatória quando APP_ENV=production.")
-    SECRET_KEY = "django-insecure-edustock-development-only"
+SECRET_KEY = (
+    PRODUCTION_ENV["SECRET_KEY"]
+    if IS_PRODUCTION
+    else os.environ.get("SECRET_KEY") or "django-insecure-edustock-development-only"
+)
 
 # Seguro por padrão: desenvolvimento com debug precisa ser habilitado explicitamente.
-DEBUG = os.environ.get("DEBUG", "False").strip().lower() in ("1", "true", "yes")
+DEBUG = (
+    False
+    if IS_PRODUCTION
+    else os.environ.get("DEBUG", "False").strip().lower() in TRUE_VALUES
+)
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = (
+    PRODUCTION_ENV["ALLOWED_HOSTS"]
+    if IS_PRODUCTION
+    else csv_env("ALLOWED_HOSTS") or ["localhost", "127.0.0.1"]
+)
 
 
 # Application definition
@@ -57,6 +68,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     # CORS precisa vir o mais alto possível (antes do CommonMiddleware)
     "corsheaders.middleware.CorsMiddleware",
@@ -92,7 +104,15 @@ WSGI_APPLICATION = "easystock.wsgi.application"
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 # Use PostgreSQL in production (Render), SQLite in development
-if 'DATABASE_URL' in os.environ:
+if IS_PRODUCTION:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=PRODUCTION_ENV["DATABASE_URL"],
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+elif 'DATABASE_URL' in os.environ:
     DATABASES = {
         "default": dj_database_url.config(
             default=os.environ.get('DATABASE_URL'),
@@ -157,10 +177,10 @@ if IS_PRODUCTION:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "3600"))
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", "31536000"))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = (
-        os.environ.get("SECURE_HSTS_PRELOAD", "False").strip().lower()
+        os.environ.get("SECURE_HSTS_PRELOAD", "True").strip().lower()
         in ("1", "true", "yes")
     )
     SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -185,18 +205,22 @@ REST_FRAMEWORK = {
 
 # Origem do dev server do Vite (React) e produção
 # Em produção, adicione os domínios da Render
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # frontend admin (dev)
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",  # app-alunos (dev)
-    "http://127.0.0.1:5174",
-    "http://localhost:5175",  # app-cozinha (dev)
-    "http://127.0.0.1:5175",
-]
+CORS_ALLOWED_ORIGINS = (
+    PRODUCTION_ENV["CORS_ALLOWED_ORIGINS"]
+    if IS_PRODUCTION
+    else [
+        "http://localhost:5173",  # frontend admin (dev)
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",  # app-alunos (dev)
+        "http://127.0.0.1:5174",
+        "http://localhost:5175",  # app-cozinha (dev)
+        "http://127.0.0.1:5175",
+    ]
+)
 
 # Em produção, adicione dinamicamente os domínios do Render
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
-if RENDER_EXTERNAL_HOSTNAME:
+if RENDER_EXTERNAL_HOSTNAME and not IS_PRODUCTION:
     CORS_ALLOWED_ORIGINS.extend([
         f'https://{RENDER_EXTERNAL_HOSTNAME}',
         'https://edustock-frontend.onrender.com',
@@ -212,7 +236,19 @@ CORS_ALLOW_CREDENTIALS = True
 # login por PIN em /api/operacao/auth/) recebe 403 "CSRF Failed: Origin
 # checking failed", mesmo com CORS liberado — CORS e CSRF são checagens
 # independentes. Mesma lista de origens que CORS_ALLOWED_ORIGINS.
-CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
+CSRF_TRUSTED_ORIGINS = (
+    PRODUCTION_ENV["CSRF_TRUSTED_ORIGINS"]
+    if IS_PRODUCTION
+    else list(CORS_ALLOWED_ORIGINS)
+)
+
+SECURE_CSP = {
+    "default-src": [CSP.SELF],
+    "script-src": [CSP.SELF],
+    "style-src": [CSP.SELF, CSP.UNSAFE_INLINE],
+    "img-src": [CSP.SELF, "data:"],
+    "connect-src": [CSP.SELF, *CORS_ALLOWED_ORIGINS],
+}
 
 # ------------------------------------------------------------------
 # Módulo de Operação da Merenda
@@ -221,7 +257,7 @@ CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
 # pelo Django Admin — ver core/models.py e core/admin.py.
 
 # Tempo de vida dos tokens de sessão em horas (padrão 12h)
-OPERACAO_TOKEN_TTL_HORAS = 12
+OPERACAO_TOKEN_TTL_HORAS = int(os.environ.get("OPERACAO_TOKEN_TTL_HORAS", "12"))
 
 # ------------------------------------------------------------------
 # Autenticação da plataforma (dashboard admin)
@@ -255,4 +291,10 @@ else:
 
 PIN_LOGIN_MAX_TENTATIVAS = int(os.environ.get("PIN_LOGIN_MAX_TENTATIVAS", "5"))
 PIN_LOGIN_JANELA_SEGUNDOS = int(os.environ.get("PIN_LOGIN_JANELA_SEGUNDOS", "300"))
-PIN_LOOKUP_SECRET = os.environ.get("PIN_LOOKUP_SECRET", SECRET_KEY)
+PIN_LOOKUP_SECRET = (
+    PRODUCTION_ENV["PIN_LOOKUP_SECRET"]
+    if IS_PRODUCTION
+    else os.environ.get("PIN_LOOKUP_SECRET", SECRET_KEY)
+)
+
+DEMO_MODE = os.environ.get("DEMO_MODE", "False").strip().lower() in TRUE_VALUES
