@@ -1,212 +1,103 @@
-# Apps Aluno e Cozinha — instalação pelo navegador
+# Apps Alunos e Cozinha
 
-## Objetivo
+Os apps EduStock Alunos e EduStock Cozinha são Progressive Web Apps (PWAs).
+Continuam funcionando como sites e podem ser instalados pelo navegador, sem
+publicação em lojas.
 
-Os aplicativos **EduStock Alunos** e **EduStock Cozinha** foram transformados
-em Progressive Web Apps (PWAs). Com isso, continuam funcionando como sites e
-também podem ser instalados diretamente pelo navegador, sem precisar publicar
-um aplicativo nas lojas Google Play ou App Store.
+## Publicação atual
 
-Depois de instalados, cada app aparece com nome e ícone próprios na tela inicial
-do celular ou no menu de aplicativos do computador e abre em uma janela
-independente, sem a barra de navegação comum do navegador.
+O `render.yaml` declara dois sites estáticos independentes:
 
-## O que foi implementado
+| App | Serviço | Origem | Publicação | Rota autenticada |
+| --- | --- | --- | --- | --- |
+| Alunos | `edustock-demo-alunos` | `app-alunos/` | `app-alunos/dist` | `/registrar` |
+| Cozinha | `edustock-demo-cozinha` | `app-cozinha/` | `app-cozinha/dist` | `/producao` |
 
-### 1. Manifesto de cada aplicativo
+Os dois entram por `/login`, usam `VITE_API_BASE` para localizar
+`edustock-demo-api` e possuem rewrite de SPA para `/index.html`. Não existe
+`.env.production` versionado; a URL da API é definida pelo Blueprint durante o
+build.
 
-Foram criados os arquivos:
+## Autenticação
 
-- `app-alunos/public/manifest.webmanifest`
-- `app-cozinha/public/manifest.webmanifest`
+- Alunos usa o PIN fictício definido em `DEMO_ALUNOS_PIN`.
+- Cozinha usa o PIN fictício definido em `DEMO_COZINHA_PIN`.
+- Os PINs devem ser distintos, secretos e compartilhados somente com quem fará
+  a avaliação.
+- As sessões expiram e voltam ao login após inatividade.
+- Na demonstração, nunca reutilize um PIN adotado por uma escola real.
 
-O manifesto informa ao navegador:
+O backend armazena os PINs protegidos, não em texto puro. Na demonstração, o
+comando idempotente `python manage.py preparar_demo` cria ou atualiza os acessos
+a partir das variáveis secretas da Render.
 
-- nome completo e nome curto do aplicativo;
-- descrição e idioma;
-- rota inicial (`/login`);
-- escopo de navegação (`/`);
-- execução no modo `standalone`;
-- orientação preferencial em modo retrato;
-- cores de abertura e da barra do sistema;
-- categorias do aplicativo;
-- ícones de 192 × 192 e 512 × 512 pixels.
+## Instalação
 
-Como Alunos e Cozinha são publicados em domínios diferentes na Render, cada um
-é reconhecido pelo navegador como um aplicativo independente.
+### Chrome ou Edge no computador
 
-### 2. Ícones próprios
-
-Cada app recebeu uma identidade visual própria:
-
-- **Alunos:** capelo escolar;
-- **Cozinha:** chapéu de cozinheiro.
-
-Os arquivos ficam em `public/icons/` dentro de cada projeto e incluem:
-
-- `icon.svg`: versão vetorial original;
-- `icon-192.png`: ícone usado pelos navegadores;
-- `icon-512.png`: ícone de alta resolução e máscara adaptável;
-- `apple-touch-icon.png`: ícone específico para iPhone e iPad.
-
-O fundo dos ícones ocupa toda a imagem para funcionar corretamente com os
-formatos de máscara aplicados por Android, ChromeOS e outros sistemas.
-
-### 3. Integração com o HTML
-
-Os arquivos `index.html` dos dois apps agora possuem:
-
-- referência ao manifesto;
-- favicon do aplicativo;
-- ícone para dispositivos Apple;
-- nome do aplicativo para instalação;
-- cor do tema;
-- metadados para execução em modo aplicativo no iOS e em outros navegadores.
-
-### 4. Service workers
-
-Foram criados:
-
-- `app-alunos/public/service-worker.js`
-- `app-cozinha/public/service-worker.js`
-
-O service worker é registrado automaticamente pelo `src/main.jsx` de cada app
-após o carregamento do build de produção. O modo de desenvolvimento não ativa
-cache para evitar que arquivos antigos interfiram nos testes locais. Ele é o
-componente que permite ao navegador tratar o site como uma PWA e manter os
-arquivos essenciais da interface em cache.
-
-Durante a instalação, ele armazena:
-
-- a página inicial;
-- o `index.html`;
-- o manifesto;
-- os arquivos JavaScript e CSS gerados com hash pelo Vite.
-
-Os nomes dos arquivos gerados pelo Vite mudam a cada build. Por isso, o service
-worker lê o `index.html` publicado, identifica automaticamente os caminhos em
-`/assets/` e adiciona os arquivos correspondentes ao cache.
-
-### 5. Estratégia de cache
-
-O comportamento adotado é:
-
-- **Navegação entre páginas:** tenta buscar a versão atual na rede; se não
-  houver conexão, utiliza o `index.html` armazenado.
-- **JavaScript, CSS, ícones e demais arquivos locais:** utiliza o cache quando
-  o arquivo já estiver armazenado e busca na rede quando necessário.
-- **Requisições da API em `/api/`:** nunca são interceptadas nem armazenadas
-  pelo service worker.
-- **Arquivos externos, como Google Fonts:** não são armazenados pelo service
-  worker; sem internet, o navegador utiliza a fonte alternativa do sistema.
-
-Essa separação é importante para impedir que autenticação, frequência, estoque
-ou produção sejam exibidos ou enviados como se fossem dados atuais quando o
-dispositivo estiver sem conexão.
-
-## Como a instalação funciona
-
-### Chrome e Edge no computador
-
-1. Acessar a URL do app Alunos ou Cozinha.
-2. Aguardar o primeiro carregamento completo.
-3. Selecionar o ícone de instalação na barra de endereço ou abrir o menu do
-   navegador e escolher **Instalar app**.
-4. Confirmar a instalação.
+1. Abra a URL publicada do app.
+2. Aguarde o carregamento completo.
+3. Use o ícone da barra de endereço ou o menu **Instalar app**.
+4. Confirme.
 
 ### Android
 
-1. Abrir o app pelo Chrome ou outro navegador compatível.
-2. Abrir o menu do navegador.
-3. Escolher **Instalar app** ou **Adicionar à tela inicial**.
-4. Confirmar.
+1. Abra o app em um navegador compatível.
+2. Escolha **Instalar app** ou **Adicionar à tela inicial**.
+3. Confirme.
 
-Dependendo da versão do navegador, uma sugestão automática de instalação também
-pode ser exibida.
+### iPhone ou iPad
 
-### iPhone e iPad
+1. Abra o app no Safari.
+2. Toque em **Compartilhar**.
+3. Selecione **Adicionar à Tela de Início**.
+4. Confirme.
 
-1. Abrir o endereço pelo Safari.
-2. Tocar em **Compartilhar**.
-3. Escolher **Adicionar à Tela de Início**.
-4. Confirmar o nome e tocar em **Adicionar**.
+HTTPS é obrigatório em produção. As publicações da Render usam HTTPS;
+`localhost` também é aceito no desenvolvimento.
 
-O iOS normalmente não exibe o mesmo aviso automático de instalação encontrado
-no Chrome.
+## Cache e funcionamento offline
 
-## O que funciona sem internet
+O manifesto, os ícones e o service worker ficam em `public/` e são copiados
+pelo Vite para o build. A navegação tenta a rede e pode usar o `index.html` em
+cache. JavaScript, CSS e ícones locais também podem ser reutilizados do cache.
 
-Após pelo menos um carregamento completo com conexão, a estrutura visual do app
-pode ser aberta sem internet. Isso inclui o HTML, o JavaScript, o CSS e os ícones
-armazenados.
+Requisições da API não são guardadas pelo service worker. A interface pode
+abrir sem internet após um carregamento completo, mas autenticação e consultas
+atuais continuam dependendo do backend.
 
-As funções operacionais continuam dependendo do backend. Portanto, sem conexão
-não é possível:
+Quando a rede falha durante um registro operacional:
 
-- autenticar com PIN;
-- consultar o plano de produção;
-- registrar a produção da cozinha;
-- consultar ou registrar frequência de alunos;
-- sincronizar alterações com o EduStock.
+- a ação pendente permanece em uma fila local visível;
+- o usuário pode tentar novamente ou remover a pendência;
+- erros de autenticação pausam o envio até novo login;
+- frequência e produção usam identificadores idempotentes para evitar
+  duplicidade no reenvio.
 
-Além do cache do aplicativo, registros feitos durante falhas de rede entram em
-uma fila local e são reenviados quando a conexão retorna. Frequência e baixa de
-produção usam identificadores idempotentes, evitando duplicação no reenvio.
+O filesystem do Web Service Free da Render é efêmero, mas a fila offline fica
+no dispositivo do usuário e os registros confirmados ficam no PostgreSQL. Nem a
+fila local nem o plano gratuito devem receber dados reais nesta demonstração.
 
-## Compatibilidade com o deploy atual
+## Validação após cada publicação
 
-Os dois serviços continuam publicados como sites estáticos independentes:
+1. Abra `/login` nos dois sites e confirme identidade visual e teclado.
+2. Entre com o PIN correto de cada app.
+3. Em Alunos, valide uma contagem fictícia em `/registrar`.
+4. Em Cozinha, valide plano e baixa fictícios em `/producao`.
+5. Desative a rede antes de confirmar uma nova ação e confira a pendência.
+6. Reative a rede, autentique novamente se necessário e sincronize.
+7. Confirme que o backend registrou a ação uma única vez.
+8. Atualize a página e confirme que manifesto e service worker não ficaram em
+   uma versão antiga.
+9. Faça ao menos um teste de instalação em Android/Chrome e iPhone/Safari antes
+   de uma implantação em escola.
 
-- `edustock-alunos` publica `app-alunos/dist`;
-- `edustock-cozinha` publica `app-cozinha/dist`.
+O checklist completo da demonstração está em
+[docs/CHECKLIST_GO_LIVE_DEMO.md](docs/CHECKLIST_GO_LIVE_DEMO.md).
 
-O `render.yaml` passou a usar `/api/health/` para validar banco e cache antes de
-considerar o backend saudável.
+## Melhorias futuras
 
-O Vite copia automaticamente os manifestos, service workers e ícones da pasta
-`public/` para `dist/`. As regras de rewrite existentes na Render continuam
-direcionando rotas como `/login`, `/registrar` e `/producao` para o React.
-
-Para que um navegador permita a instalação em produção, o app deve ser servido
-por **HTTPS**. As URLs da Render já utilizam HTTPS. Em desenvolvimento,
-`localhost` também é aceito pelos navegadores.
-
-## Validações realizadas
-
-Foram executadas as seguintes verificações:
-
-- validação de sintaxe dos dois service workers;
-- validação do JSON dos dois manifestos;
-- conferência das dimensões dos ícones;
-- conferência de que manifestos, ícones, service workers, CSS e JavaScript foram
-  copiados para os dois diretórios `dist`;
-- build de produção dos dois aplicativos;
-- suíte de testes do app Alunos: **25 testes aprovados**;
-- suíte de testes do app Cozinha: **29 testes aprovados**.
-
-## O que ainda falta
-
-### Necessário para disponibilizar aos usuários
-
-1. Fazer commit e enviar estas alterações ao repositório usado pela Render.
-2. Executar ou aguardar um novo deploy dos serviços `edustock-alunos` e
-   `edustock-cozinha`.
-3. Abrir cada endereço publicado e confirmar no DevTools do navegador que o
-   manifesto e o service worker foram reconhecidos.
-4. Fazer um teste real de instalação em pelo menos um Android/Chrome e um
-   iPhone/Safari, pois a apresentação do comando de instalação varia conforme o
-   sistema operacional e a versão do navegador.
-5. Validar o login e uma operação completa de cada app depois da instalação.
-
-### Melhorias opcionais
-
-- Adicionar screenshots aos manifestos para enriquecer a caixa de instalação em
-  navegadores que suportam esse recurso.
-- Acompanhar em campo o volume de operações offline e definir uma política de
-  expiração para itens que permaneçam pendentes por vários dias.
-- Automatizar uma auditoria PWA em CI com navegador real, além dos testes e
-  builds já executados.
-
-As melhorias opcionais não impedem a instalação. A etapa indispensável que
-resta é publicar o novo build e validar o comportamento nos dispositivos que
-serão usados pela escola.
+- adicionar screenshots aos manifestos;
+- medir o volume e a idade das operações offline;
+- definir política de expiração para pendências antigas;
+- automatizar uma auditoria PWA com navegador real no CI.

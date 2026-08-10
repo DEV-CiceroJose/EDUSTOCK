@@ -1,40 +1,95 @@
-# Monitoramento e backup do EduStock
+# Operação, monitoramento e backup do EduStock
 
-## Verificação automática
+## Saúde do serviço
 
-O backend disponibiliza `GET /api/health/`, sem autenticação. A resposta não expõe credenciais ou detalhes de infraestrutura e confirma apenas:
+O backend oferece `GET /api/health/` sem autenticação. A resposta confirma banco
+e cache sem expor credenciais ou detalhes internos. O serviço
+`edustock-demo-api` usa essa rota como `healthCheckPath` no `render.yaml`.
 
-- comunicação com o banco de dados;
-- leitura e escrita no cache de sessões;
-- horário da verificação.
+Na demonstração Free, o primeiro acesso após 15 minutos sem tráfego pode levar
+cerca de um minuto enquanto o serviço desperta. Durante esse intervalo, não
+trate a demora inicial isolada como indisponibilidade definitiva. Depois do
+despertar, uma resposta diferente de HTTP 200 exige investigação.
 
-O serviço web no Render usa esse endereço como `healthCheckPath`. Uma resposta diferente de HTTP 200 deve impedir que uma instância sem banco ou cache seja considerada saudável.
+## Rotina da demonstração
 
-## Rotina de acompanhamento
+Antes de compartilhar:
 
-1. Conferir o health check antes do início das aulas.
-2. Conferir no app Alunos se a sincronização diária responde.
-3. Conferir no app Cozinha se as três refeições aparecem e se o histórico abre.
-4. Investigar respostas 429 como tentativas repetidas de PIN; não aumentar o limite sem avaliar os registros do servidor.
-5. Trocar ou desativar imediatamente um PIN exposto. As sessões abertas por esse PIN serão revogadas na próxima chamada à API.
+1. verificar o deploy mais recente dos quatro serviços;
+2. abrir `/api/health/` e confirmar HTTP 200;
+3. testar login administrativo e os dois logins por PIN;
+4. executar os fluxos do checklist de go-live;
+5. inspecionar os logs em busca de erros, sem copiar segredos;
+6. conferir a data de `DEMO_EXPIRES_AT` e a data de expiração do banco Free;
+7. confirmar que todo conteúdo exibido é fictício.
 
-## Backup do banco de produção
+Durante a avaliação:
 
-Usar o backup gerenciado do PostgreSQL do Render como fonte principal. Antes de migrations, alterações de PIN em massa ou importações:
+- respostas 429 indicam excesso de tentativas; não aumente limites sem análise;
+- PIN exposto deve ser rotacionado imediatamente;
+- falha de banco ou cache deve manter o health check fora de HTTP 200;
+- nunca registrar senha, PIN, token, `SECRET_KEY`, `PIN_LOOKUP_SECRET` ou
+  `DATABASE_URL` em chamados e capturas;
+- monitorar as 750 horas mensais do workspace e os limites de banda e build.
 
-1. criar um backup completo;
-2. registrar data, horário e responsável;
-3. confirmar que o arquivo ou snapshot possui tamanho válido;
-4. manter a cópia em armazenamento protegido e com acesso restrito;
-5. executar periodicamente uma restauração em ambiente separado.
+O plano gratuito é apropriado para demonstração, não para produção. A Render
+pode reiniciar instâncias Free e o filesystem do Web Service é efêmero. Dados
+duráveis devem estar no PostgreSQL, nunca em SQLite local, uploads locais ou
+arquivos gerados no processo web.
 
-Os dados de `PinAcesso` são protegidos por hash, mas o backup continua sendo sensível porque contém usuários, movimentações e histórico operacional. Não anexar backups a commits, e-mails ou chamados públicos.
+## Expiração e descarte
 
-## Recuperação
+O PostgreSQL Free tem 1 GB e expira 30 dias após a criação. Após expirar, há um
+período de 14 dias para upgrade; depois disso, a Render remove o banco e os
+dados. Registre a data de criação e configure aviso antes da expiração.
 
-1. Interromper temporariamente novas movimentações.
-2. Restaurar o backup em uma instância isolada.
-3. executar as migrations da mesma versão da aplicação;
-4. validar `/api/health/`;
-5. testar login administrativo, PIN de aluno e PIN da cozinha;
-6. somente então liberar novamente o acesso dos usuários.
+Ao encerrar a demonstração:
+
+1. revogue ou troque todas as credenciais compartilhadas;
+2. remova acessos e dados fictícios que não precisam ser preservados;
+3. desligue ou exclua os recursos conforme a política do projeto;
+4. não transforme o banco demonstrativo em produção por conveniência.
+
+## Backups
+
+O Render Postgres Free não possui recuperação point-in-time nem backups
+lógicos gerenciados. Como a demonstração contém somente dados descartáveis e
+fictícios, a recuperação esperada é recriar o banco pelo Blueprint e executar
+novamente `preparar_demo`.
+
+Se for necessário preservar uma demonstração específica, faça um `pg_dump` por
+uma máquina autorizada usando a URL externa temporariamente e armazene o arquivo
+fora do repositório, criptografado e com acesso restrito. Nunca inclua dumps em
+commits, e-mails ou chamados públicos.
+
+## Migração para produção paga
+
+Antes de receber dados reais:
+
+1. atualizar `edustock-demo-api` e `edustock-demo-db` para instâncias pagas;
+2. definir capacidade, retenção e janela de recuperação;
+3. habilitar e testar recuperação point-in-time e exportações lógicas;
+4. realizar uma restauração em ambiente isolado;
+5. trocar todas as credenciais, definir `DEMO_MODE=false` e usar banco limpo;
+6. revisar CORS, CSRF, domínios, logs, alertas e responsáveis;
+7. executar homologação completa antes da liberação.
+
+Bancos pagos recebem recuperação contínua de acordo com o plano do workspace.
+A troca do tipo de instância pode causar alguns minutos de indisponibilidade e
+deve ter janela de mudança comunicada.
+
+## Recuperação de uma instalação paga
+
+1. interromper novas movimentações;
+2. restaurar para uma nova instância isolada;
+3. validar os dados antes de alterar `DATABASE_URL`;
+4. aplicar migrations da mesma versão da aplicação;
+5. validar `/api/health/`, logins e operações críticas;
+6. apontar os serviços para a instância recuperada;
+7. liberar o acesso e registrar o incidente.
+
+## Fontes oficiais
+
+- [Limitações dos serviços e bancos Free](https://render.com/docs/free)
+- [Planos do Render Postgres](https://render.com/docs/postgresql-refresh)
+- [Recuperação, backup lógico e pg_dump](https://render.com/docs/postgresql-backups)

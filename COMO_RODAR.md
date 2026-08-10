@@ -1,93 +1,137 @@
-# Como rodar o EduStock
+# Como rodar o EduStock localmente
 
-O EduStock é composto por **1 backend Django** + **3 frontends React** (Dashboard, Cozinha e Alunos).
+O sistema usa um backend Django e três frontends React.
 
 ## Pré-requisitos
-- Python 3.11+
-- Node.js 18+
-- Git
 
-## 1. Clonar o repositório
+- Python 3.13;
+- Node.js 22;
+- Git.
+
+## 1. Preparar o backend
+
 ```bash
 git clone https://github.com/DEV-CiceroJose/EDUSTOCK.git
 cd EDUSTOCK
+python -m venv .venv
 ```
 
-## 2. Backend (Django)
+Ative o ambiente virtual:
+
+```powershell
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+```
+
 ```bash
-# criar e ativar o ambiente virtual
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# Linux/Mac:
+# Linux ou macOS
 source .venv/bin/activate
+```
 
-# instalar dependências
+Instale, migre e inicie:
+
+```bash
 pip install -r requirements.txt
-
-# rodar as migrações
 python manage.py migrate
-
-# criar o primeiro usuário administrador (escolha usuário e senha à sua vontade)
-python manage.py createsuperuser
-python manage.py criar_admin <usuario> <senha>
-
-# (opcional) popular o banco com alguns produtos de exemplo
-python manage.py shell < seed_demo.py
-
-# iniciar o servidor
 python manage.py runserver
 ```
-Backend em: http://127.0.0.1:8000/
 
-## 3. Frontend Dashboard (administrativo)
+API: `http://127.0.0.1:8000/api/`
+
+Health check: `http://127.0.0.1:8000/api/health/`
+
+Para uma instalação local normal, crie contas escolhendo credenciais próprias:
+
+```bash
+python manage.py criar_admin <usuario>
+```
+
+O comando solicita a senha sem exibi-la no terminal. Para automação controlada,
+use `--password-env NOME_DA_VARIAVEL` e remova a variável após a execução.
+
+Não existem usuário, senha ou PIN de fábrica. PINs de Alunos e Cozinha são
+administrados no Django Admin. Não use credenciais da demonstração em outro
+ambiente.
+
+## 2. Dashboard
+
+Em outro terminal:
+
 ```bash
 cd frontend
-npm install
-echo "VITE_API_URL=http://localhost:8000/api" > .env
-npm run dev
+npm ci
 ```
-Em: http://localhost:5173/
 
-## 4. App Cozinha
+Crie `frontend/.env.local` com:
+
+```dotenv
+VITE_API_URL=http://127.0.0.1:8000/api
+VITE_DEMO_MODE=false
+```
+
+Depois:
+
 ```bash
-cd app-cozinha
-npm install
-echo "VITE_API_BASE=" > .env
 npm run dev
 ```
-Em: http://localhost:5175/
 
-## 5. App Alunos
+Dashboard: `http://127.0.0.1:5173/`
+
+## 3. App Alunos
+
 ```bash
 cd app-alunos
-npm install
-cp .env.example .env
+npm ci
+```
+
+Crie `app-alunos/.env.local` com:
+
+```dotenv
+VITE_API_BASE=http://127.0.0.1:8000
+```
+
+```bash
 npm run dev
 ```
-Em: http://localhost:5174/
 
----
+Alunos: `http://127.0.0.1:5174/login`
 
-### ⚠️ Nota importante antes de rodar
+## 4. App Cozinha
 
-Este pacote que te mandei está **desatualizado em relação ao repositório no GitHub** (`main`). O `main` está **dezenas de commits à frente** — foi adicionado um sistema completo de autenticação/permissões (app `plataforma`), gestão de usuários pelo dashboard, módulo Financeiro, tela de edição de perfil, entre outros. As instruções acima já refletem o que está **atualmente no GitHub**, e não exatamente o que veio no zip. Recomendo clonar direto do repositório (passo 1) em vez de usar os arquivos do zip, para não rodar uma versão velha do sistema.
+```bash
+cd app-cozinha
+npm ci
+```
 
----
+Crie `app-cozinha/.env.local` com:
 
-### 🔐 Usuários e senhas
+```dotenv
+VITE_API_BASE=http://127.0.0.1:8000
+```
 
-O sistema **não tem mais usuário/senha fixos de fábrica**. Isso mudou nas últimas atualizações:
+```bash
+npm run dev
+```
 
-- **Login do Dashboard (Django)**: não existe usuário padrão. Ele é criado por quem instala o sistema, no passo 2, com:
-  ```bash
-  python manage.py createsuperuser
-  python manage.py criar_admin <usuario> <senha>
-  ```
-  Ou seja: o usuário e a senha são os que **você mesmo escolher** ao rodar esse comando.
+Cozinha: `http://127.0.0.1:5175/login`
 
-- **PINs do App Cozinha e App Alunos**: também não ficam mais fixos em arquivo `.env`. Eles são cadastrados manualmente pelo administrador no Django Admin (`/admin/`), em:
-  - `/admin/core/turma/` → PINs de cada turma (App Alunos)
-  - `/admin/core/pinacesso/` → PINs da equipe da cozinha (App Cozinha)
+## Variáveis e arquivos locais
 
-  Ou seja, depois de criar o superusuário/admin, é preciso entrar no Django Admin e cadastrar os PINs manualmente antes de usar os apps de Cozinha e Alunos.
+Arquivos `.env.local` são ignorados pelo Git. Não crie nem versione
+`.env.production`: a configuração de produção fica no `render.yaml` e os
+segredos ficam no painel da hospedagem.
+
+Para simular produção localmente, defina todas as configurações de segurança de
+forma explícita. Não use `APP_ENV=production` com chaves fracas, SQLite, hosts
+locais ou origens HTTP; o backend rejeita uma configuração insegura.
+
+## Verificação rápida
+
+1. Confirme resposta HTTP 200 em `/api/health/`.
+2. Entre no dashboard por `/login` com a conta criada localmente.
+3. Cadastre os PINs necessários no Django Admin.
+4. Entre em Alunos e Cozinha com os respectivos PINs.
+5. Registre somente dados locais de teste.
+
+Para publicar a demonstração gratuita, não replique esta configuração manual:
+use [docs/DEPLOY_RENDER_FREE_DEMO.md](docs/DEPLOY_RENDER_FREE_DEMO.md).
