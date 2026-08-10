@@ -235,10 +235,13 @@ class OperadorAutorizacaoApiTest(AutenticadoAPITestCase):
         from django.contrib.auth.models import User
         from django.utils import timezone
         from rest_framework.test import APIClient
-        from plataforma.models import Perfil, TokenAcesso
+        from plataforma.models import Modulo, Perfil, TokenAcesso
 
         operador = User.objects.create_user(username="operador-api", password="x")
-        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        perfil = Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        perfil.modulos.set(
+            Modulo.objects.filter(slug__in=("inventario", "movimentacoes"))
+        )
         token = TokenAcesso.objects.create(
             user=operador,
             expira_em=timezone.now() + timedelta(hours=1),
@@ -252,6 +255,11 @@ class OperadorAutorizacaoApiTest(AutenticadoAPITestCase):
         self.grupo = Grupo.objects.create(nome="Geral", categoria=self.cat)
         self.produto = Produto.objects.create(
             nome="Arroz", grupo=self.grupo, quantidade=10, unidade="KG"
+        )
+        LoteEstoque.objects.create(
+            produto=self.produto,
+            codigo="OPERADOR-API",
+            quantidade=Decimal("10"),
         )
 
     def test_operador_consulta_mas_nao_cria_cadastro_mestre(self):

@@ -62,7 +62,10 @@ class SeedModulosMigrationTest(TransactionTestCase):
         explicito = Perfil.objects.create(
             user=User.objects.create(username="explicito"), papel="OPERADOR"
         )
-        explicito.modulos.add(Modulo.objects.get(slug="inventario"))
+        inventario, _ = Modulo.objects.get_or_create(
+            slug="inventario", defaults={"nome": "Inventário", "ativo": True}
+        )
+        explicito.modulos.add(inventario)
 
         apps = self._migrate(("plataforma", "0006_perfil_acesso_legado"))
         Perfil = apps.get_model("plataforma", "Perfil")
