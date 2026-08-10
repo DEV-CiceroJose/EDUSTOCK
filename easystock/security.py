@@ -22,6 +22,7 @@ def csv_env(name, env=os.environ):
 
 
 def _is_local_hostname(hostname):
+    hostname = hostname.rstrip(".")
     return hostname in LOCAL_HOSTS or hostname.endswith(".localhost")
 
 

@@ -11,7 +11,7 @@ from django.utils.dateparse import parse_datetime
 
 from core.models import Categoria, Entrada, Fornecedor, Grupo, PinAcesso, Produto, Turma
 from core.services import registrar_entrada
-from plataforma.models import Perfil
+from plataforma.models import Perfil, TokenAcesso
 
 
 REQUIRED_ENV = (
@@ -24,6 +24,8 @@ REQUIRED_ENV = (
     "DEMO_EXPIRES_AT",
 )
 DEMO_ENTRY_NUMBER = "DEMO-FICTICIA-001"
+DEMO_ADMIN_MATRICULA = "EDUSTOCK_DEMO_ADMIN_V1"
+DEMO_OPERATOR_MATRICULA = "EDUSTOCK_DEMO_OPERATOR_V1"
 
 
 class Command(BaseCommand):
@@ -41,6 +43,7 @@ class Command(BaseCommand):
         admin = self._ensure_user(
             username=values["DEMO_ADMIN_USERNAME"],
             password=values["DEMO_ADMIN_PASSWORD"],
+            matricula=DEMO_ADMIN_MATRICULA,
             role=Perfil.ADMIN,
             is_staff=True,
             is_superuser=True,
@@ -48,6 +51,7 @@ class Command(BaseCommand):
         self._ensure_user(
             username=values["DEMO_OPERATOR_USERNAME"],
             password=values["DEMO_OPERATOR_PASSWORD"],
+            matricula=DEMO_OPERATOR_MATRICULA,
             role=Perfil.OPERADOR,
             is_staff=False,
             is_superuser=False,
@@ -79,9 +83,36 @@ class Command(BaseCommand):
         if values["DEMO_ALUNOS_PIN"] == values["DEMO_COZINHA_PIN"]:
             raise CommandError("Os PINs fictícios da demo precisam ser distintos.")
 
-    def _ensure_user(self, *, username, password, role, is_staff, is_superuser):
-        user, _ = User.objects.get_or_create(username=username)
+    def _ensure_user(self, *, username, password, matricula, role, is_staff, is_superuser):
+        profile = (
+            Perfil.objects.select_related("user")
+            .filter(matricula=matricula)
+            .first()
+        )
+        conflicting_user = User.objects.filter(username=username)
+        if profile:
+            conflicting_user = conflicting_user.exclude(pk=profile.user_id)
+        if conflicting_user.exists():
+            raise CommandError("O username da demo já pertence a outra conta.")
+
+        if profile is None:
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                is_active=True,
+                is_staff=is_staff,
+                is_superuser=is_superuser,
+            )
+            Perfil.objects.create(user=user, matricula=matricula, papel=role)
+            return user
+
+        user = profile.user
         changed_fields = []
+        credentials_changed = False
+        if user.username != username:
+            user.username = username
+            changed_fields.append("username")
+            credentials_changed = True
         desired = {
             "is_active": True,
             "is_staff": is_staff,
@@ -94,9 +125,14 @@ class Command(BaseCommand):
         if not user.check_password(password):
             user.set_password(password)
             changed_fields.append("password")
+            credentials_changed = True
         if changed_fields:
             user.save(update_fields=changed_fields)
-        Perfil.objects.update_or_create(user=user, defaults={"papel": role})
+        if profile.papel != role:
+            profile.papel = role
+            profile.save(update_fields=["papel"])
+        if credentials_changed:
+            TokenAcesso.objects.filter(user=user).delete()
         return user
 
     def _ensure_operational_access(self, values):

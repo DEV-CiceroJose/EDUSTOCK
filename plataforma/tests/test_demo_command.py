@@ -9,7 +9,11 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from core.models import Entrada, LoteEstoque, Movimentacao, PinAcesso, Produto, Turma
-from plataforma.models import Perfil
+from plataforma.management.commands.preparar_demo import (
+    DEMO_ADMIN_MATRICULA,
+    DEMO_OPERATOR_MATRICULA,
+)
+from plataforma.models import Perfil, TokenAcesso
 
 
 class PrepararDemoCommandTest(TestCase):
@@ -68,6 +72,10 @@ class PrepararDemoCommandTest(TestCase):
     @override_settings(DEMO_MODE=True)
     def test_rotaciona_senhas_e_pins_sem_criar_novos_registros(self):
         self.run_demo()
+        admin = User.objects.get(username=self.demo_env()["DEMO_ADMIN_USERNAME"])
+        operador = User.objects.get(username=self.demo_env()["DEMO_OPERATOR_USERNAME"])
+        TokenAcesso.emitir(user=admin, expira_em=timezone.now() + timedelta(hours=1))
+        TokenAcesso.emitir(user=operador, expira_em=timezone.now() + timedelta(hours=1))
         rotated = self.demo_env(
             DEMO_ADMIN_PASSWORD="Senha-Ficticia-Nova-123",
             DEMO_OPERATOR_PASSWORD="Senha-Ficticia-Nova-456",
@@ -93,6 +101,55 @@ class PrepararDemoCommandTest(TestCase):
         )
         self.assertEqual(User.objects.count(), 2)
         self.assertEqual(PinAcesso.objects.count(), 2)
+        self.assertFalse(TokenAcesso.objects.filter(user__in=(admin, operador)).exists())
+
+    @override_settings(DEMO_MODE=True)
+    def test_rotaciona_usernames_no_mesmo_usuario_e_revoga_tokens(self):
+        original = self.demo_env()
+        self.run_demo(original)
+        admin_original = User.objects.get(username=original["DEMO_ADMIN_USERNAME"])
+        operador_original = User.objects.get(username=original["DEMO_OPERATOR_USERNAME"])
+        TokenAcesso.emitir(
+            user=admin_original, expira_em=timezone.now() + timedelta(hours=1)
+        )
+        TokenAcesso.emitir(
+            user=operador_original, expira_em=timezone.now() + timedelta(hours=1)
+        )
+        rotated = self.demo_env(
+            DEMO_ADMIN_USERNAME="admin.rotacionado.demo",
+            DEMO_ADMIN_PASSWORD="Senha-Admin-Rotacionada-123",
+            DEMO_OPERATOR_USERNAME="operador.rotacionado.demo",
+            DEMO_OPERATOR_PASSWORD="Senha-Operador-Rotacionada-456",
+        )
+
+        self.run_demo(rotated)
+        self.run_demo(rotated)
+
+        admin = User.objects.get(username=rotated["DEMO_ADMIN_USERNAME"])
+        operador = User.objects.get(username=rotated["DEMO_OPERATOR_USERNAME"])
+        self.assertEqual(admin.pk, admin_original.pk)
+        self.assertEqual(operador.pk, operador_original.pk)
+        self.assertFalse(User.objects.filter(username=original["DEMO_ADMIN_USERNAME"]).exists())
+        self.assertFalse(User.objects.filter(username=original["DEMO_OPERATOR_USERNAME"]).exists())
+        self.assertFalse(User.objects.filter(is_superuser=True).exclude(pk=admin.pk).exists())
+        self.assertFalse(TokenAcesso.objects.filter(user__in=(admin, operador)).exists())
+        self.assertEqual(admin.perfil.matricula, DEMO_ADMIN_MATRICULA)
+        self.assertEqual(operador.perfil.matricula, DEMO_OPERATOR_MATRICULA)
+        self.assertEqual(User.objects.count(), 2)
+
+    @override_settings(DEMO_MODE=True)
+    def test_rotacao_rejeita_username_que_pertence_a_outra_conta(self):
+        original = self.demo_env()
+        self.run_demo(original)
+        User.objects.create_user(username="conta-real-ficticia")
+
+        with self.assertRaisesMessage(CommandError, "j\u00e1 pertence"):
+            self.run_demo(
+                self.demo_env(DEMO_ADMIN_USERNAME="conta-real-ficticia")
+            )
+
+        self.assertTrue(User.objects.filter(username=original["DEMO_ADMIN_USERNAME"]).exists())
+        self.assertTrue(User.objects.filter(username="conta-real-ficticia").exists())
 
     @override_settings(DEMO_MODE=True)
     def test_recusa_demo_expirada_sem_gravar_dados(self):

@@ -67,6 +67,17 @@ class ProductionEnvironmentTest(SimpleTestCase):
                 with self.assertRaisesMessage(ImproperlyConfigured, name):
                     validate_production_env(self.valid_env(**{name: value}))
 
+    def test_producao_rejeita_localhost_absoluto_em_hosts_cors_e_csrf(self):
+        invalid_values = (
+            ("ALLOWED_HOSTS", "localhost."),
+            ("CORS_ALLOWED_ORIGINS", "https://localhost."),
+            ("CSRF_TRUSTED_ORIGINS", "https://localhost."),
+        )
+        for name, value in invalid_values:
+            with self.subTest(name=name, value=value):
+                with self.assertRaisesMessage(ImproperlyConfigured, name):
+                    validate_production_env(self.valid_env(**{name: value}))
+
     def test_producao_rejeita_origem_sem_https(self):
         with self.assertRaisesMessage(ImproperlyConfigured, "HTTPS"):
             validate_production_env(
