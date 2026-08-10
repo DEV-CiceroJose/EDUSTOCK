@@ -42,6 +42,10 @@ arquivos gerados no processo web.
 O PostgreSQL Free tem 1 GB e expira 30 dias após a criação. Após expirar, há um
 período de 14 dias para upgrade; depois disso, a Render remove o banco e os
 dados. Registre a data de criação e configure aviso antes da expiração.
+Um workspace só pode manter um Render Postgres Free ativo. Se outro projeto já
+ocupar essa cota, use outro workspace ou migre conscientemente um dos bancos
+para um plano pago; nunca exclua ou reutilize um banco de outra aplicação para
+forçar a criação da demo.
 
 Ao encerrar a demonstração:
 

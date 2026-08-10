@@ -6,8 +6,10 @@ demonstração descartável no plano gratuito, siga o roteiro específico em
 
 ## Arquitetura declarada
 
-O `render.yaml` é a fonte de verdade do deploy e usa Python 3.13, Node 22 no
-pipeline dos sites e PostgreSQL 18.
+O `render.yaml` é a fonte de verdade do deploy e usa Python 3.13, Node 22.22.0
+nos três sites estáticos e PostgreSQL 18. A versão do Node é fixada pela
+variável `NODE_VERSION` de cada serviço, mecanismo suportado oficialmente pela
+Render.
 
 | Recurso | Nome no Blueprint | Tipo |
 | --- | --- | --- |
@@ -54,6 +56,9 @@ O plano Free serve para avaliação e apresentação, não para operação escol
 Web Service gratuito pode adormecer após 15 minutos sem tráfego e leva cerca de
 um minuto para despertar. O filesystem é efêmero. O PostgreSQL Free tem 1 GB,
 expira 30 dias após a criação e não oferece backup gerenciado nem recuperação.
+Cada workspace pode manter somente um Render Postgres Free ativo. Se já houver
+um banco gratuito, preserve-o quando pertencer a outro sistema e use outro
+workspace ou migre deliberadamente um dos bancos para uma instância paga.
 
 Antes de qualquer uso real:
 
@@ -90,3 +95,4 @@ Depois de cada atualização:
 - [Recuperação e backups do PostgreSQL](https://render.com/docs/postgresql-backups)
 - [Deploy de Django na Render](https://render.com/docs/deploy-django)
 - [Referência do Blueprint](https://render.com/docs/blueprint-spec)
+- [Configuração da versão do Node.js](https://render.com/docs/node-version)

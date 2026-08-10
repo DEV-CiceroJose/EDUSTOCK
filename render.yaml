@@ -58,6 +58,8 @@ services:
     buildCommand: cd frontend && npm ci && npm run build
     staticPublishPath: frontend/dist
     envVars:
+      - key: NODE_VERSION
+        value: "22.22.0"
       - key: VITE_API_URL
         value: https://edustock-demo-api.onrender.com/api
       - key: VITE_DEMO_MODE
@@ -86,6 +88,8 @@ services:
     buildCommand: cd app-alunos && npm ci && npm run build
     staticPublishPath: app-alunos/dist
     envVars:
+      - key: NODE_VERSION
+        value: "22.22.0"
       - key: VITE_API_BASE
         value: https://edustock-demo-api.onrender.com
     routes:
@@ -112,6 +116,8 @@ services:
     buildCommand: cd app-cozinha && npm ci && npm run build
     staticPublishPath: app-cozinha/dist
     envVars:
+      - key: NODE_VERSION
+        value: "22.22.0"
       - key: VITE_API_BASE
         value: https://edustock-demo-api.onrender.com
     routes:

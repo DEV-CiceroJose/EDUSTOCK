@@ -13,6 +13,8 @@ Marque somente itens verificados na publicação atual.
 - [ ] `DEMO_EXPIRES_AT` está no futuro, com fuso, e a data foi registrada.
 - [ ] A data de criação e de expiração em 30 dias do PostgreSQL Free foi
   registrada e possui aviso.
+- [ ] O workspace não possui outro PostgreSQL Free ativo; se possuía, foi usado
+  outro workspace ou uma migração paga deliberada, sem excluir dados alheios.
 - [ ] Não existe `.env.production` versionado.
 
 ## Deploy e saúde
@@ -22,6 +24,7 @@ Marque somente itens verificados na publicação atual.
 - [ ] `edustock-demo-dashboard` concluiu o build.
 - [ ] `edustock-demo-alunos` concluiu o build.
 - [ ] `edustock-demo-cozinha` concluiu o build.
+- [ ] Os três builds estáticos registram Node 22.22.0.
 - [ ] `GET https://edustock-demo-api.onrender.com/api/health/` retorna HTTP 200.
 - [ ] O despertar após inatividade foi explicado aos avaliadores.
 

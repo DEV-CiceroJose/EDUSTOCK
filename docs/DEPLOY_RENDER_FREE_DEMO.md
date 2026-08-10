@@ -16,9 +16,10 @@ O `render.yaml` cria estes recursos:
 | `edustock-demo-cozinha` | Static Site | `https://edustock-demo-cozinha.onrender.com` |
 | `edustock-demo-db` | PostgreSQL 18 Free | sem URL pública de aplicação |
 
-A API usa Python 3.13.5. Os três sites são construídos com Node 22 no pipeline
-do projeto. O banco se conecta à API pela referência `fromDatabase` do
-Blueprint; não copie a URL do banco para arquivos do repositório.
+A API usa Python 3.13.5. Os três sites são construídos com Node 22.22.0, fixado
+em cada serviço por `NODE_VERSION`, conforme o mecanismo oficial da Render. O
+banco se conecta à API pela referência `fromDatabase` do Blueprint; não copie a
+URL do banco para arquivos do repositório.
 
 ## Limitações que precisam ser aceitas
 
@@ -28,6 +29,7 @@ Segundo a documentação da Render:
 - o primeiro acesso seguinte leva cerca de um minuto para despertar;
 - o filesystem do serviço é efêmero e é apagado em reinícios e redeploys;
 - cada workspace recebe 750 horas de instância Free por mês;
+- somente um Render Postgres Free pode ficar ativo por workspace;
 - o PostgreSQL Free tem 1 GB e expira 30 dias após a criação;
 - após a expiração do banco há 14 dias para upgrade antes da exclusão;
 - banco Free não tem recuperação nem backup lógico gerenciado;
@@ -40,17 +42,25 @@ arquivos do processo web como armazenamento.
 
 1. Tenha uma conta na [Render](https://dashboard.render.com/) e acesso ao
    repositório GitHub do EduStock.
-2. Confirme que a branch escolhida contém `render.yaml` e `build.sh`.
+2. Confirme que a branch `new/demo-render-prontidao` contém `render.yaml` e
+   `build.sh`.
 3. Confirme que o CI da branch está verde.
 4. Não crie `.env.production`. Não faça commit de senhas, PINs ou chaves.
 5. Escolha credenciais novas, exclusivas da demonstração e sem relação com
    pessoas reais.
+6. Abra a lista de bancos do workspace. Se já houver um Postgres Free ativo:
+   - não o exclua se ele pertencer a outro sistema;
+   - para manter ambos, crie a demo em outro workspace ou migre deliberadamente
+     um dos bancos para uma instância paga;
+   - só remova o banco existente se ele for descartável, estiver no escopo da
+     operação e a perda dos dados tiver sido aceita;
+   - não aponte o EduStock para um banco de outra aplicação.
 
 ## 2. Criar o Blueprint
 
 1. No painel da Render, escolha **New > Blueprint**.
 2. Conecte o repositório do EduStock.
-3. Selecione a branch que será demonstrada.
+3. Selecione exatamente a branch `new/demo-render-prontidao`.
 4. Confirme que a Render detectou o `render.yaml` da raiz.
 5. Revise os cinco recursos e mantenha os planos `free` declarados.
 6. Preencha as sete variáveis solicitadas pelo Blueprint.
@@ -175,3 +185,4 @@ Antes de qualquer implantação real:
 - [Recuperação e backups do PostgreSQL](https://render.com/docs/postgresql-backups)
 - [Deploy de Django](https://render.com/docs/deploy-django)
 - [Especificação de Blueprint](https://render.com/docs/blueprint-spec)
+- [Configuração da versão do Node.js](https://render.com/docs/node-version)
