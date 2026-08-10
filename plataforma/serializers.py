@@ -24,7 +24,20 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "username", "password", "papel", "modulos"]
+        fields = ["id", "username", "password", "is_active", "papel", "modulos"]
+
+    def validate(self, attrs):
+        perfil_data = attrs.get("perfil", {})
+        if self.instance is None and perfil_data.get("papel") == Perfil.OPERADOR:
+            if not perfil_data.get("modulos"):
+                raise serializers.ValidationError(
+                    {"modulos": "Selecione ao menos um módulo para o novo operador."}
+                )
+        if self.instance is not None and "password" in attrs:
+            raise serializers.ValidationError(
+                {"password": "Use a ação de redefinição de senha."}
+            )
+        return attrs
 
     def create(self, validated_data):
         perfil_data = validated_data.pop("perfil")
@@ -34,7 +47,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
         # define uma senha inutilizável (conta criada pelo admin que definirá
         # a própria senha depois), em vez de levantar KeyError → HTTP 500.
         password = validated_data.pop("password", None)
-        user = User.objects.create_user(username=validated_data["username"], password=password)
+        user = User.objects.create_user(password=password, **validated_data)
         perfil = Perfil.objects.create(user=user, papel=papel)
         if modulos:
             perfil.modulos.set(modulos)
@@ -42,6 +55,11 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         papel_data = validated_data.pop("perfil", None)
+        validated_data.pop("password", None)
+        for atributo, valor in validated_data.items():
+            setattr(instance, atributo, valor)
+        if validated_data:
+            instance.save(update_fields=list(validated_data.keys()))
         if papel_data:
             perfil = instance.perfil
             if "papel" in papel_data:

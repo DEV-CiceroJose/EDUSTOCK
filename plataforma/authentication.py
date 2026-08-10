@@ -25,6 +25,10 @@ class TokenAcessoAuthentication(BaseAuthentication):
         if token.expirado:
             raise AuthenticationFailed("Token expirado.")
 
+        if not token.user.is_active:
+            token.delete()
+            raise AuthenticationFailed("Usuário inativo.")
+
         return (token.user, token)
 
     def authenticate_header(self, request):

@@ -57,7 +57,7 @@ function NewUserForm({ onClose, onCreated }) {
         {papel === "OPERADOR" && (
           <fieldset className="rounded-xl border border-line p-3">
             <legend className="px-1 text-sm font-semibold">Módulos permitidos</legend>
-            <p className="mb-2 text-xs text-ink-faint">Nenhum marcado significa todos os módulos ativos.</p>
+            <p className="mb-2 text-xs text-ink-faint">Selecione ao menos um módulo para um novo operador.</p>
             <div className="grid grid-cols-2 gap-2">
               {MODULOS.map((slug) => (
                 <label key={slug} className="flex items-center gap-2 text-sm">
@@ -95,7 +95,7 @@ function NewUserForm({ onClose, onCreated }) {
           <button type="button" onClick={onClose} className="btn btn-ghost">Cancelar</button>
           <button
             type="submit"
-            disabled={!username.trim() || !password.trim() || salvando}
+            disabled={!username.trim() || !password.trim() || (papel === "OPERADOR" && modulos.length === 0) || salvando}
             className="btn btn-brand disabled:opacity-50"
           >
             {salvando ? "Criando…" : "Criar usuário"}

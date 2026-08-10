@@ -4,9 +4,12 @@ import hashlib
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -164,7 +167,10 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         )
 
     def perform_update(self, serializer):
+        estava_ativo = serializer.instance.is_active
         usuario = serializer.save()
+        if estava_ativo and not usuario.is_active:
+            TokenAcesso.objects.filter(user=usuario).delete()
         RegistroAuditoria.objects.create(
             user=self.request.user,
             acao="ATUALIZOU",
@@ -172,3 +178,58 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             objeto_id=str(usuario.pk),
             detalhes={"campos": sorted(self.request.data.keys())},
         )
+
+    def partial_update(self, request, *args, **kwargs):
+        usuario = self.get_object()
+        if (
+            request.data.get("is_active") is False
+            and usuario.is_active
+            and usuario.perfil.papel == Perfil.ADMIN
+            and not User.objects.filter(
+                is_active=True, perfil__papel=Perfil.ADMIN
+            ).exclude(pk=usuario.pk).exists()
+        ):
+            return Response(
+                {"detail": "Não é possível desativar o último administrador ativo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().partial_update(request, *args, **kwargs)
+
+    @action(detail=True, methods=["post"], url_path="senha")
+    def senha(self, request, pk=None):
+        usuario = self.get_object()
+        password = request.data.get("password")
+        if not password:
+            return Response(
+                {"password": ["Este campo é obrigatório."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            validate_password(password, user=usuario)
+        except ValidationError as erro:
+            return Response(
+                {"password": list(erro.messages)}, status=status.HTTP_400_BAD_REQUEST
+            )
+        usuario.set_password(password)
+        usuario.save(update_fields=["password"])
+        TokenAcesso.objects.filter(user=usuario).delete()
+        RegistroAuditoria.objects.create(
+            user=request.user,
+            acao="REDEFINIU_SENHA",
+            recurso="usuario",
+            objeto_id=str(usuario.pk),
+            detalhes={"campos": ["password"]},
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"], url_path="revogar-sessoes")
+    def revogar_sessoes(self, request, pk=None):
+        usuario = self.get_object()
+        TokenAcesso.objects.filter(user=usuario).delete()
+        RegistroAuditoria.objects.create(
+            user=request.user,
+            acao="REVOGOU_SESSOES",
+            recurso="usuario",
+            objeto_id=str(usuario.pk),
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)

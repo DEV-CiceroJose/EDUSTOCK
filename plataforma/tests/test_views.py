@@ -5,7 +5,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from plataforma.models import Modulo, Perfil, TokenAcesso
+from plataforma.models import Modulo, Perfil, RegistroAuditoria, TokenAcesso
 
 
 class LoginViewTest(APITestCase):
@@ -175,8 +175,9 @@ class UsuarioViewSetTest(APITestCase):
 
     def test_admin_cria_operador(self):
         self._autenticar_admin()
+        modulo = Modulo.objects.get(slug="inventario")
         resp = self.client.post("/api/usuarios/", {
-            "username": "maria", "password": "senha-boa-123", "papel": "OPERADOR",
+            "username": "maria", "password": "senha-boa-123", "papel": "OPERADOR", "modulos": [modulo.slug],
         }, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
         maria = User.objects.get(username="maria")
@@ -218,14 +219,89 @@ class UsuarioViewSetTest(APITestCase):
     def test_admin_cria_usuario_sem_senha(self):
         """password é required=False: criar sem senha deve dar 201, não 500."""
         self._autenticar_admin()
+        modulo = Modulo.objects.get(slug="inventario")
         resp = self.client.post("/api/usuarios/", {
-            "username": "joao", "papel": "OPERADOR",
+            "username": "joao", "papel": "OPERADOR", "modulos": [modulo.slug],
         }, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
         joao = User.objects.get(username="joao")
         self.assertEqual(joao.perfil.papel, "OPERADOR")
         # sem senha usável — não pode autenticar por senha, mas a conta existe
         self.assertFalse(joao.has_usable_password())
+
+    def test_novo_operador_exige_modulos_explicitos(self):
+        self._autenticar_admin()
+
+        resposta = self.client.post(
+            "/api/usuarios/", {"username": "sem-modulos", "papel": "OPERADOR"}, format="json"
+        )
+
+        self.assertEqual(resposta.status_code, 400)
+        self.assertIn("modulos", resposta.data)
+
+    def test_perfil_legado_sem_modulos_permanece_compativel(self):
+        self._autenticar_admin()
+        legado = User.objects.create_user(username="legado", password="x")
+        Perfil.objects.create(user=legado, papel=Perfil.OPERADOR)
+
+        resposta = self.client.patch(f"/api/usuarios/{legado.pk}/", {"papel": "OPERADOR"}, format="json")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+
+    def test_admin_desativa_usuario_e_revoga_todos_os_tokens(self):
+        self._autenticar_admin()
+        operador = User.objects.create_user(username="maria", password="x")
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        TokenAcesso.objects.create(user=operador, expira_em=timezone.now() + timedelta(hours=1))
+        TokenAcesso.objects.create(user=operador, expira_em=timezone.now() + timedelta(hours=1))
+
+        resposta = self.client.patch(f"/api/usuarios/{operador.pk}/", {"is_active": False}, format="json")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        operador.refresh_from_db()
+        self.assertFalse(operador.is_active)
+        self.assertFalse(TokenAcesso.objects.filter(user=operador).exists())
+
+    def test_nao_desativa_ultimo_admin_ativo(self):
+        self._autenticar_admin()
+        admin = User.objects.get(username="admin1")
+
+        resposta = self.client.patch(f"/api/usuarios/{admin.pk}/", {"is_active": False}, format="json")
+
+        self.assertEqual(resposta.status_code, 400)
+        admin.refresh_from_db()
+        self.assertTrue(admin.is_active)
+
+    def test_admin_redefine_senha_sem_auditar_segredo_e_revoga_sessoes(self):
+        self._autenticar_admin()
+        operador = User.objects.create_user(username="maria", password="senha-antiga")
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        TokenAcesso.objects.create(user=operador, expira_em=timezone.now() + timedelta(hours=1))
+
+        resposta = self.client.post(
+            f"/api/usuarios/{operador.pk}/senha/", {"password": "Nova-Senha-123"}, format="json"
+        )
+
+        self.assertEqual(resposta.status_code, 204, resposta.content)
+        operador.refresh_from_db()
+        self.assertTrue(operador.check_password("Nova-Senha-123"))
+        self.assertFalse(TokenAcesso.objects.filter(user=operador).exists())
+        auditoria = RegistroAuditoria.objects.latest("id")
+        self.assertEqual(auditoria.detalhes, {"campos": ["password"]})
+        self.assertNotIn("Nova-Senha-123", str(auditoria.detalhes))
+
+    def test_admin_revoga_sessoes_sem_alterar_usuario(self):
+        self._autenticar_admin()
+        operador = User.objects.create_user(username="maria", password="senha-antiga")
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        TokenAcesso.objects.create(user=operador, expira_em=timezone.now() + timedelta(hours=1))
+
+        resposta = self.client.post(f"/api/usuarios/{operador.pk}/revogar-sessoes/", format="json")
+
+        self.assertEqual(resposta.status_code, 204, resposta.content)
+        operador.refresh_from_db()
+        self.assertTrue(operador.check_password("senha-antiga"))
+        self.assertFalse(TokenAcesso.objects.filter(user=operador).exists())
 
 
 class MeuPerfilViewTest(APITestCase):

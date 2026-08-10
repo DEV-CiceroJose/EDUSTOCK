@@ -3,6 +3,7 @@ import { getToken, ehAdmin } from "../lib/auth"
 import { useToast } from "../components/ui/useToast"
 import { Icon } from "../lib/icons.jsx"
 import NewUserModal from "../features/usuarios/NewUserModal"
+import ResetPasswordModal from "../features/usuarios/ResetPasswordModal"
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 const PAPEIS = [
@@ -15,6 +16,7 @@ export default function AdminUsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
   const [carregando, setCarregando] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [usuarioParaRedefinir, setUsuarioParaRedefinir] = useState(null)
   const toast = useToast()
 
   useEffect(() => {
@@ -61,6 +63,58 @@ export default function AdminUsuariosPage() {
     if (!resp.ok) {
       setUsuarios((lista) => lista.map((u) => (u.id === usuario.id ? { ...u, modulos: anteriores } : u)))
       toast("Não foi possível alterar os módulos.", "danger")
+    }
+  }
+
+  async function trocarEstado(usuario) {
+    const ativo = usuario.is_active !== false
+    const acao = ativo ? "desativar" : "ativar"
+    if (!window.confirm(`Deseja ${acao} o usuário ${usuario.username}?`)) return
+
+    if (!ativo) {
+      setUsuarios((lista) => lista.map((item) => (item.id === usuario.id ? { ...item, is_active: true } : item)))
+    }
+    try {
+      const resposta = await fetch(`${BASE}/usuarios/${usuario.id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
+        body: JSON.stringify({ is_active: !ativo }),
+      })
+      if (!resposta.ok) {
+        const dados = await resposta.json().catch(() => ({}))
+        if (!ativo) {
+          setUsuarios((lista) => lista.map((item) => (item.id === usuario.id ? { ...item, is_active: false } : item)))
+        }
+        toast(dados.detail || `Não foi possível ${acao} o usuário.`, "danger")
+        return
+      }
+      if (ativo) {
+        setUsuarios((lista) => lista.map((item) => (item.id === usuario.id ? { ...item, is_active: false } : item)))
+      }
+      toast(`Usuário ${ativo ? "desativado" : "ativado"}.`)
+    } catch {
+      if (!ativo) {
+        setUsuarios((lista) => lista.map((item) => (item.id === usuario.id ? { ...item, is_active: false } : item)))
+      }
+      toast("Falha na conexão. Tente novamente.", "danger")
+    }
+  }
+
+  async function revogarSessoes(usuario) {
+    if (!window.confirm(`Deseja revogar todas as sessões de ${usuario.username}?`)) return
+    try {
+      const resposta = await fetch(`${BASE}/usuarios/${usuario.id}/revogar-sessoes/`, {
+        method: "POST",
+        headers: { Authorization: `Token ${getToken()}` },
+      })
+      if (!resposta.ok) {
+        const dados = await resposta.json().catch(() => ({}))
+        toast(dados.detail || "Não foi possível revogar as sessões.", "danger")
+        return
+      }
+      toast("Sessões revogadas.")
+    } catch {
+      toast("Falha na conexão. Tente novamente.", "danger")
     }
   }
 
@@ -112,10 +166,27 @@ export default function AdminUsuariosPage() {
                 {(u.modulos ?? []).length === 0 && <span className="text-xs text-ink-faint">Todos os módulos ativos</span>}
               </div>
             )}
+            <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
+              <button onClick={() => trocarEstado(u)} className="btn btn-ghost text-sm">
+                {u.is_active === false ? `Ativar ${u.username}` : `Desativar ${u.username}`}
+              </button>
+              <button onClick={() => setUsuarioParaRedefinir(u)} className="btn btn-ghost text-sm">
+                Redefinir senha de {u.username}
+              </button>
+              <button onClick={() => revogarSessoes(u)} className="btn btn-ghost text-sm">
+                Revogar sessões de {u.username}
+              </button>
+            </div>
           </div>
         ))}
       </div>
       <NewUserModal open={modalOpen} onClose={() => setModalOpen(false)} onCreated={aoCriar} />
+      <ResetPasswordModal
+        open={Boolean(usuarioParaRedefinir)}
+        usuario={usuarioParaRedefinir}
+        onClose={() => setUsuarioParaRedefinir(null)}
+        onSuccess={() => toast("Senha redefinida e sessões revogadas.")}
+      />
     </div>
   )
 }
