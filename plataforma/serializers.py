@@ -67,4 +67,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
                 perfil.save(update_fields=["papel"])
             if "modulos" in papel_data:
                 perfil.modulos.set(papel_data["modulos"])
+                if perfil.acesso_legado:
+                    perfil.acesso_legado = False
+                    perfil.save(update_fields=["acesso_legado"])
         return instance

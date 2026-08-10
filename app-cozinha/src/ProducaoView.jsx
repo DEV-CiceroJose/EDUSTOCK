@@ -305,7 +305,7 @@ export default function ProducaoView() {
   useEffect(() => filaBaixas.subscribe(setOfflineEntries), [])
 
   function removerPendente(id) {
-    if (window.confirm('Remover este registro rejeitado da fila?')) {
+    if (window.confirm('Remover este registro pendente da fila?')) {
       filaBaixas.remove(id)
     }
   }

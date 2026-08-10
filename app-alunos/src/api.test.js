@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { getSessao, login, logout, registrarContagem } from './api.js'
+import {
+  filaContagens,
+  getSessao,
+  login,
+  logout,
+  registrarContagem,
+  sincronizarContagensPendentes,
+} from './api.js'
 
 const originalFetch = global.fetch
 
@@ -119,5 +126,25 @@ describe('api.js — ciclo de sessão', () => {
     )
     expect(sessionStorage.getItem('operacao_token')).toBeNull()
     expect(sessionStorage.getItem('operacao_sessao')).toBeNull()
+  })
+
+  it('isola registro de outra turma sem bloquear a turma autenticada', async () => {
+    sessionStorage.setItem('operacao_token', 'token-valido')
+    sessionStorage.setItem('operacao_sessao', JSON.stringify({
+      turma: '6A', turno: 'INTEGRAL', perfil: 'ALUNO_REP',
+    }))
+    filaContagens.add({ operacao_id: 'outra-turma', quantidade_alunos: 20, _turma: '5A' })
+    filaContagens.add({ operacao_id: 'turma-atual', quantidade_alunos: 30, _turma: '6A' })
+    global.fetch = vi.fn().mockResolvedValue(respostaJson(200, { ok: true }))
+
+    await sincronizarContagensPendentes()
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toMatchObject({
+      operacao_id: 'turma-atual', quantidade_alunos: 30,
+    })
+    expect(filaContagens.list()).toEqual([
+      expect.objectContaining({ id: 'outra-turma', status: 'attention' }),
+    ])
   })
 })

@@ -51,7 +51,26 @@ class SeedModulosMigrationTest(TransactionTestCase):
         Modulo = apps.get_model("plataforma", "Modulo")
         self.assertFalse(Modulo.objects.filter(slug="financeiro").exists())
 
+    def test_marca_somente_operador_sem_modulos_como_legado(self):
+        apps = self._migrate(("plataforma", "0005_seguranca_permissoes_auditoria"))
+        User = apps.get_model("auth", "User")
+        Perfil = apps.get_model("plataforma", "Perfil")
+        Modulo = apps.get_model("plataforma", "Modulo")
+        legado = Perfil.objects.create(
+            user=User.objects.create(username="legado"), papel="OPERADOR"
+        )
+        explicito = Perfil.objects.create(
+            user=User.objects.create(username="explicito"), papel="OPERADOR"
+        )
+        explicito.modulos.add(Modulo.objects.get(slug="inventario"))
+
+        apps = self._migrate(("plataforma", "0006_perfil_acesso_legado"))
+        Perfil = apps.get_model("plataforma", "Perfil")
+
+        self.assertTrue(Perfil.objects.get(pk=legado.pk).acesso_legado)
+        self.assertFalse(Perfil.objects.get(pk=explicito.pk).acesso_legado)
+
     def tearDown(self):
         # deixa o banco de teste na migração mais recente, como as demais
         # suítes de migration deste projeto (core.tests.test_migrations)
-        self._migrate(("plataforma", "0004_seed_modulo_financeiro"))
+        self._migrate(("plataforma", "0006_perfil_acesso_legado"))

@@ -32,11 +32,15 @@ class Perfil(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil")
     matricula = models.CharField(max_length=50, unique=True, null=True, blank=True)
     papel = models.CharField(max_length=10, choices=PAPEL_CHOICES, default=OPERADOR)
+    acesso_legado = models.BooleanField(
+        default=False,
+        help_text="Mantém o acesso amplo apenas para perfis migrados sem módulos explícitos.",
+    )
     modulos = models.ManyToManyField(
         Modulo,
         blank=True,
         related_name="perfis_autorizados",
-        help_text="Vazio mantém acesso a todos os módulos ativos para compatibilidade.",
+        help_text="Selecione explicitamente os módulos permitidos.",
     )
 
     class Meta:

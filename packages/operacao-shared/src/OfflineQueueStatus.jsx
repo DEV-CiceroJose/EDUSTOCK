@@ -6,9 +6,11 @@ export function OfflineQueueStatus({ entries, onRetry, onRemove }) {
     <section aria-label="Sincronização pendente">
       <p>{pending.length} pendente(s) · {attention.length} requer(em) atenção</p>
       <button type="button" onClick={onRetry}>Tentar novamente</button>
-      {attention.map((entry) => (
+      {entries.map((entry) => (
         <button key={entry.id} type="button" onClick={() => onRemove(entry.id)}>
-          Remover registro rejeitado
+          {entry.status === "attention"
+            ? "Remover registro rejeitado"
+            : "Remover registro pendente"}
         </button>
       ))}
     </section>

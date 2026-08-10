@@ -243,10 +243,12 @@ describe('ProducaoView (app-cozinha)', () => {
       '1 pendente(s) · 1 requer(em) atenção',
     )
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remover registro pendente' }))
     fireEvent.click(screen.getByRole('button', { name: 'Remover registro rejeitado' }))
 
     expect(filaBaixas.retry).toHaveBeenCalledTimes(1)
-    expect(confirmar).toHaveBeenCalledTimes(1)
+    expect(confirmar).toHaveBeenCalledTimes(2)
+    expect(filaBaixas.remove).toHaveBeenCalledWith('pendente-1')
     expect(filaBaixas.remove).toHaveBeenCalledWith('rejeitada-1')
     confirmar.mockRestore()
   })

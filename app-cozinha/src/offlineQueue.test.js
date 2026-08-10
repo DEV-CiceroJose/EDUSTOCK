@@ -1,9 +1,25 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createOfflineQueue } from "@edustock/operacao-shared"
 
 describe("fila offline", () => {
   beforeEach(() => {
     localStorage.clear()
+  })
+
+  it("respeita Retry-After do HTTP 429", async () => {
+    const queue = createOfflineQueue({
+      storageKey: "fila",
+      send: vi.fn().mockRejectedValue(Object.assign(new Error("limite"), {
+        status: 429,
+        retryAfterMs: 120_000,
+      })),
+      now: () => 1_000,
+    })
+    queue.add({ operacao_id: "operacao-1" })
+
+    await queue.flush()
+
+    expect(queue.list()[0]).toMatchObject({ status: "pending", retryAt: 121_000 })
   })
 
   it.each([429, 500, 503])("mantém HTTP %s como pendente", async (status) => {

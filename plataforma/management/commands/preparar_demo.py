@@ -23,7 +23,7 @@ from core.models import (
     Turma,
 )
 from core.services import registrar_entrada
-from plataforma.models import Perfil, TokenAcesso
+from plataforma.models import Modulo, Perfil, TokenAcesso
 
 
 REQUIRED_ENV = (
@@ -38,6 +38,14 @@ REQUIRED_ENV = (
 DEMO_ENTRY_NUMBER = "DEMO-FICTICIA-001"
 DEMO_ADMIN_MATRICULA = "EDUSTOCK_DEMO_ADMIN_V1"
 DEMO_OPERATOR_MATRICULA = "EDUSTOCK_DEMO_OPERATOR_V1"
+DEMO_OPERATOR_MODULE_SLUGS = (
+    "inventario",
+    "movimentacoes",
+    "fornecedores",
+    "alertas",
+    "relatorios",
+    "merenda",
+)
 
 
 class Command(BaseCommand):
@@ -59,6 +67,9 @@ class Command(BaseCommand):
             role=Perfil.ADMIN,
             is_staff=True,
             is_superuser=True,
+            module_slugs=tuple(
+                Modulo.objects.filter(ativo=True).values_list("slug", flat=True)
+            ),
         )
         self._ensure_user(
             username=values["DEMO_OPERATOR_USERNAME"],
@@ -67,6 +78,7 @@ class Command(BaseCommand):
             role=Perfil.OPERADOR,
             is_staff=False,
             is_superuser=False,
+            module_slugs=DEMO_OPERATOR_MODULE_SLUGS,
         )
         self._ensure_operational_access(values)
         produtos = self._ensure_inventory(admin)
@@ -96,7 +108,17 @@ class Command(BaseCommand):
         if values["DEMO_ALUNOS_PIN"] == values["DEMO_COZINHA_PIN"]:
             raise CommandError("Os PINs fictícios da demo precisam ser distintos.")
 
-    def _ensure_user(self, *, username, password, matricula, role, is_staff, is_superuser):
+    def _ensure_user(
+        self,
+        *,
+        username,
+        password,
+        matricula,
+        role,
+        is_staff,
+        is_superuser,
+        module_slugs,
+    ):
         profile = (
             Perfil.objects.select_related("user")
             .filter(matricula=matricula)
@@ -116,36 +138,47 @@ class Command(BaseCommand):
                 is_staff=is_staff,
                 is_superuser=is_superuser,
             )
-            Perfil.objects.create(user=user, matricula=matricula, papel=role)
-            return user
+            profile = Perfil.objects.create(user=user, matricula=matricula, papel=role)
+        else:
+            user = profile.user
+            changed_fields = []
+            credentials_changed = False
+            if user.username != username:
+                user.username = username
+                changed_fields.append("username")
+                credentials_changed = True
+            desired = {
+                "is_active": True,
+                "is_staff": is_staff,
+                "is_superuser": is_superuser,
+            }
+            for field, value in desired.items():
+                if getattr(user, field) != value:
+                    setattr(user, field, value)
+                    changed_fields.append(field)
+            if not user.check_password(password):
+                user.set_password(password)
+                changed_fields.append("password")
+                credentials_changed = True
+            if changed_fields:
+                user.save(update_fields=changed_fields)
+            if profile.papel != role:
+                profile.papel = role
+                profile.save(update_fields=["papel"])
+            if credentials_changed:
+                TokenAcesso.objects.filter(user=user).delete()
 
-        user = profile.user
-        changed_fields = []
-        credentials_changed = False
-        if user.username != username:
-            user.username = username
-            changed_fields.append("username")
-            credentials_changed = True
-        desired = {
-            "is_active": True,
-            "is_staff": is_staff,
-            "is_superuser": is_superuser,
-        }
-        for field, value in desired.items():
-            if getattr(user, field) != value:
-                setattr(user, field, value)
-                changed_fields.append(field)
-        if not user.check_password(password):
-            user.set_password(password)
-            changed_fields.append("password")
-            credentials_changed = True
-        if changed_fields:
-            user.save(update_fields=changed_fields)
-        if profile.papel != role:
-            profile.papel = role
-            profile.save(update_fields=["papel"])
-        if credentials_changed:
-            TokenAcesso.objects.filter(user=user).delete()
+        desired_modules = list(Modulo.objects.filter(slug__in=module_slugs))
+        found_slugs = {module.slug for module in desired_modules}
+        missing_slugs = sorted(set(module_slugs) - found_slugs)
+        if missing_slugs:
+            raise CommandError(
+                "Módulos obrigatórios da demo ausentes: " + ", ".join(missing_slugs)
+            )
+        profile.modulos.set(desired_modules)
+        if profile.acesso_legado:
+            profile.acesso_legado = False
+            profile.save(update_fields=["acesso_legado"])
         return user
 
     def _ensure_operational_access(self, values):

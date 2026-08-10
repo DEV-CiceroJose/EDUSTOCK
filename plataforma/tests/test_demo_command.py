@@ -25,9 +25,10 @@ from core.models import (
 from core.operacao import executar_baixa_idempotente, gerar_plano_do_dia
 from plataforma.management.commands.preparar_demo import (
     DEMO_ADMIN_MATRICULA,
+    DEMO_OPERATOR_MODULE_SLUGS,
     DEMO_OPERATOR_MATRICULA,
 )
-from plataforma.models import Perfil, TokenAcesso
+from plataforma.models import Modulo, Perfil, TokenAcesso
 
 
 class PrepararDemoCommandTest(TestCase):
@@ -89,11 +90,37 @@ class PrepararDemoCommandTest(TestCase):
         self.assertTrue(admin.is_staff and admin.is_superuser)
         self.assertEqual(admin.perfil.papel, Perfil.ADMIN)
         self.assertEqual(operador.perfil.papel, Perfil.OPERADOR)
+        self.assertEqual(
+            set(operador.perfil.modulos.values_list("slug", flat=True)),
+            set(DEMO_OPERATOR_MODULE_SLUGS),
+        )
+        self.assertFalse(operador.perfil.acesso_legado)
+        self.assertEqual(
+            set(admin.perfil.modulos.values_list("slug", flat=True)),
+            set(Modulo.objects.filter(ativo=True).values_list("slug", flat=True)),
+        )
         self.assertTrue(
             Entrada.objects.filter(numero_nota_fiscal="DEMO-FICTICIA-001").exists()
         )
         self.assertTrue(Movimentacao.objects.filter(tipo=Movimentacao.ENTRADA).exists())
         self.assertTrue(LoteEstoque.objects.filter(quantidade__gt=0).exists())
+
+    @override_settings(DEMO_MODE=True)
+    def test_operador_demo_nao_recebe_modulo_adicionado_no_futuro(self):
+        futuro = Modulo.objects.create(
+            slug="modulo-futuro", nome="Módulo futuro", ativo=True
+        )
+
+        self.run_demo()
+
+        admin = User.objects.get(username=self.demo_env()["DEMO_ADMIN_USERNAME"])
+        operador = User.objects.get(username=self.demo_env()["DEMO_OPERATOR_USERNAME"])
+        self.assertIn(futuro, admin.perfil.modulos.all())
+        self.assertNotIn(futuro, operador.perfil.modulos.all())
+        self.assertEqual(
+            set(operador.perfil.modulos.values_list("slug", flat=True)),
+            set(DEMO_OPERATOR_MODULE_SLUGS),
+        )
 
     @override_settings(DEMO_MODE=True)
     def test_preparar_demo_habilita_fluxo_real_da_cozinha(self):

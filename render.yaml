@@ -3,7 +3,7 @@ services:
     name: edustock-demo-api
     runtime: python
     plan: free
-    buildCommand: ./build.sh
+    buildCommand: bash build.sh
     startCommand: gunicorn easystock.wsgi:application
     healthCheckPath: /api/health/
     envVars:

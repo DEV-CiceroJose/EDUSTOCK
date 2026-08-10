@@ -7,6 +7,7 @@ from plataforma.permissions import (
     EhAdmin,
     LeituraOuAdmin,
     RequerModuloAtivo,
+    slugs_modulos_do_usuario,
     usuario_admin_do_estoque,
 )
 
@@ -31,6 +32,18 @@ class RequerModuloAtivoTest(TestCase):
         permission = RequerModuloAtivo("modulo-inexistente")()
         request = self.factory.get("/api/produtos/")
         self.assertFalse(permission.has_permission(request, None))
+
+    def test_operador_novo_sem_modulos_nao_recebe_fallback(self):
+        user = User.objects.create_user(username="novo", password="x")
+        Perfil.objects.create(user=user, papel=Perfil.OPERADOR)
+
+        self.assertEqual(slugs_modulos_do_usuario(user), set())
+
+    def test_operador_legado_sem_modulos_mantem_fallback(self):
+        user = User.objects.create_user(username="legado", password="x")
+        Perfil.objects.create(user=user, papel=Perfil.OPERADOR, acesso_legado=True)
+
+        self.assertIn("inventario", slugs_modulos_do_usuario(user))
 
 
 class EhAdminTest(TestCase):

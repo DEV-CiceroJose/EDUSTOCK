@@ -4,7 +4,7 @@ import os
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 
-from plataforma.models import Perfil
+from plataforma.models import Modulo, Perfil
 
 
 class Command(BaseCommand):
@@ -28,5 +28,6 @@ class Command(BaseCommand):
         if User.objects.filter(username=username).exists():
             raise CommandError(f"Usuário '{username}' já existe.")
         user = User.objects.create_user(username=username, password=password, is_staff=True)
-        Perfil.objects.create(user=user, papel=Perfil.ADMIN)
+        perfil = Perfil.objects.create(user=user, papel=Perfil.ADMIN)
+        perfil.modulos.set(Modulo.objects.filter(ativo=True))
         self.stdout.write(self.style.SUCCESS(f"Administrador '{username}' criado com sucesso."))

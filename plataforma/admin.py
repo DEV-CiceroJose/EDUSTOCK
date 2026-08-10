@@ -12,8 +12,9 @@ class ModuloAdmin(admin.ModelAdmin):
 
 @admin.register(Perfil)
 class PerfilAdmin(admin.ModelAdmin):
-    list_display = ("user", "papel", "matricula")
-    list_filter = ("papel",)
+    list_display = ("user", "papel", "matricula", "acesso_legado")
+    list_filter = ("papel", "acesso_legado")
+    readonly_fields = ("acesso_legado",)
     filter_horizontal = ("modulos",)
     search_fields = ("user__username", "matricula")
 

@@ -24,6 +24,7 @@ class PerfilModelTest(TestCase):
         user = User.objects.create_user(username="joao", password="senha123")
         perfil = Perfil.objects.create(user=user)
         self.assertEqual(perfil.papel, Perfil.OPERADOR)
+        self.assertFalse(perfil.acesso_legado)
 
     def test_permite_dois_perfis_sem_matricula(self):
         u1 = User.objects.create_user(username="joao", password="senha123")

@@ -20,7 +20,7 @@ class LoginViewTest(APITestCase):
         Modulo.objects.update(ativo=False)
         Modulo.objects.filter(slug="inventario").update(ativo=True)
 
-    def test_login_com_credenciais_corretas_retorna_token_e_modulos(self):
+    def test_login_de_conta_nova_nao_concede_modulos_implicitamente(self):
         resp = self.client.post(
             "/api/auth/login/",
             {"username": "joao", "password": "senha-boa-123"},
@@ -32,7 +32,7 @@ class LoginViewTest(APITestCase):
         self.assertFalse(resp.data["is_staff"])
         self.assertEqual(resp.data["username"], "joao")
         self.assertEqual(resp.data["nome"], "joao")
-        self.assertEqual(resp.data["modulos_ativos"], ["inventario"])
+        self.assertEqual(resp.data["modulos_ativos"], [])
 
     def test_login_retorna_first_name_como_nome_quando_definido(self):
         self.user.first_name = "João Silva"
@@ -244,11 +244,31 @@ class UsuarioViewSetTest(APITestCase):
     def test_perfil_legado_sem_modulos_permanece_compativel(self):
         self._autenticar_admin()
         legado = User.objects.create_user(username="legado", password="x")
-        Perfil.objects.create(user=legado, papel=Perfil.OPERADOR)
+        Perfil.objects.create(
+            user=legado, papel=Perfil.OPERADOR, acesso_legado=True
+        )
 
         resposta = self.client.patch(f"/api/usuarios/{legado.pk}/", {"papel": "OPERADOR"}, format="json")
 
         self.assertEqual(resposta.status_code, 200, resposta.content)
+
+    def test_atribuir_modulos_converte_perfil_legado_em_explicito(self):
+        self._autenticar_admin()
+        legado = User.objects.create_user(username="legado-explicito", password="x")
+        perfil = Perfil.objects.create(
+            user=legado, papel=Perfil.OPERADOR, acesso_legado=True
+        )
+        modulo = Modulo.objects.get(slug="inventario")
+
+        resposta = self.client.patch(
+            f"/api/usuarios/{legado.pk}/",
+            {"modulos": [modulo.slug]},
+            format="json",
+        )
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        perfil.refresh_from_db()
+        self.assertFalse(perfil.acesso_legado)
 
     def test_admin_desativa_usuario_e_revoga_todos_os_tokens(self):
         self._autenticar_admin()

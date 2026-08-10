@@ -11,7 +11,9 @@ def slugs_modulos_do_usuario(user):
         perfil = user.perfil
     except Perfil.DoesNotExist:
         return set()
-    if perfil.papel == Perfil.ADMIN or not perfil.modulos.exists():
+    if perfil.papel == Perfil.ADMIN or (
+        perfil.acesso_legado and not perfil.modulos.exists()
+    ):
         return set(ativos.values_list("slug", flat=True))
     return set(
         ativos.filter(perfis_autorizados=perfil).values_list("slug", flat=True)

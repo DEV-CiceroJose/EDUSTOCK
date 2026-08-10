@@ -171,10 +171,12 @@ describe('ContagemView (app-alunos)', () => {
       '1 pendente(s) · 1 requer(em) atenção',
     )
     fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remover registro pendente' }))
     fireEvent.click(screen.getByRole('button', { name: 'Remover registro rejeitado' }))
 
     expect(filaContagens.retry).toHaveBeenCalledTimes(1)
-    expect(confirmar).toHaveBeenCalledTimes(1)
+    expect(confirmar).toHaveBeenCalledTimes(2)
+    expect(filaContagens.remove).toHaveBeenCalledWith('pendente-1')
     expect(filaContagens.remove).toHaveBeenCalledWith('rejeitada-1')
     confirmar.mockRestore()
   })

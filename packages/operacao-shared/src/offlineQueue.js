@@ -1,10 +1,22 @@
 const STORAGE_VERSION = 1
 const RETRY_DELAY_MS = 30_000
+const MIN_RETRY_AFTER_MS = 1_000
+const MAX_RETRY_AFTER_MS = 300_000
 
 export function classifyOfflineError(error) {
+  if (["pending", "attention", "auth"].includes(error.offlineClassification)) {
+    return error.offlineClassification
+  }
   if (!error.status || error.status === 429 || error.status >= 500) return "pending"
   if (error.status === 401 || error.status === 403) return "auth"
   return "attention"
+}
+
+function retryDelayFor(error) {
+  if (error.status !== 429 || !Number.isFinite(error.retryAfterMs)) {
+    return RETRY_DELAY_MS
+  }
+  return Math.min(MAX_RETRY_AFTER_MS, Math.max(MIN_RETRY_AFTER_MS, error.retryAfterMs))
 }
 
 export function createOfflineQueue({ storageKey, send, now = Date.now }) {
@@ -129,7 +141,7 @@ export function createOfflineQueue({ storageKey, send, now = Date.now }) {
                 ...item,
                 status: classification === "attention" ? "attention" : "pending",
                 attempts: item.attempts + 1,
-                retryAt: classification === "pending" ? now() + RETRY_DELAY_MS : null,
+                retryAt: classification === "pending" ? now() + retryDelayFor(error) : null,
                 lastError: error.message ?? String(error),
               }
             : item))

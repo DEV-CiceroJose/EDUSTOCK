@@ -98,7 +98,7 @@ export default function ContagemView() {
   useEffect(() => filaContagens.subscribe(setOfflineEntries), [])
 
   function removerPendente(id) {
-    if (window.confirm('Remover este registro rejeitado da fila?')) {
+    if (window.confirm('Remover este registro pendente da fila?')) {
       filaContagens.remove(id)
     }
   }

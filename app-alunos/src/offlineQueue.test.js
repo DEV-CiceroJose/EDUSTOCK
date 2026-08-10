@@ -6,6 +6,45 @@ describe("fila offline", () => {
     localStorage.clear()
   })
 
+  it("respeita Retry-After do HTTP 429 com teto seguro", async () => {
+    const error = Object.assign(new Error("muitas tentativas"), {
+      status: 429,
+      retryAfterMs: 600_000,
+    })
+    const queue = createOfflineQueue({
+      storageKey: "fila",
+      send: vi.fn().mockRejectedValue(error),
+      now: () => 1_000,
+    })
+    queue.add({ operacao_id: "operacao-1" })
+
+    await queue.flush()
+
+    expect(queue.list()[0]).toMatchObject({ status: "pending", retryAt: 301_000 })
+  })
+
+  it("marca incompatibilidade local para atencao e continua itens independentes", async () => {
+    const send = vi.fn(async (payload) => {
+      if (payload.operacao_id === "outra-turma") {
+        throw Object.assign(new Error("outra turma"), {
+          status: 401,
+          offlineClassification: "attention",
+        })
+      }
+      return { ok: true }
+    })
+    const queue = createOfflineQueue({ storageKey: "fila", send })
+    queue.add({ operacao_id: "outra-turma" })
+    queue.add({ operacao_id: "turma-atual" })
+
+    await queue.flush()
+
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(queue.list()).toEqual([
+      expect.objectContaining({ id: "outra-turma", status: "attention" }),
+    ])
+  })
+
   it.each([429, 500, 503])("mantém HTTP %s como pendente", async (status) => {
     const queue = createOfflineQueue({ storageKey: "fila", send: async () => {
       const error = new Error("falhou")

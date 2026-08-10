@@ -7,7 +7,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
-from plataforma.models import Perfil
+from plataforma.models import Modulo, Perfil
 
 
 class CriarAdminCommandTest(TestCase):
@@ -18,6 +18,10 @@ class CriarAdminCommandTest(TestCase):
             user = User.objects.get(username="admin")
             self.assertEqual(user.perfil.papel, Perfil.ADMIN)
             self.assertTrue(user.is_staff)
+            self.assertEqual(
+                set(user.perfil.modulos.values_list("slug", flat=True)),
+                set(Modulo.objects.filter(ativo=True).values_list("slug", flat=True)),
+            )
             self.assertIn("criado com sucesso", out.getvalue())
 
     def test_pede_senha_sem_aceitar_argumento_posicional(self):

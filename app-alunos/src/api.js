@@ -17,6 +17,7 @@ export const filaContagens = createOfflineQueue({
     if (getSessao()?.turma !== _turma) {
       const error = new Error("Aguardando a sessão da turma que criou este registro.")
       error.status = 401
+      error.offlineClassification = "attention"
       throw error
     }
     return http.request("POST", "/api/operacao/contagem/", payload, { retry: false })

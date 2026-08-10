@@ -34,3 +34,7 @@ class RenderBlueprintTest(SimpleTestCase):
                     block,
                     r'(?m)^      - key: NODE_VERSION\n        value: "22\.22\.0"$',
                 )
+
+    def test_backend_invoca_build_com_bash_sem_depender_do_bit_executavel(self):
+        block = self._service_block("edustock-demo-api")
+        self.assertRegex(block, r"(?m)^    buildCommand: bash build\.sh$")
