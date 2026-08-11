@@ -98,6 +98,23 @@ class TestFrequenciaDuplicataBloqueada(TestCase):
         self.assertEqual(r1.status_code, 201, r1.content)
         self.assertEqual(r2.status_code, 201, r2.content)
 
+    def test_nome_completo_da_turma_cabe_na_frequencia(self):
+        """O espelho textual aceita o mesmo tamanho do cadastro de Turma."""
+        nome = "Turma Única - Demonstração"
+        frequencia = FrequenciaDiaria(
+            data=self.hoje,
+            turno=FrequenciaDiaria.INTEGRAL,
+            turma=nome,
+            registrado_por_turma=nome,
+            quantidade_alunos=30,
+        )
+
+        frequencia.full_clean(exclude=["registrado_por"])
+        frequencia.save()
+
+        self.assertEqual(frequencia.turma, nome)
+        self.assertEqual(frequencia.registrado_por_turma, nome)
+
 
 # ---------------------------------------------------------------------------
 # 2. test_previsao_alerta_reducao

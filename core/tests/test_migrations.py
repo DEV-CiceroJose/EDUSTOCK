@@ -4,6 +4,13 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 
 
+def _restore_latest_schema():
+    """Restaura todos os apps antes do flush do TransactionTestCase."""
+    executor = MigrationExecutor(connection)
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
 class RepointDataMigrationTest(TransactionTestCase):
     migrate_from = ("core", "0004_fundacao_grupo_bempermanente")
     migrate_to = ("core", "0005_repoint_produtos_para_grupo")
@@ -40,8 +47,7 @@ class RepointDataMigrationTest(TransactionTestCase):
         self.assertEqual(Grupo.objects.filter(nome="Geral").count(), 0)
 
     def tearDown(self):
-        # deixa o banco de teste na migração mais recente
-        self._migrate(("core", "0005_repoint_produtos_para_grupo"))
+        _restore_latest_schema()
 
 
 class SaldoInicialMigrationTest(TransactionTestCase):
@@ -76,7 +82,7 @@ class SaldoInicialMigrationTest(TransactionTestCase):
         self.assertEqual(mov.quantidade, Decimal("10.000"))
 
     def tearDown(self):
-        self._migrate(("core", "0009_saldo_inicial"))
+        _restore_latest_schema()
 
 
 class ProtecaoPinMigrationTest(TransactionTestCase):
@@ -115,7 +121,7 @@ class ProtecaoPinMigrationTest(TransactionTestCase):
         self.assertEqual(len(protegido.pin_fingerprint), 64)
 
     def tearDown(self):
-        self._migrate(self.migrate_to)
+        _restore_latest_schema()
 
 
 class MaterializaLotesLegadosMigrationTest(TransactionTestCase):
@@ -158,4 +164,4 @@ class MaterializaLotesLegadosMigrationTest(TransactionTestCase):
         self.assertTrue(LoteEstoque.objects.filter(codigo="LOTE-EXISTENTE").exists())
 
     def tearDown(self):
-        self._migrate(self.migrate_to)
+        _restore_latest_schema()

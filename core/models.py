@@ -351,13 +351,13 @@ class FrequenciaDiaria(models.Model):
 
     data = models.DateField(default=timezone.localdate)
     turno = models.CharField(max_length=8, choices=TURNO_CHOICES)
-    turma = models.CharField(max_length=20)
+    turma = models.CharField(max_length=100)
     quantidade_alunos = models.PositiveIntegerField()
     operacao_id = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     # Identificador do PIN/turma que enviou via app-alunos (vazio quando
     # o registro foi feito pelo painel administrativo).
     registrado_por_turma = models.CharField(
-        max_length=20,
+        max_length=100,
         blank=True,
         default="",
         verbose_name="Registrado pela turma (PIN)",
