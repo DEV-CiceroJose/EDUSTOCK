@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 import dj_database_url
+from corsheaders.defaults import default_headers
 from django.utils.csp import CSP
 from pathlib import Path
 
@@ -230,6 +231,7 @@ if RENDER_EXTERNAL_HOSTNAME and not IS_PRODUCTION:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = (*default_headers, "x-operacao-token")
 
 # Origens confiáveis para o Origin-check de CSRF do Django (Django 4+).
 # Sem isso, qualquer POST vindo dos apps React via proxy do Vite (ex.:
