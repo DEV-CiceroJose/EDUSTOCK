@@ -146,3 +146,41 @@ export const httpOperacao = {
   baixaProducao: (data: Record<string, unknown>) =>
     req<Record<string, unknown>>(`/operacao/baixa-de-producao/`, { method: "POST", body: data }),
 }
+
+export type IndicadoresRede = {
+  periodo: { inicio: string; fim: string }
+  consolidado: Record<string, string | number | null>
+  por_escola: Array<{
+    escola: { id: number; nome: string; slug: string }
+    estoque: { itens: number; criticos: number; perdas_por_validade: string }
+    refeicoes: Record<string, string | number | null>
+    economia_estimada: null
+    economia_observacao: string
+    divergencias: { conferencias: number; itens_divergentes: number; quantidade_absoluta: string }
+    origens: { registros_refeicao: number[]; contagens_estoque: number[] }
+  }>
+}
+
+export const httpRede = {
+  indicadores: (params: { inicio?: string; fim?: string; escola?: number } = {}) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => value != null && qs.set(key, String(value)))
+    return req<IndicadoresRede>(`/rede/indicadores/${qs.size ? `?${qs}` : ""}`)
+  },
+  trocarEscola: (escola_id: number) =>
+    req<{ escola: Record<string, unknown> }>(`/auth/escola/`, { method: "POST", body: { escola_id } }),
+  importarProdutos: async (arquivo: File, escola_id: number) => {
+    const form = new FormData()
+    form.append("arquivo", arquivo)
+    form.append("escola_id", String(escola_id))
+    const token = getToken()
+    const res = await fetch(`${BASE}/rede/importar-produtos/`, {
+      method: "POST",
+      headers: token ? { Authorization: `Token ${token}` } : {},
+      body: form,
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.detail || "Falha ao importar planilha.")
+    return data as { criados: number; atualizados: number }
+  },
+}

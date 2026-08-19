@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import OuterRef, Subquery
-from plataforma.permissions import LeituraOuAdmin, RequerModuloAtivo
+from plataforma.permissions import LeituraOuAdmin, RequerModuloAtivo, escola_do_request
 from .models import (
     BemPermanente, Cardapio, Categoria, Entrada, Fornecedor, Grupo,
     LoteEstoque, Movimentacao, Produto, Receita,
@@ -58,6 +58,7 @@ class AlertasView(APIView):
                 tipo=tipo,
                 urgencia=urgencia,
                 dias_alerta=dias_validade,
+                escola=escola_do_request(request),
             )
         )
 
@@ -81,16 +82,29 @@ class PrestacaoContasView(APIView):
             inicio=inicio,
             fim=fim,
             incluir_financeiro="financeiro" in slugs_modulos_do_usuario(request.user),
+            escola=escola_do_request(request),
         ))
 
 
-class CategoriaViewSet(viewsets.ModelViewSet):
+class EscolaScopedViewSetMixin:
+    """Impõe o escopo autenticado; IDs enviados pelo cliente não mudam a escola."""
+
+    def escola_atual(self):
+        return escola_do_request(self.request)
+
+    def perform_create(self, serializer):
+        serializer.save(escola=self.escola_atual())
+
+
+class CategoriaViewSet(EscolaScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
-    queryset = Categoria.objects.all().order_by("name")
     serializer_class = CategoriaSerializer
 
+    def get_queryset(self):
+        return Categoria.objects.filter(escola=self.escola_atual()).order_by("name")
 
-class ProdutoViewSet(viewsets.ModelViewSet):
+
+class ProdutoViewSet(EscolaScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
     serializer_class = ProdutoSerializer
     filter_backends = [filters.SearchFilter]
@@ -108,7 +122,7 @@ class ProdutoViewSet(viewsets.ModelViewSet):
         )
         qs = Produto.objects.select_related(
             "grupo__categoria", "fornecedor", "criado_por", "atualizado_por"
-        ).annotate(ultimo_preco=Subquery(ultimo_preco))
+        ).filter(escola=self.escola_atual()).annotate(ultimo_preco=Subquery(ultimo_preco))
         grupo = self.request.query_params.get("grupo")
         categoria = self.request.query_params.get("categoria")
         fornecedor = self.request.query_params.get("fornecedor")
@@ -122,41 +136,45 @@ class ProdutoViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(criado_por=user, atualizado_por=user)
+        serializer.save(escola=self.escola_atual(), criado_por=user, atualizado_por=user)
 
     def perform_update(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         serializer.save(atualizado_por=user)
 
 
-class GrupoViewSet(viewsets.ModelViewSet):
+class GrupoViewSet(EscolaScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
-    queryset = Grupo.objects.select_related("categoria").all()
     serializer_class = GrupoSerializer
 
+    def get_queryset(self):
+        return Grupo.objects.filter(escola=self.escola_atual()).select_related("categoria")
 
-class BemPermanenteViewSet(viewsets.ModelViewSet):
+
+class BemPermanenteViewSet(EscolaScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario"), LeituraOuAdmin]
-    queryset = BemPermanente.objects.all()
     serializer_class = BemPermanenteSerializer
+
+    def get_queryset(self):
+        return BemPermanente.objects.filter(escola=self.escola_atual())
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(criado_por=user, atualizado_por=user)
+        serializer.save(escola=self.escola_atual(), criado_por=user, atualizado_por=user)
 
     def perform_update(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         serializer.save(atualizado_por=user)
 
 
-class FornecedorViewSet(viewsets.ModelViewSet):
+class FornecedorViewSet(EscolaScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("fornecedores"), LeituraOuAdmin]
     serializer_class = FornecedorSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["nome", "documento"]
 
     def get_queryset(self):
-        qs = Fornecedor.objects.all()
+        qs = Fornecedor.objects.filter(escola=self.escola_atual())
         for campo in ("emite_nota_fiscal", "aceita_fiado", "ativo"):
             valor = self.request.query_params.get(campo)
             if valor is not None:
@@ -165,20 +183,20 @@ class FornecedorViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
-        serializer.save(criado_por=user, atualizado_por=user)
+        serializer.save(escola=self.escola_atual(), criado_por=user, atualizado_por=user)
 
     def perform_update(self, serializer):
         user = self.request.user if self.request.user.is_authenticated else None
         serializer.save(atualizado_por=user)
 
 
-class MovimentacaoViewSet(viewsets.ModelViewSet):
+class MovimentacaoViewSet(EscolaScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("movimentacoes")]
     serializer_class = MovimentacaoSerializer
     http_method_names = ["get", "post", "head", "options"]  # append-only
 
     def get_queryset(self):
-        qs = Movimentacao.objects.select_related("produto", "entrada").all()
+        qs = Movimentacao.objects.filter(escola=self.escola_atual()).select_related("produto", "entrada")
         params = self.request.query_params
         if params.get("produto"):
             qs = qs.filter(produto_id=params["produto"])
@@ -200,6 +218,7 @@ class MovimentacaoViewSet(viewsets.ModelViewSet):
                 produto=d["produto"], tipo=d["tipo"], quantidade=d["quantidade"],
                 motivo=d.get("motivo", ""), preco_unitario=d.get("preco_unitario"),
                 data=d.get("data"), user=user,
+                escola=self.escola_atual(),
             )
         except DjangoValidationError as e:
             return Response({"detail": e.messages}, status=status.HTTP_400_BAD_REQUEST)
@@ -207,13 +226,13 @@ class MovimentacaoViewSet(viewsets.ModelViewSet):
         return Response(out.data, status=status.HTTP_201_CREATED)
 
 
-class EntradaViewSet(viewsets.ModelViewSet):
+class EntradaViewSet(EscolaScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("movimentacoes")]
     serializer_class = EntradaSerializer
     http_method_names = ["get", "post", "head", "options"]  # append-only
 
     def get_queryset(self):
-        return Entrada.objects.select_related("fornecedor").prefetch_related("itens__produto").all()
+        return Entrada.objects.filter(escola=self.escola_atual()).select_related("fornecedor").prefetch_related("itens__produto")
 
     def create(self, request, *args, **kwargs):
         ser = self.get_serializer(data=request.data)
@@ -226,12 +245,12 @@ class EntradaViewSet(viewsets.ModelViewSet):
         return Response(out.data, status=status.HTTP_201_CREATED)
 
 
-class LoteEstoqueViewSet(viewsets.ReadOnlyModelViewSet):
+class LoteEstoqueViewSet(EscolaScopedViewSetMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
     serializer_class = LoteEstoqueSerializer
 
     def get_queryset(self):
-        qs = LoteEstoque.objects.select_related("produto", "entrada").all()
+        qs = LoteEstoque.objects.filter(escola=self.escola_atual()).select_related("produto", "entrada")
         if self.request.query_params.get("produto"):
             qs = qs.filter(produto_id=self.request.query_params["produto"])
         if self.request.query_params.get("ativos") in ("1", "true"):
@@ -239,13 +258,17 @@ class LoteEstoqueViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
 
-class ReceitaViewSet(viewsets.ModelViewSet):
+class ReceitaViewSet(EscolaScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("merenda"), LeituraOuAdmin]
     serializer_class = ReceitaSerializer
-    queryset = Receita.objects.prefetch_related("ingredientes__produto").all()
+
+    def get_queryset(self):
+        return Receita.objects.filter(escola=self.escola_atual()).prefetch_related("ingredientes__produto")
 
 
-class CardapioViewSet(viewsets.ModelViewSet):
+class CardapioViewSet(EscolaScopedViewSetMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("merenda"), LeituraOuAdmin]
     serializer_class = CardapioSerializer
-    queryset = Cardapio.objects.select_related("receita").all()
+
+    def get_queryset(self):
+        return Cardapio.objects.filter(escola=self.escola_atual()).select_related("receita")

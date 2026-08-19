@@ -13,8 +13,8 @@ const http = createOperacaoHttpClient({
 const filaContagens = createOfflineQueue({
   storageKey: "edustock:alunos:fila-contagens",
   send: (body) => {
-    const { _turma, ...payload } = body
-    if (getSessao()?.turma !== _turma) {
+    const { _turma, _escola_id, ...payload } = body
+    if (getSessao()?.turma !== _turma || getSessao()?.escola?.id !== _escola_id) {
       const error = new Error("Aguardando a sessão da turma que criou este registro.")
       error.status = 401
       throw error
@@ -24,9 +24,11 @@ const filaContagens = createOfflineQueue({
 })
 
 export async function login(pin) {
+  const escola = import.meta.env.VITE_ESCOLA_CODIGO
   const data = await http.request("POST", "/api/operacao/auth/", {
     pin,
     perfil: "ALUNO_REP",
+    ...(escola ? { escola } : {}),
   })
 
   if (
@@ -43,6 +45,7 @@ export async function login(pin) {
     turma: data.turma,
     turno: data.turno,
     perfil: data.perfil,
+    escola: data.escola,
   }))
   void sincronizarContagensPendentes()
   return data
@@ -91,7 +94,11 @@ export async function registrarContagem(quantidade_alunos, data) {
     return await http.request("POST", "/api/operacao/contagem/", body, { retry: true })
   } catch (error) {
     if (error.status) throw error
-    filaContagens.add({ ...body, _turma: getSessao()?.turma })
+    filaContagens.add({
+      ...body,
+      _turma: getSessao()?.turma,
+      _escola_id: getSessao()?.escola?.id,
+    })
     return { ...body, pendente: true }
   }
 }

@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import RequireAuth from "./components/RequireAuth"
 import RequireAdmin from "./components/RequireAdmin"
 import RequireModule from "./components/RequireModule"
+import RequireRede from "./components/RequireRede"
 import LandingPage from "./pages/LandingPage"
 
 const MainLayout = lazy(() => import("./layouts/MainLayout"))
@@ -18,6 +19,7 @@ const ConfiguracoesPage = lazy(() => import("./pages/ConfiguracoesPage"))
 const ModuloIndisponivelPage = lazy(() => import("./pages/ModuloIndisponivelPage"))
 const AdminModulosPage = lazy(() => import("./pages/AdminModulosPage"))
 const AdminUsuariosPage = lazy(() => import("./pages/AdminUsuariosPage"))
+const RedeMunicipalPage = lazy(() => import("./pages/RedeMunicipalPage"))
 
 export default function App() {
   return (
@@ -50,6 +52,9 @@ export default function App() {
 
             <Route path="perfil" element={<PerfilPage />} />
             <Route path="configuracoes" element={<ConfiguracoesPage />} />
+            <Route element={<RequireRede />}>
+              <Route path="rede" element={<RedeMunicipalPage />} />
+            </Route>
             <Route element={<RequireAdmin />}>
               <Route path="admin/modulos" element={<AdminModulosPage />} />
               <Route path="admin/usuarios" element={<AdminUsuariosPage />} />

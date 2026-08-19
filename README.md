@@ -1,6 +1,17 @@
-# 🏫 EduStock - Sistema de Gestão Escolar
+# 🏫 EduStock - Operação da Alimentação Escolar
 
-Sistema completo de gestão de estoque e merenda escolar desenvolvido com Django e React.
+Camada operacional que conecta presença real, previsão de produção, consumo
+rastreável, baixa FEFO e indicadores municipais. Desenvolvida com Django e React.
+
+## 🏛️ Redes municipais
+
+A EduStock possui hierarquia Município/Secretaria → Escola, perfis por escopo,
+isolamento autenticado dos dados, painel municipal, catálogo central, importação
+CSV e indicadores de impacto. Instalações anteriores são migradas para uma escola
+piloto padrão sem reescrever o histórico.
+
+O guia de produto, as rotas e os portões de evidência para o Centelha estão em
+[`docs/CENTELHA_PREPARACAO.md`](docs/CENTELHA_PREPARACAO.md).
 
 ## 📋 Sobre o Projeto
 

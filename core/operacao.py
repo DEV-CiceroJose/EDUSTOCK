@@ -2,6 +2,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from plataforma.models import Escola, escola_padrao_id
 
 from .models import (
     Cardapio,
@@ -10,6 +11,7 @@ from .models import (
     Movimentacao,
     OperacaoBaixaProducao,
     Produto,
+    RegistroRefeicao,
 )
 from .services import calcular_previsao_producao, registrar_movimentacao, total_frequencia
 
@@ -24,6 +26,12 @@ class RefeicaoJaBaixada(Exception):
     def __init__(self, operacao):
         self.operacao = operacao
         super().__init__("A baixa desta refeição já foi realizada hoje.")
+
+
+def _resolver_escola(escola):
+    if isinstance(escola, Escola):
+        return escola
+    return Escola.objects.get(pk=escola or escola_padrao_id())
 
 
 def _money_qty(val):
@@ -48,13 +56,14 @@ def _unidade_legivel(unidade, quantidade):
     return f"{q} {nome}"
 
 
-def gerar_plano_do_dia(*, data, turno, refeicao=None):
-    total_alunos = total_frequencia(data=data, turno=turno)
-    previsao = calcular_previsao_producao(data, turno)
+def gerar_plano_do_dia(*, data, turno, refeicao=None, escola=None):
+    escola = _resolver_escola(escola)
+    total_alunos = total_frequencia(data=data, turno=turno, escola=escola)
+    previsao = calcular_previsao_producao(data, turno, escola=escola)
     cardapio = None
     if refeicao:
         cardapio = (
-            Cardapio.objects.filter(data=data, refeicao=refeicao, receita__ativa=True)
+            Cardapio.objects.filter(escola=escola, data=data, refeicao=refeicao, receita__ativa=True)
             .select_related("receita")
             .prefetch_related("receita__ingredientes__produto__grupo__categoria")
             .first()
@@ -62,7 +71,7 @@ def gerar_plano_do_dia(*, data, turno, refeicao=None):
     fatores = (
         cardapio.receita.ingredientes.all()
         if cardapio
-        else FatorConsumo.objects.filter(ativo=True)
+        else FatorConsumo.objects.filter(produto__escola=escola, ativo=True)
         .select_related("produto", "produto__grupo__categoria")
         .order_by("produto_id")
     )
@@ -97,12 +106,13 @@ def gerar_plano_do_dia(*, data, turno, refeicao=None):
     }
 
 
-def baixa_de_producao(*, data, turno, refeicao=None, itens_override=None, user=None):
+def baixa_de_producao(*, data, turno, refeicao=None, itens_override=None, user=None, escola=None):
     """
     Baixa cada item da ordem de produção individualmente.
     Falha em um item não impede os demais (cada saída é transacional).
     """
-    plano = gerar_plano_do_dia(data=data, turno=turno, refeicao=refeicao)
+    plano = gerar_plano_do_dia(data=data, turno=turno, refeicao=refeicao, escola=escola)
+    escola = _resolver_escola(escola)
     overrides = {}
     if itens_override:
         overrides = {int(i["produto_id"]): i for i in itens_override}
@@ -122,7 +132,7 @@ def baixa_de_producao(*, data, turno, refeicao=None, itens_override=None, user=N
         override = overrides.get(pid, {})
         qtd = override.get("quantidade_override") or item["quantidade"]
         try:
-            produto = Produto.objects.get(pk=pid)
+            produto = Produto.objects.get(pk=pid, escola=escola)
             mov = registrar_movimentacao(
                 produto=produto,
                 tipo=Movimentacao.SAIDA,
@@ -130,6 +140,7 @@ def baixa_de_producao(*, data, turno, refeicao=None, itens_override=None, user=N
                 motivo="consumo",
                 data=data,
                 user=user,
+                escola=escola,
             )
             resultados.append({
                 "ok": True,
@@ -150,6 +161,7 @@ def baixa_de_producao(*, data, turno, refeicao=None, itens_override=None, user=N
     return {
         "data": data.isoformat(),
         "turno": turno,
+        "total_alunos": plano["total_alunos"],
         "resultados": resultados,
         "sucesso": sum(1 for r in resultados if r["ok"]),
         "falhas": sum(1 for r in resultados if not r["ok"]),
@@ -167,11 +179,12 @@ def _normalizar_itens_solicitados(itens):
 
 
 @transaction.atomic
-def executar_baixa_idempotente(*, operacao_id, data, refeicao, itens=None, user=None):
+def executar_baixa_idempotente(*, operacao_id, data, refeicao, itens=None, user=None, escola=None):
+    escola = _resolver_escola(escola)
     itens_normalizados = _normalizar_itens_solicitados(itens)
     operacao_existente = (
         OperacaoBaixaProducao.objects.select_for_update()
-        .filter(operacao_id=operacao_id)
+        .filter(escola=escola, operacao_id=operacao_id)
         .first()
     )
 
@@ -191,6 +204,7 @@ def executar_baixa_idempotente(*, operacao_id, data, refeicao, itens=None, user=
         return resultado_anterior
 
     operacao, criada = OperacaoBaixaProducao.objects.select_for_update().get_or_create(
+        escola=escola,
         data=data,
         refeicao=refeicao,
         defaults={
@@ -214,6 +228,7 @@ def executar_baixa_idempotente(*, operacao_id, data, refeicao, itens=None, user=
         refeicao=refeicao,
         itens_override=itens_normalizados,
         user=user,
+        escola=escola,
     )
     status_operacao = (
         OperacaoBaixaProducao.PARCIAL
@@ -231,4 +246,15 @@ def executar_baixa_idempotente(*, operacao_id, data, refeicao, itens=None, user=
     operacao.status = status_operacao
     operacao.resultado = resultado
     operacao.save(update_fields=["status", "resultado", "atualizado_em"])
+    RegistroRefeicao.objects.update_or_create(
+        escola=escola,
+        data=data,
+        refeicao=refeicao,
+        defaults={
+            "operacao": operacao,
+            "porcoes_planejadas": resultado.get("total_alunos", 0),
+            "porcoes_produzidas": resultado.get("total_alunos", 0),
+            "fonte": RegistroRefeicao.AUTOMATICA,
+        },
+    )
     return resultado

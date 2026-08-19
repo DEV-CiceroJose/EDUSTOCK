@@ -1,7 +1,45 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from .models import Modulo, Perfil
+from .models import Escola, Modulo, Municipio, Perfil, VinculoUsuario
+
+
+class MunicipioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Municipio
+        fields = ["id", "nome", "uf", "slug", "codigo_ibge", "ativo"]
+
+
+class EscolaSerializer(serializers.ModelSerializer):
+    municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+
+    class Meta:
+        model = Escola
+        fields = [
+            "id", "municipio", "municipio_nome", "nome", "slug",
+            "codigo_inep", "ativa",
+        ]
+
+
+class VinculoUsuarioSerializer(serializers.ModelSerializer):
+    usuario_nome = serializers.CharField(source="user.username", read_only=True)
+    escola_nome = serializers.CharField(source="escola.nome", read_only=True)
+    municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+
+    class Meta:
+        model = VinculoUsuario
+        fields = [
+            "id", "user", "usuario_nome", "municipio", "municipio_nome",
+            "escola", "escola_nome", "papel", "ativo",
+        ]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        municipio = getattr(getattr(request, "auth", None), "municipio", None)
+        escola = attrs.get("escola", getattr(self.instance, "escola", None))
+        if municipio and escola and escola.municipio_id != municipio.pk:
+            raise serializers.ValidationError({"escola": "Escola fora do município autorizado."})
+        return attrs
 
 
 class ModuloSerializer(serializers.ModelSerializer):

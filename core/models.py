@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
@@ -9,6 +9,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password, identify_hasher, make_password
 from django.utils.crypto import salted_hmac
 from django.utils import timezone
+from plataforma.models import escola_padrao_id
 
 
 REFEICAO_CHOICES = [
@@ -19,10 +20,19 @@ REFEICAO_CHOICES = [
 
 
 class Categoria(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="categorias",
+        default=escola_padrao_id,
+    )
+    name = models.CharField(max_length=100)
 
     class Meta:
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["escola", "name"], name="unique_categoria_por_escola"
+            )
+        ]
         verbose_name = "Categoria"
         verbose_name_plural = "Categorias"
 
@@ -31,6 +41,10 @@ class Categoria(models.Model):
 
 
 class Grupo(models.Model):
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="grupos",
+        default=escola_padrao_id,
+    )
     nome = models.CharField(max_length=100)
     categoria = models.ForeignKey(
         Categoria, on_delete=models.PROTECT, related_name="grupos"
@@ -40,7 +54,7 @@ class Grupo(models.Model):
         ordering = ["categoria__name", "nome"]
         constraints = [
             models.UniqueConstraint(
-                fields=["categoria", "nome"], name="unique_grupo_por_categoria"
+                fields=["escola", "categoria", "nome"], name="unique_grupo_por_categoria"
             )
         ]
 
@@ -62,6 +76,10 @@ class Produto(models.Model):
         ("EVENTUAL", "Eventual"),
     ]
 
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="produtos",
+        default=escola_padrao_id,
+    )
     nome = models.CharField("Nome", max_length=200)
     grupo = models.ForeignKey("Grupo", on_delete=models.PROTECT, related_name="produtos")
     fornecedor = models.ForeignKey(
@@ -94,6 +112,10 @@ class Produto(models.Model):
 
 
 class Fornecedor(models.Model):
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="fornecedores",
+        default=escola_padrao_id,
+    )
     nome = models.CharField(max_length=200)
     documento = models.CharField("CNPJ/CPF", max_length=20, blank=True)
     endereco = models.CharField(max_length=200, blank=True)
@@ -131,8 +153,12 @@ class BemPermanente(models.Model):
         ("INSERVIVEL", "Inservível"),
     ]
 
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="bens_permanentes",
+        default=escola_padrao_id,
+    )
     nome = models.CharField(max_length=200)
-    numero_patrimonio = models.CharField(max_length=50, null=True, blank=True, unique=True)
+    numero_patrimonio = models.CharField(max_length=50, null=True, blank=True)
     localizacao = models.CharField(max_length=150, blank=True)
     responsavel = models.CharField(max_length=150, blank=True)
     estado_conservacao = models.CharField(max_length=10, choices=ESTADO_CHOICES, default="BOM")
@@ -150,6 +176,13 @@ class BemPermanente(models.Model):
 
     class Meta:
         ordering = ["nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["escola", "numero_patrimonio"],
+                condition=Q(numero_patrimonio__isnull=False),
+                name="unique_patrimonio_por_escola",
+            )
+        ]
         verbose_name = "Bem permanente"
         verbose_name_plural = "Bens permanentes"
 
@@ -158,6 +191,10 @@ class BemPermanente(models.Model):
 
 
 class Entrada(models.Model):
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="entradas",
+        default=escola_padrao_id,
+    )
     fornecedor = models.ForeignKey(
         "Fornecedor", on_delete=models.PROTECT, null=True, blank=True, related_name="entradas"
     )
@@ -187,6 +224,10 @@ class Entrada(models.Model):
 
 
 class LoteEstoque(models.Model):
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="lotes_estoque",
+        default=escola_padrao_id,
+    )
     produto = models.ForeignKey(Produto, on_delete=models.PROTECT, related_name="lotes")
     entrada = models.ForeignKey(
         Entrada,
@@ -204,7 +245,9 @@ class LoteEstoque(models.Model):
     class Meta:
         ordering = [models.F("validade").asc(nulls_last=True), "criado_em"]
         constraints = [
-            models.UniqueConstraint(fields=["produto", "codigo"], name="unique_lote_por_produto"),
+            models.UniqueConstraint(
+                fields=["escola", "produto", "codigo"], name="unique_lote_por_produto"
+            ),
             models.CheckConstraint(condition=Q(quantidade__gte=0), name="lote_quantidade_nao_negativa"),
         ]
         verbose_name = "Lote de estoque"
@@ -219,6 +262,10 @@ class Movimentacao(models.Model):
     SAIDA = "SAIDA"
     TIPO_CHOICES = [(ENTRADA, "Entrada"), (SAIDA, "Saída")]
 
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="movimentacoes",
+        default=escola_padrao_id,
+    )
     produto = models.ForeignKey("Produto", on_delete=models.PROTECT, related_name="movimentacoes")
     tipo = models.CharField(max_length=7, choices=TIPO_CHOICES, db_index=True)
     quantidade = models.DecimalField(max_digits=10, decimal_places=3)
@@ -280,6 +327,10 @@ class FrequenciaDiaria(models.Model):
         (INTEGRAL, "Integral"),
     ]
 
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="frequencias_diarias",
+        default=escola_padrao_id,
+    )
     data = models.DateField(default=timezone.localdate)
     turno = models.CharField(max_length=8, choices=TURNO_CHOICES)
     turma = models.CharField(max_length=20)
@@ -302,7 +353,7 @@ class FrequenciaDiaria(models.Model):
         ordering = ["-data", "turno", "turma"]
         constraints = [
             models.UniqueConstraint(
-                fields=["data", "turno", "turma"],
+                fields=["escola", "data", "turno", "turma"],
                 name="unique_frequencia_por_turma_turno_dia",
             )
         ]
@@ -329,13 +380,22 @@ class FatorConsumo(models.Model):
 
 
 class Receita(models.Model):
-    nome = models.CharField(max_length=150, unique=True)
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="receitas",
+        default=escola_padrao_id,
+    )
+    nome = models.CharField(max_length=150)
     refeicao = models.CharField(max_length=12, choices=REFEICAO_CHOICES)
     ativa = models.BooleanField(default=True)
     observacao = models.TextField(blank=True)
 
     class Meta:
         ordering = ["refeicao", "nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["escola", "nome"], name="unique_receita_por_escola"
+            )
+        ]
 
     def __str__(self):
         return self.nome
@@ -364,6 +424,10 @@ class ReceitaIngrediente(models.Model):
 
 
 class Cardapio(models.Model):
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="cardapios",
+        default=escola_padrao_id,
+    )
     data = models.DateField(db_index=True)
     refeicao = models.CharField(max_length=12, choices=REFEICAO_CHOICES)
     receita = models.ForeignKey(Receita, on_delete=models.PROTECT, related_name="cardapios")
@@ -373,7 +437,7 @@ class Cardapio(models.Model):
         ordering = ["-data", "refeicao"]
         constraints = [
             models.UniqueConstraint(
-                fields=["data", "refeicao"],
+                fields=["escola", "data", "refeicao"],
                 name="unique_cardapio_por_refeicao_dia",
             )
         ]
@@ -403,6 +467,10 @@ class OperacaoBaixaProducao(models.Model):
         (PARCIAL, "Parcial"),
     ]
 
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="operacoes_baixa",
+        default=escola_padrao_id,
+    )
     operacao_id = models.UUIDField(unique=True, editable=False)
     data = models.DateField(db_index=True)
     refeicao = models.CharField(max_length=12, choices=REFEICAO_CHOICES)
@@ -416,7 +484,7 @@ class OperacaoBaixaProducao(models.Model):
         ordering = ["-criado_em"]
         constraints = [
             models.UniqueConstraint(
-                fields=["data", "refeicao"],
+                fields=["escola", "data", "refeicao"],
                 name="unique_baixa_producao_por_refeicao_dia",
             )
         ]
@@ -435,7 +503,11 @@ class Turma(models.Model):
     INTEGRAL = "INTEGRAL"
     TURNO_CHOICES = [(INTEGRAL, "Integral")]
 
-    nome = models.CharField(max_length=50, unique=True)
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="turmas",
+        default=escola_padrao_id,
+    )
+    nome = models.CharField(max_length=50)
     curso = models.CharField(max_length=3, choices=CURSO_CHOICES)
     ano = models.PositiveSmallIntegerField()
     turno = models.CharField(max_length=10, choices=TURNO_CHOICES, default=INTEGRAL)
@@ -443,6 +515,11 @@ class Turma(models.Model):
 
     class Meta:
         ordering = ["curso", "ano", "nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["escola", "nome"], name="unique_turma_por_escola"
+            )
+        ]
         verbose_name = "Turma"
         verbose_name_plural = "Turmas"
 
@@ -455,6 +532,10 @@ class PinAcesso(models.Model):
     COZINHA = "COZINHA"
     PAPEL_CHOICES = [(ALUNO_REP, "Representante de turma"), (COZINHA, "Equipe da cozinha")]
 
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="pins_acesso",
+        default=escola_padrao_id,
+    )
     papel = models.CharField(max_length=10, choices=PAPEL_CHOICES, default=ALUNO_REP)
     turma = models.ForeignKey(
         Turma, on_delete=models.CASCADE, null=True, blank=True, related_name="pins"
@@ -465,7 +546,6 @@ class PinAcesso(models.Model):
     )
     pin_fingerprint = models.CharField(
         max_length=64,
-        unique=True,
         editable=False,
     )
     titular = models.CharField(
@@ -479,6 +559,10 @@ class PinAcesso(models.Model):
         verbose_name = "PIN de acesso"
         verbose_name_plural = "PINs de acesso"
         constraints = [
+            models.UniqueConstraint(
+                fields=["escola", "pin_fingerprint"],
+                name="unique_pin_por_escola",
+            ),
             models.CheckConstraint(
                 condition=(
                     Q(papel="ALUNO_REP", turma__isnull=False)
@@ -528,7 +612,8 @@ class PinAcesso(models.Model):
             )(pin_aberto)
             fingerprint = self.gerar_fingerprint(pin_aberto)
             if type(self).objects.exclude(pk=self.pk).filter(
-                pin_fingerprint=fingerprint
+                escola_id=self.escola_id,
+                pin_fingerprint=fingerprint,
             ).exists():
                 raise ValidationError({"pin": "Este PIN já está em uso."})
             self.definir_pin(pin_aberto)
@@ -553,6 +638,10 @@ class PinAcesso(models.Model):
 class ConfiguracaoAlertas(models.Model):
     """Parâmetros globais editáveis pela administração da escola."""
 
+    escola = models.OneToOneField(
+        "plataforma.Escola", on_delete=models.CASCADE, related_name="configuracao_alertas",
+        default=escola_padrao_id,
+    )
     critico_dias = models.PositiveSmallIntegerField(
         "Prazo crítico de validade (dias)",
         default=7,
@@ -589,14 +678,191 @@ class ConfiguracaoAlertas(models.Model):
             )
 
     def save(self, *args, **kwargs):
-        self.pk = 1
+        existente = type(self).objects.filter(escola_id=self.escola_id).first()
+        if existente and self.pk is None:
+            self.pk = existente.pk
         self.full_clean()
         return super().save(*args, **kwargs)
 
     @classmethod
-    def carregar(cls):
-        configuracao, _ = cls.objects.get_or_create(pk=1)
+    def carregar(cls, escola=None):
+        escola_id = getattr(escola, "pk", escola) or escola_padrao_id()
+        configuracao, _ = cls.objects.get_or_create(escola_id=escola_id)
         return configuracao
+
+
+class CatalogoProdutoMunicipal(models.Model):
+    """Item de referência da rede, importável e adaptável em cada escola."""
+
+    municipio = models.ForeignKey(
+        "plataforma.Municipio", on_delete=models.CASCADE, related_name="catalogo_produtos"
+    )
+    nome = models.CharField(max_length=200)
+    categoria = models.CharField(max_length=100)
+    grupo = models.CharField(max_length=100)
+    unidade = models.CharField(max_length=2, choices=Produto.UNIDADE_CHOICES)
+    estoque_minimo_sugerido = models.DecimalField(
+        max_digits=10, decimal_places=3, default=0
+    )
+    perecivel = models.BooleanField(default=False)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["categoria", "grupo", "nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["municipio", "nome", "unidade"],
+                name="unique_item_catalogo_municipal",
+            )
+        ]
+        verbose_name = "Item do catálogo municipal"
+        verbose_name_plural = "Itens do catálogo municipal"
+
+    def __str__(self):
+        return f"{self.nome} · {self.municipio}"
+
+
+class CardapioModeloMunicipal(models.Model):
+    """Modelo central; ingredientes referenciam o catálogo e são copiados para a escola."""
+
+    municipio = models.ForeignKey(
+        "plataforma.Municipio", on_delete=models.CASCADE, related_name="cardapios_modelo"
+    )
+    nome = models.CharField(max_length=150)
+    refeicao = models.CharField(max_length=12, choices=REFEICAO_CHOICES)
+    ingredientes = models.JSONField(default=list)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["refeicao", "nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["municipio", "nome"], name="unique_cardapio_modelo_municipio"
+            )
+        ]
+        verbose_name = "Cardápio modelo municipal"
+        verbose_name_plural = "Cardápios modelo municipais"
+
+    def clean(self):
+        super().clean()
+        if not isinstance(self.ingredientes, list):
+            raise ValidationError({"ingredientes": "Informe uma lista de ingredientes."})
+        for item in self.ingredientes:
+            if not isinstance(item, dict) or not item.get("catalogo_produto_id"):
+                raise ValidationError(
+                    {"ingredientes": "Cada ingrediente exige catalogo_produto_id."}
+                )
+            try:
+                gramas = Decimal(str(item.get("gramas_por_aluno")))
+            except (InvalidOperation, TypeError, ValueError):
+                raise ValidationError(
+                    {"ingredientes": "gramas_por_aluno deve ser numérico."}
+                ) from None
+            if gramas <= 0:
+                raise ValidationError(
+                    {"ingredientes": "gramas_por_aluno deve ser maior que zero."}
+                )
+
+    def __str__(self):
+        return f"{self.nome} · {self.get_refeicao_display()}"
+
+
+class RegistroRefeicao(models.Model):
+    """Evidência operacional para impacto, desperdício e aderência ao cardápio."""
+
+    AUTOMATICA = "AUTOMATICA"
+    MANUAL = "MANUAL"
+    FONTE_CHOICES = [(AUTOMATICA, "Automática"), (MANUAL, "Manual")]
+
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="registros_refeicao",
+        default=escola_padrao_id,
+    )
+    operacao = models.OneToOneField(
+        OperacaoBaixaProducao,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="registro_impacto",
+    )
+    data = models.DateField(db_index=True)
+    refeicao = models.CharField(max_length=12, choices=REFEICAO_CHOICES)
+    porcoes_planejadas = models.PositiveIntegerField(default=0)
+    porcoes_produzidas = models.PositiveIntegerField(default=0)
+    porcoes_servidas = models.PositiveIntegerField(default=0)
+    sobra_limpa_kg = models.DecimalField(max_digits=10, decimal_places=3, default=0)
+    descarte_kg = models.DecimalField(max_digits=10, decimal_places=3, default=0)
+    custo_estimado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cardapio_atendido = models.BooleanField(default=True)
+    fonte = models.CharField(max_length=10, choices=FONTE_CHOICES, default=MANUAL)
+    observacao = models.TextField(blank=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-data", "refeicao"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["escola", "data", "refeicao"],
+                name="unique_registro_refeicao_escola_dia",
+            ),
+            models.CheckConstraint(condition=Q(sobra_limpa_kg__gte=0), name="sobra_nao_negativa"),
+            models.CheckConstraint(condition=Q(descarte_kg__gte=0), name="descarte_nao_negativo"),
+            models.CheckConstraint(condition=Q(custo_estimado__gte=0), name="custo_nao_negativo"),
+        ]
+        verbose_name = "Registro de refeição"
+        verbose_name_plural = "Registros de refeições"
+
+    def clean(self):
+        super().clean()
+        if self.porcoes_servidas > self.porcoes_produzidas:
+            raise ValidationError(
+                {"porcoes_servidas": "Porções servidas não podem superar as produzidas."}
+            )
+        if self.operacao_id and self.operacao.escola_id != self.escola_id:
+            raise ValidationError({"operacao": "A operação deve pertencer à mesma escola."})
+
+    def __str__(self):
+        return f"{self.escola} · {self.data} · {self.get_refeicao_display()}"
+
+
+class ContagemEstoque(models.Model):
+    """Conferência física rastreável usada para medir divergência de estoque."""
+
+    escola = models.ForeignKey(
+        "plataforma.Escola", on_delete=models.PROTECT, related_name="contagens_estoque",
+        default=escola_padrao_id,
+    )
+    produto = models.ForeignKey(Produto, on_delete=models.PROTECT, related_name="contagens_fisicas")
+    data = models.DateField(default=timezone.localdate, db_index=True)
+    quantidade_sistema = models.DecimalField(max_digits=10, decimal_places=3)
+    quantidade_fisica = models.DecimalField(max_digits=10, decimal_places=3)
+    observacao = models.TextField(blank=True)
+    criado_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="contagens_estoque_criadas"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data", "produto__nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["escola", "produto", "data"], name="unique_contagem_produto_escola_dia"
+            ),
+            models.CheckConstraint(condition=Q(quantidade_fisica__gte=0), name="contagem_fisica_nao_negativa"),
+            models.CheckConstraint(condition=Q(quantidade_sistema__gte=0), name="contagem_sistema_nao_negativa"),
+        ]
+
+    @property
+    def divergencia(self):
+        return self.quantidade_fisica - self.quantidade_sistema
+
+    def clean(self):
+        super().clean()
+        if self.produto_id and self.produto.escola_id != self.escola_id:
+            raise ValidationError({"produto": "O produto deve pertencer à mesma escola."})
+
+    def __str__(self):
+        return f"{self.escola} · {self.produto} · {self.data}"
 
 
 class CacheEntry(models.Model):

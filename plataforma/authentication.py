@@ -16,7 +16,7 @@ class TokenAcessoAuthentication(BaseAuthentication):
 
         token_str = header[len(self.keyword) + 1:].strip()
         try:
-            token = TokenAcesso.objects.select_related("user").get(
+            token = TokenAcesso.objects.select_related("user", "municipio", "escola").get(
                 token_hash=TokenAcesso.calcular_hash(token_str)
             )
         except (TokenAcesso.DoesNotExist, ValueError, ValidationError):

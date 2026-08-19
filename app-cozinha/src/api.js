@@ -6,19 +6,30 @@
 import { createOfflineQueue, createOperacaoHttpClient } from "@edustock/operacao-shared"
 
 const OPERACOES_PENDENTES_KEY = "cozinha_operacoes_pendentes"
+const SESSION_KEY = "cozinha_sessao"
 const http = createOperacaoHttpClient({
   baseUrl: import.meta.env.VITE_API_BASE ?? "",
   tokenKey: "cozinha_token",
 })
 const filaBaixas = createOfflineQueue({
   storageKey: "edustock:cozinha:fila-baixas",
-  send: (body) => http.request("POST", "/api/operacao/baixa-de-producao/", body, { retry: false }),
+  send: (body) => {
+    const { _escola_id, ...payload } = body
+    if (getSessao()?.escola?.id !== _escola_id) {
+      const error = new Error("Aguardando a sessão da escola que criou esta baixa.")
+      error.status = 401
+      throw error
+    }
+    return http.request("POST", "/api/operacao/baixa-de-producao/", payload, { retry: false })
+  },
 })
 
 export async function login(pin) {
+  const escola = import.meta.env.VITE_ESCOLA_CODIGO
   const data = await http.request("POST", "/api/operacao/auth/", {
     pin,
     perfil: "COZINHA",
+    ...(escola ? { escola } : {}),
   })
 
   if (!data?.token || data?.perfil !== "COZINHA") {
@@ -26,12 +37,14 @@ export async function login(pin) {
   }
 
   http.setToken(data.token)
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ perfil: data.perfil, escola: data.escola }))
   void sincronizarBaixasPendentes()
   return data
 }
 
 export function limparSessao() {
   http.clearToken()
+  sessionStorage.removeItem(SESSION_KEY)
 }
 
 export async function logout() {
@@ -45,6 +58,10 @@ export async function logout() {
 
 export function isLoggedIn() {
   return http.isLoggedIn()
+}
+
+export function getSessao() {
+  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? "null") } catch { return null }
 }
 
 function lerOperacoesPendentes() {
@@ -103,7 +120,7 @@ export async function baixaProducao(data, refeicao, itens, operacaoId = obterOpe
     return await http.request("POST", "/api/operacao/baixa-de-producao/", body, { retry: false })
   } catch (error) {
     if (!error.status) {
-      filaBaixas.add(body)
+      filaBaixas.add({ ...body, _escola_id: getSessao()?.escola?.id })
       error.enfileirada = true
     }
     throw error

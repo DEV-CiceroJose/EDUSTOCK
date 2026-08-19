@@ -1,8 +1,9 @@
 from decimal import Decimal
 
 from django.utils import timezone
+from django.db import transaction
 from rest_framework import serializers
-from plataforma.permissions import slugs_modulos_do_usuario
+from plataforma.permissions import escola_do_request, slugs_modulos_do_usuario
 
 from .models import (
     BemPermanente,
@@ -124,6 +125,16 @@ class ProdutoSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSeria
         ]
         read_only_fields = ["quantidade", "criado_por_nome", "criado_em", "atualizado_em"]
 
+    def validate(self, attrs):
+        escola = escola_do_request(self.context.get("request"))
+        grupo = attrs.get("grupo", getattr(self.instance, "grupo", None))
+        fornecedor = attrs.get("fornecedor", getattr(self.instance, "fornecedor", None))
+        if escola and grupo and grupo.escola_id != escola.pk:
+            raise serializers.ValidationError({"grupo": "Grupo não pertence à escola autenticada."})
+        if escola and fornecedor and fornecedor.escola_id != escola.pk:
+            raise serializers.ValidationError({"fornecedor": "Fornecedor não pertence à escola autenticada."})
+        return attrs
+
 
 class GrupoSerializer(serializers.ModelSerializer):
     categoria_nome = serializers.CharField(source="categoria.name", read_only=True)
@@ -131,6 +142,12 @@ class GrupoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Grupo
         fields = ["id", "nome", "categoria", "categoria_nome"]
+
+    def validate_categoria(self, categoria):
+        escola = escola_do_request(self.context.get("request"))
+        if escola and categoria.escola_id != escola.pk:
+            raise serializers.ValidationError("Categoria não pertence à escola autenticada.")
+        return categoria
 
 
 class BemPermanenteSerializer(serializers.ModelSerializer):
@@ -167,6 +184,12 @@ class MovimentacaoSerializer(CamposFinanceirosProtegidosMixin, serializers.Model
         ]
         read_only_fields = ["entrada", "criado_em"]
 
+    def validate_produto(self, produto):
+        escola = escola_do_request(self.context.get("request"))
+        if escola and produto.escola_id != escola.pk:
+            raise serializers.ValidationError("Produto não pertence à escola autenticada.")
+        return produto
+
 
 class EntradaItemSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSerializer):
     campos_financeiros = ("preco_unitario",)
@@ -180,6 +203,13 @@ class EntradaItemSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelS
             "produto", "produto_nome", "quantidade", "preco_unitario",
             "codigo_lote", "validade",
         ]
+
+    def validate_produto(self, produto):
+        request = self.context.get("request") or self.parent.context.get("request")
+        escola = escola_do_request(request)
+        if escola and produto.escola_id != escola.pk:
+            raise serializers.ValidationError("Produto não pertence à escola autenticada.")
+        return produto
 
 
 class EntradaSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSerializer):
@@ -210,7 +240,7 @@ class EntradaSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSeria
             numero_nota_fiscal=validated_data.get("numero_nota_fiscal", ""),
             data=validated_data.get("data"),
             observacao=validated_data.get("observacao", ""),
-            itens=itens, user=user,
+            itens=itens, user=user, escola=escola_do_request(request),
         )
 
 
@@ -235,11 +265,43 @@ class ReceitaIngredienteSerializer(serializers.ModelSerializer):
 
 
 class ReceitaSerializer(serializers.ModelSerializer):
-    ingredientes = ReceitaIngredienteSerializer(many=True, read_only=True)
+    ingredientes = ReceitaIngredienteSerializer(many=True, required=False)
 
     class Meta:
         model = Receita
         fields = ["id", "nome", "refeicao", "ativa", "observacao", "ingredientes"]
+
+    def validate_ingredientes(self, ingredientes):
+        escola = escola_do_request(self.context.get("request"))
+        ids = []
+        for item in ingredientes:
+            produto = item["produto"]
+            if escola and produto.escola_id != escola.pk:
+                raise serializers.ValidationError("Todos os produtos devem pertencer à escola autenticada.")
+            ids.append(produto.pk)
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError("Cada produto pode aparecer apenas uma vez.")
+        return ingredientes
+
+    @transaction.atomic
+    def create(self, validated_data):
+        ingredientes = validated_data.pop("ingredientes", [])
+        receita = Receita.objects.create(**validated_data)
+        ReceitaIngrediente.objects.bulk_create(
+            [ReceitaIngrediente(receita=receita, **item) for item in ingredientes]
+        )
+        return receita
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        ingredientes = validated_data.pop("ingredientes", None)
+        instance = super().update(instance, validated_data)
+        if ingredientes is not None:
+            instance.ingredientes.all().delete()
+            ReceitaIngrediente.objects.bulk_create(
+                [ReceitaIngrediente(receita=instance, **item) for item in ingredientes]
+            )
+        return instance
 
 
 class CardapioSerializer(serializers.ModelSerializer):
@@ -254,4 +316,7 @@ class CardapioSerializer(serializers.ModelSerializer):
         refeicao = attrs.get("refeicao", getattr(self.instance, "refeicao", None))
         if receita and refeicao and receita.refeicao != refeicao:
             raise serializers.ValidationError({"receita": "A receita deve pertencer à mesma refeição."})
+        escola = escola_do_request(self.context.get("request"))
+        if escola and receita and receita.escola_id != escola.pk:
+            raise serializers.ValidationError({"receita": "Receita não pertence à escola autenticada."})
         return attrs

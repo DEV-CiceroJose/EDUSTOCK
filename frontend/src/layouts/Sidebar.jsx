@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { NavLink } from "react-router-dom"
 import { Icon } from "../lib/icons.jsx"
-import { getModulosAtivos, ehAdmin } from "../lib/auth"
+import { getModulosAtivos, ehAdmin, podeVerRede } from "../lib/auth"
 
 const navItems = [
   { to: "/inventario", label: "Inventário", icon: "grid", section: "Operacional", modulo: "inventario" },
@@ -10,6 +10,7 @@ const navItems = [
   { to: "/fornecedores", label: "Fornecedores", icon: "users", section: "Gestão", modulo: "fornecedores" },
   { to: "/relatorios", label: "Relatórios", icon: "report", section: "Gestão", modulo: "relatorios" },
   { to: "/merenda", label: "Merenda", icon: "food", section: "Gestão", modulo: "merenda" },
+  { to: "/rede", label: "Painel municipal", icon: "report", section: "Gestão", modulo: null, somenteRede: true },
   { to: "/perfil", label: "Perfil", icon: "home", section: "Sistema", modulo: null },
   { to: "/configuracoes", label: "Configurações", icon: "gear", section: "Sistema", modulo: null },
   { to: "/admin/modulos", label: "Módulos", icon: "gear", section: "Sistema", modulo: null, somenteAdmin: true },
@@ -27,6 +28,7 @@ export default function Sidebar({ mobile = false, onNavigate, onClose }) {
   const modulosAtivos = getModulosAtivos()
   const itensVisiveis = navItems.filter((item) => {
     if (item.somenteAdmin && !ehAdmin()) return false
+    if (item.somenteRede && !podeVerRede()) return false
     return !item.modulo || modulosAtivos.includes(item.modulo)
   })
   const sections = ["Operacional", "Gestão", "Sistema"]
