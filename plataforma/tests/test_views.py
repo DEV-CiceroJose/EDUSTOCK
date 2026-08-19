@@ -1,14 +1,18 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from plataforma.models import Modulo, Perfil, TokenAcesso
+from plataforma.models import Modulo, Perfil, RegistroAuditoria, TokenAcesso
+from plataforma.views import UsuarioViewSet
 
 
 class LoginViewTest(APITestCase):
     def setUp(self):
+        cache.clear()
         self.user = User.objects.create_user(username="joao", password="senha-boa-123")
         # A migração 0002_seed_modulos já popula "inventario", "merenda" e
         # outros módulos como ativos. Ajustamos os dados existentes em vez
@@ -16,7 +20,7 @@ class LoginViewTest(APITestCase):
         Modulo.objects.update(ativo=False)
         Modulo.objects.filter(slug="inventario").update(ativo=True)
 
-    def test_login_com_credenciais_corretas_retorna_token_e_modulos(self):
+    def test_login_de_conta_nova_nao_concede_modulos_implicitamente(self):
         resp = self.client.post(
             "/api/auth/login/",
             {"username": "joao", "password": "senha-boa-123"},
@@ -28,7 +32,7 @@ class LoginViewTest(APITestCase):
         self.assertFalse(resp.data["is_staff"])
         self.assertEqual(resp.data["username"], "joao")
         self.assertEqual(resp.data["nome"], "joao")
-        self.assertEqual(resp.data["modulos_ativos"], ["inventario"])
+        self.assertEqual(resp.data["modulos_ativos"], [])
 
     def test_login_retorna_first_name_como_nome_quando_definido(self):
         self.user.first_name = "João Silva"
@@ -51,11 +55,44 @@ class LoginViewTest(APITestCase):
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertTrue(resp.data["is_staff"])
 
+    def test_login_retorna_apenas_modulos_atribuidos_ao_operador(self):
+        fornecedor = Modulo.objects.get(slug="fornecedores")
+        fornecedor.ativo = True
+        fornecedor.save(update_fields=["ativo"])
+        inventario = Modulo.objects.get(slug="inventario")
+        perfil, _ = Perfil.objects.get_or_create(user=self.user)
+        perfil.modulos.set([inventario])
+
+        resp = self.client.post(
+            "/api/auth/login/",
+            {"username": "joao", "password": "senha-boa-123"},
+            format="json",
+        )
+
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.data["modulos_ativos"], ["inventario"])
+
     def test_login_com_senha_errada_retorna_401(self):
         resp = self.client.post(
             "/api/auth/login/", {"username": "joao", "password": "errada"}, format="json"
         )
         self.assertEqual(resp.status_code, 401)
+
+    def test_login_bloqueia_apos_cinco_falhas(self):
+        for _ in range(5):
+            resposta = self.client.post(
+                "/api/auth/login/",
+                {"username": "joao", "password": "errada"},
+                format="json",
+            )
+            self.assertEqual(resposta.status_code, 401)
+        bloqueada = self.client.post(
+            "/api/auth/login/",
+            {"username": "joao", "password": "senha-boa-123"},
+            format="json",
+        )
+        self.assertEqual(bloqueada.status_code, 429)
+        self.assertIn("Retry-After", bloqueada.headers)
 
 
 class LogoutViewTest(APITestCase):
@@ -140,8 +177,9 @@ class UsuarioViewSetTest(APITestCase):
 
     def test_admin_cria_operador(self):
         self._autenticar_admin()
+        modulo = Modulo.objects.get(slug="inventario")
         resp = self.client.post("/api/usuarios/", {
-            "username": "maria", "password": "senha-boa-123", "papel": "OPERADOR",
+            "username": "maria", "password": "senha-boa-123", "papel": "OPERADOR", "modulos": [modulo.slug],
         }, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
         maria = User.objects.get(username="maria")
@@ -183,14 +221,154 @@ class UsuarioViewSetTest(APITestCase):
     def test_admin_cria_usuario_sem_senha(self):
         """password é required=False: criar sem senha deve dar 201, não 500."""
         self._autenticar_admin()
+        modulo = Modulo.objects.get(slug="inventario")
         resp = self.client.post("/api/usuarios/", {
-            "username": "joao", "papel": "OPERADOR",
+            "username": "joao", "papel": "OPERADOR", "modulos": [modulo.slug],
         }, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
         joao = User.objects.get(username="joao")
         self.assertEqual(joao.perfil.papel, "OPERADOR")
         # sem senha usável — não pode autenticar por senha, mas a conta existe
         self.assertFalse(joao.has_usable_password())
+
+    def test_novo_operador_exige_modulos_explicitos(self):
+        self._autenticar_admin()
+
+        resposta = self.client.post(
+            "/api/usuarios/", {"username": "sem-modulos", "papel": "OPERADOR"}, format="json"
+        )
+
+        self.assertEqual(resposta.status_code, 400)
+        self.assertIn("modulos", resposta.data)
+
+    def test_perfil_legado_sem_modulos_permanece_compativel(self):
+        self._autenticar_admin()
+        legado = User.objects.create_user(username="legado", password="x")
+        Perfil.objects.create(
+            user=legado, papel=Perfil.OPERADOR, acesso_legado=True
+        )
+
+        resposta = self.client.patch(f"/api/usuarios/{legado.pk}/", {"papel": "OPERADOR"}, format="json")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+
+    def test_atribuir_modulos_converte_perfil_legado_em_explicito(self):
+        self._autenticar_admin()
+        legado = User.objects.create_user(username="legado-explicito", password="x")
+        perfil = Perfil.objects.create(
+            user=legado, papel=Perfil.OPERADOR, acesso_legado=True
+        )
+        modulo = Modulo.objects.get(slug="inventario")
+
+        resposta = self.client.patch(
+            f"/api/usuarios/{legado.pk}/",
+            {"modulos": [modulo.slug]},
+            format="json",
+        )
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        perfil.refresh_from_db()
+        self.assertFalse(perfil.acesso_legado)
+
+    def test_admin_desativa_usuario_e_revoga_todos_os_tokens(self):
+        self._autenticar_admin()
+        operador = User.objects.create_user(username="maria", password="x")
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        TokenAcesso.objects.create(user=operador, expira_em=timezone.now() + timedelta(hours=1))
+        TokenAcesso.objects.create(user=operador, expira_em=timezone.now() + timedelta(hours=1))
+
+        resposta = self.client.patch(f"/api/usuarios/{operador.pk}/", {"is_active": False}, format="json")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        operador.refresh_from_db()
+        self.assertFalse(operador.is_active)
+        self.assertFalse(TokenAcesso.objects.filter(user=operador).exists())
+
+    def test_nao_desativa_ultimo_admin_ativo(self):
+        self._autenticar_admin()
+        admin = User.objects.get(username="admin1")
+
+        resposta = self.client.patch(f"/api/usuarios/{admin.pk}/", {"is_active": False}, format="json")
+
+        self.assertEqual(resposta.status_code, 400)
+        admin.refresh_from_db()
+        self.assertTrue(admin.is_active)
+
+    def test_nao_rebaixa_ultimo_admin_ativo_para_operador(self):
+        self._autenticar_admin()
+        admin = User.objects.get(username="admin1")
+
+        resposta = self.client.patch(
+            f"/api/usuarios/{admin.pk}/", {"papel": "OPERADOR"}, format="json"
+        )
+
+        self.assertEqual(resposta.status_code, 400)
+        admin.perfil.refresh_from_db()
+        self.assertEqual(admin.perfil.papel, Perfil.ADMIN)
+
+    def test_permite_transicao_de_admin_quando_ha_outro_admin_ativo(self):
+        self._autenticar_admin()
+        admin = User.objects.get(username="admin1")
+        outro_admin = User.objects.create_user(username="admin2", password="x")
+        Perfil.objects.create(user=outro_admin, papel=Perfil.ADMIN)
+
+        resposta = self.client.patch(
+            f"/api/usuarios/{admin.pk}/", {"papel": "OPERADOR"}, format="json"
+        )
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        admin.perfil.refresh_from_db()
+        self.assertEqual(admin.perfil.papel, Perfil.OPERADOR)
+        self.assertTrue(outro_admin.is_active)
+        self.assertEqual(outro_admin.perfil.papel, Perfil.ADMIN)
+
+    def test_transicao_critica_bloqueia_conjunto_de_admins_em_transacao(self):
+        self._autenticar_admin()
+        admin = User.objects.get(username="admin1")
+
+        with patch("plataforma.views.transaction.atomic") as atomic, patch.object(
+            UsuarioViewSet,
+            "_usuarios_com_bloqueio",
+            wraps=UsuarioViewSet._usuarios_com_bloqueio,
+        ) as usuarios_com_bloqueio:
+            resposta = self.client.patch(
+                f"/api/usuarios/{admin.pk}/", {"is_active": False}, format="json"
+            )
+
+        self.assertEqual(resposta.status_code, 400)
+        atomic.assert_called_once_with()
+        self.assertGreaterEqual(usuarios_com_bloqueio.call_count, 2)
+
+    def test_admin_redefine_senha_sem_auditar_segredo_e_revoga_sessoes(self):
+        self._autenticar_admin()
+        operador = User.objects.create_user(username="maria", password="senha-antiga")
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        TokenAcesso.objects.create(user=operador, expira_em=timezone.now() + timedelta(hours=1))
+
+        resposta = self.client.post(
+            f"/api/usuarios/{operador.pk}/senha/", {"password": "Nova-Senha-123"}, format="json"
+        )
+
+        self.assertEqual(resposta.status_code, 204, resposta.content)
+        operador.refresh_from_db()
+        self.assertTrue(operador.check_password("Nova-Senha-123"))
+        self.assertFalse(TokenAcesso.objects.filter(user=operador).exists())
+        auditoria = RegistroAuditoria.objects.latest("id")
+        self.assertEqual(auditoria.detalhes, {"campos": ["password"]})
+        self.assertNotIn("Nova-Senha-123", str(auditoria.detalhes))
+
+    def test_admin_revoga_sessoes_sem_alterar_usuario(self):
+        self._autenticar_admin()
+        operador = User.objects.create_user(username="maria", password="senha-antiga")
+        Perfil.objects.create(user=operador, papel=Perfil.OPERADOR)
+        TokenAcesso.objects.create(user=operador, expira_em=timezone.now() + timedelta(hours=1))
+
+        resposta = self.client.post(f"/api/usuarios/{operador.pk}/revogar-sessoes/", format="json")
+
+        self.assertEqual(resposta.status_code, 204, resposta.content)
+        operador.refresh_from_db()
+        self.assertTrue(operador.check_password("senha-antiga"))
+        self.assertFalse(TokenAcesso.objects.filter(user=operador).exists())
 
 
 class MeuPerfilViewTest(APITestCase):

@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from .models import (
+    Cardapio,
     FatorConsumo,
     FrequenciaDiaria,
     Movimentacao,
@@ -11,9 +12,6 @@ from .models import (
     Produto,
 )
 from .services import calcular_previsao_producao, registrar_movimentacao, total_frequencia
-
-UNIDADES_EM_GRAMAS = {"KG", "L"}
-
 
 class OperacaoIdReutilizado(Exception):
     pass
@@ -29,11 +27,23 @@ def _money_qty(val):
     return str(val.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP))
 
 
-def _calcular_quantidade_producao(*, fator, total_alunos, unidade):
-    base = fator.gramas_por_aluno * Decimal(total_alunos)
-    if unidade in UNIDADES_EM_GRAMAS:
-        return base / Decimal("1000")
-    return base
+def converter_consumo_para_estoque(produto, quantidade_consumo):
+    if not produto.unidade_consumo or not produto.conteudo_por_unidade:
+        raise ValidationError(
+            f"Configure a conversão de unidade de '{produto.nome}'."
+        )
+    if not Produto.conversao_dimensional_compativel(
+        produto.unidade, produto.unidade_consumo
+    ):
+        raise ValidationError(
+            f"A conversão de unidade de '{produto.nome}' é incompatível."
+        )
+    return Decimal(quantidade_consumo) / produto.conteudo_por_unidade
+
+
+def _calcular_quantidade_producao(*, fator, total_alunos):
+    quantidade_consumo = fator.quantidade_por_aluno * Decimal(total_alunos)
+    return converter_consumo_para_estoque(fator.produto, quantidade_consumo)
 
 
 def _unidade_legivel(unidade, quantidade):
@@ -47,20 +57,28 @@ def _unidade_legivel(unidade, quantidade):
     return f"{q} {nome}"
 
 
-def gerar_plano_do_dia(*, data, turno):
+def gerar_plano_do_dia(*, data, turno, refeicao=None):
     total_alunos = total_frequencia(data=data, turno=turno)
     previsao = calcular_previsao_producao(data, turno)
+    cardapio = None
+    if refeicao:
+        cardapio = (
+            Cardapio.objects.filter(data=data, refeicao=refeicao, receita__ativa=True)
+            .select_related("receita")
+            .prefetch_related("receita__ingredientes__produto__grupo__categoria")
+            .first()
+        )
     fatores = (
-        FatorConsumo.objects.filter(ativo=True)
+        cardapio.receita.ingredientes.all()
+        if cardapio
+        else FatorConsumo.objects.filter(ativo=True)
         .select_related("produto", "produto__grupo__categoria")
         .order_by("produto_id")
     )
     itens = []
     for f in fatores:
         p = f.produto
-        qtd = _calcular_quantidade_producao(
-            fator=f, total_alunos=total_alunos, unidade=p.unidade
-        )
+        qtd = _calcular_quantidade_producao(fator=f, total_alunos=total_alunos)
         if qtd <= 0:
             continue
         estoque_insuficiente = p.quantidade < qtd
@@ -73,7 +91,7 @@ def gerar_plano_do_dia(*, data, turno):
             "quantidade_legivel": _unidade_legivel(p.unidade, qtd),
             "saldo_atual": _money_qty(p.quantidade),
             "estoque_insuficiente": estoque_insuficiente,
-            "gramas_por_aluno": str(f.gramas_por_aluno),
+            "quantidade_por_aluno": str(f.quantidade_por_aluno),
         })
     return {
         "data": data.isoformat(),
@@ -81,15 +99,17 @@ def gerar_plano_do_dia(*, data, turno):
         "total_alunos": total_alunos,
         "previsao": previsao,
         "itens": itens,
+        "receita": cardapio.receita.nome if cardapio else None,
+        "origem_plano": "cardapio" if cardapio else "fatores_legados",
     }
 
 
-def baixa_de_producao(*, data, turno, itens_override=None, user=None):
+def baixa_de_producao(*, data, turno, refeicao=None, itens_override=None, user=None):
     """
     Baixa cada item da ordem de produção individualmente.
     Falha em um item não impede os demais (cada saída é transacional).
     """
-    plano = gerar_plano_do_dia(data=data, turno=turno)
+    plano = gerar_plano_do_dia(data=data, turno=turno, refeicao=refeicao)
     overrides = {}
     if itens_override:
         overrides = {int(i["produto_id"]): i for i in itens_override}
@@ -198,6 +218,7 @@ def executar_baixa_idempotente(*, operacao_id, data, refeicao, itens=None, user=
     resultado = baixa_de_producao(
         data=data,
         turno=FrequenciaDiaria.INTEGRAL,
+        refeicao=refeicao,
         itens_override=itens_normalizados,
         user=user,
     )

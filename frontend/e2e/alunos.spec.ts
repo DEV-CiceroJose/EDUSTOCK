@@ -15,6 +15,17 @@ test("representante entra com PIN e registra a presença da turma", async ({ pag
         }),
       })
     }
+    if (path.endsWith("/status-do-dia/")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          sincronizado_em: new Date().toISOString(),
+          frequencia_registrada: false,
+          historico_recente: [],
+        }),
+      })
+    }
     return route.fulfill({
       status: 201,
       contentType: "application/json",
@@ -72,6 +83,17 @@ test("sessão expirada durante o envio retorna ao PIN com orientação", async (
         }),
       })
     }
+    if (path.endsWith("/status-do-dia/") && route.request().method() === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          sincronizado_em: new Date().toISOString(),
+          frequencia_registrada: false,
+          historico_recente: [],
+        }),
+      })
+    }
     return route.fulfill({
       status: 401,
       contentType: "application/json",
@@ -88,5 +110,5 @@ test("sessão expirada durante o envio retorna ao PIN com orientação", async (
   await page.getByRole("button", { name: "Confirmar" }).click()
 
   await expect(page).toHaveURL(/\/login$/)
-  await expect(page.getByRole("status")).toContainText("Sua sessão expirou")
+  await expect(page.getByText(/Sua sessão expirou/)).toBeVisible()
 })

@@ -1,278 +1,98 @@
-# 🚀 Guia de Deploy do EduStock na Render
+# Deploy do EduStock
 
-Este guia explica como fazer o deploy completo do sistema EduStock na plataforma Render.
+Este documento define o caminho de publicação. Para montar agora uma
+demonstração descartável no plano gratuito, siga o roteiro específico em
+[docs/DEPLOY_RENDER_FREE_DEMO.md](docs/DEPLOY_RENDER_FREE_DEMO.md).
 
-## 📋 Pré-requisitos
+## Arquitetura declarada
 
-1. Conta no GitHub (para conectar o repositório)
-2. Conta na Render (https://render.com - gratuita)
-3. Código do projeto commitado em um repositório GitHub
+O `render.yaml` é a fonte de verdade do deploy e usa Python 3.13, Node 22.22.0
+nos três sites estáticos e PostgreSQL 18. A versão do Node é fixada pela
+variável `NODE_VERSION` de cada serviço, mecanismo suportado oficialmente pela
+Render.
 
-## 🏗️ Arquitetura do Deploy
+| Recurso | Nome no Blueprint | Tipo |
+| --- | --- | --- |
+| API Django | `edustock-demo-api` | Web Service |
+| Dashboard | `edustock-demo-dashboard` | Static Site |
+| App Alunos | `edustock-demo-alunos` | Static Site |
+| App Cozinha | `edustock-demo-cozinha` | Static Site |
+| Banco | `edustock-demo-db` | Render Postgres |
 
-O EduStock será deployado em 5 serviços separados:
+O backend executa `build.sh`, que instala dependências, coleta arquivos
+estáticos, aplica migrations e, quando `DEMO_MODE=true`, executa
+`python manage.py preparar_demo`. O processo web usa
+`gunicorn easystock.wsgi:application` e o health check é `GET /api/health/`.
 
-1. **PostgreSQL Database** - Banco de dados
-2. **Backend Django** - API REST (edustock-backend)
-3. **Frontend Admin** - Dashboard administrativo (edustock-frontend)
-4. **App Cozinha** - Interface da cozinha (edustock-cozinha)
-5. **App Alunos** - Interface dos alunos (edustock-alunos)
+## Configuração segura
 
-## 📝 Passo a Passo
+- Não versionar `.env`, `.env.local` ou `.env.production`.
+- Manter `SECRET_KEY` e `PIN_LOOKUP_SECRET` estáveis, distintos e secretos.
+- Usar `APP_ENV=production`, `DEBUG=false` e hosts/origens explícitos.
+- Manter `DATABASE_URL` ligada ao banco pelo Blueprint.
+- Nunca escrever senhas, PINs, tokens ou URLs internas nos logs.
+- Em demonstração, usar somente dados fictícios e credenciais exclusivas.
 
-### 1. Preparar o Repositório GitHub
+As sete variáveis `sync: false` da demonstração devem ser preenchidas no painel
+da Render, sem adicioná-las ao repositório:
 
-```bash
-# Se ainda não inicializou o Git
-git init
-git add .
-git commit -m "Preparar projeto para deploy na Render"
-
-# Criar repositório no GitHub e fazer push
-git remote add origin https://github.com/SEU_USUARIO/edustock.git
-git branch -M main
-git push -u origin main
+```text
+DEMO_ADMIN_USERNAME
+DEMO_ADMIN_PASSWORD
+DEMO_OPERATOR_USERNAME
+DEMO_OPERATOR_PASSWORD
+DEMO_ALUNOS_PIN
+DEMO_COZINHA_PIN
+DEMO_EXPIRES_AT
 ```
 
-### 2. Deploy Usando render.yaml (Recomendado)
+`DEMO_EXPIRES_AT` deve ser uma data/hora futura em ISO 8601, com fuso. O comando
+de preparação falha se uma variável estiver ausente, se a data tiver expirado
+ou se credenciais que deveriam ser distintas forem iguais.
 
-A forma mais fácil é usar o arquivo `render.yaml` já configurado:
+## Demonstração gratuita versus produção
 
-1. Acesse https://dashboard.render.com/
-2. Clique em **"New" → "Blueprint"**
-3. Conecte seu repositório GitHub
-4. Selecione o repositório **edustock**
-5. A Render detectará automaticamente o `render.yaml`
-6. Clique em **"Apply"**
+O plano Free serve para avaliação e apresentação, não para operação escolar. O
+Web Service gratuito pode adormecer após 15 minutos sem tráfego e leva cerca de
+um minuto para despertar. O filesystem é efêmero. O PostgreSQL Free tem 1 GB,
+expira 30 dias após a criação e não oferece backup gerenciado nem recuperação.
+Cada workspace pode manter somente um Render Postgres Free ativo. Se já houver
+um banco gratuito, preserve-o quando pertencer a outro sistema e use outro
+workspace ou migre deliberadamente um dos bancos para uma instância paga.
 
-A Render criará automaticamente todos os 5 serviços!
+Antes de qualquer uso real:
 
-### 3. Deploy Manual (Alternativa)
+1. migrar API e banco para instâncias pagas compatíveis com a carga;
+2. habilitar e testar recuperação e backups;
+3. trocar todas as credenciais e desabilitar `DEMO_MODE`;
+4. remover dados fictícios ou criar um banco limpo;
+5. revisar domínio, CORS, CSRF, observabilidade e alertas;
+6. executar o checklist completo de homologação;
+7. definir responsáveis, retenção, resposta a incidentes e janela de mudança.
 
-Se preferir criar serviço por serviço:
+A Render informa que bancos pagos recebem recuperação point-in-time conforme o
+plano do workspace. A migração deve ser agendada porque a alteração do tipo da
+instância pode causar alguns minutos de indisponibilidade.
 
-#### 3.1. Criar o Banco de Dados
+## Atualizações
 
-1. No Dashboard da Render, clique em **"New" → "PostgreSQL"**
-2. Configure:
-   - **Name**: `edustock-db`
-   - **Database**: `edustock`
-   - **User**: `edustock`
-   - **Region**: escolha a mais próxima
-   - **Plan**: Free
-3. Clique em **"Create Database"**
-4. Guarde a **Internal Database URL** (será usada no backend)
+Publicações devem partir de uma branch revisada e com CI verde. Após o merge, a
+Render pode redeployar os serviços ligados ao repositório. Alterações em
+variáveis de build dos sites estáticos também exigem novo deploy.
 
-#### 3.2. Deploy do Backend Django
+Depois de cada atualização:
 
-1. Clique em **"New" → "Web Service"**
-2. Conecte seu repositório GitHub
-3. Configure:
-   - **Name**: `edustock-backend`
-   - **Region**: mesma do banco de dados
-   - **Branch**: `main`
-   - **Runtime**: `Python 3`
-   - **Build Command**: `./build.sh`
-   - **Start Command**: `gunicorn easystock.wsgi:application`
-   - **Plan**: Free
+1. acompanhar o build e procurar falhas de migration;
+2. validar `GET /api/health/`;
+3. executar [docs/CHECKLIST_GO_LIVE_DEMO.md](docs/CHECKLIST_GO_LIVE_DEMO.md);
+4. confirmar que os logs não contêm segredos;
+5. registrar a versão publicada e o responsável.
 
-4. **Environment Variables** (variáveis de ambiente):
-   ```
-   PYTHON_VERSION = 3.11.0
-   DATABASE_URL = [Cole aqui a Internal Database URL do PostgreSQL]
-   SECRET_KEY = [Gere uma chave aleatória segura]
-   PIN_LOOKUP_SECRET = [Gere outra chave aleatória segura]
-   APP_ENV = production
-   TRUSTED_PROXY_COUNT = 1
-   DJANGO_SETTINGS_MODULE = easystock.settings
-   DEBUG = False
-   ALLOWED_HOSTS = .onrender.com
-   ```
+## Fontes oficiais
 
-   O `PIN_LOOKUP_SECRET` deve permanecer estável: ele é usado para localizar
-   PINs protegidos sem armazená-los em texto puro. Se houver Redis disponível,
-   configure também `REDIS_URL`; sem ele, o backend usa o PostgreSQL como cache
-   compartilhado para sessões operacionais e limitação de tentativas.
-
-5. Clique em **"Create Web Service"**
-
-Aguarde o build (5-10 minutos). A URL será algo como:
-`https://edustock-backend.onrender.com`
-
-#### 3.3. Deploy do Frontend Admin
-
-1. Clique em **"New" → "Static Site"**
-2. Conecte o mesmo repositório
-3. Configure:
-   - **Name**: `edustock-frontend`
-   - **Branch**: `main`
-   - **Build Command**: `cd frontend && npm install && npm run build`
-   - **Publish Directory**: `frontend/dist`
-
-4. **Environment Variables**:
-   ```
-   VITE_API_URL = https://edustock-backend.onrender.com/api
-   ```
-
-5. Clique em **"Create Static Site"**
-
-URL: `https://edustock-frontend.onrender.com`
-
-#### 3.4. Deploy do App Cozinha
-
-1. Clique em **"New" → "Static Site"**
-2. Configure:
-   - **Name**: `edustock-cozinha`
-   - **Branch**: `main`
-   - **Build Command**: `cd app-cozinha && npm install && npm run build`
-   - **Publish Directory**: `app-cozinha/dist`
-
-3. **Environment Variables**:
-   ```
-   VITE_API_BASE = https://edustock-backend.onrender.com
-   ```
-
-4. Clique em **"Create Static Site"**
-
-URL: `https://edustock-cozinha.onrender.com`
-
-#### 3.5. Deploy do App Alunos
-
-1. Clique em **"New" → "Static Site"**
-2. Configure:
-   - **Name**: `edustock-alunos`
-   - **Branch**: `main`
-   - **Build Command**: `cd app-alunos && npm install && npm run build`
-   - **Publish Directory**: `app-alunos/dist`
-
-3. **Environment Variables**:
-   ```
-   VITE_API_BASE = https://edustock-backend.onrender.com
-   ```
-
-4. Clique em **"Create Static Site"**
-
-URL: `https://edustock-alunos.onrender.com`
-
-## 🔧 Configurações Pós-Deploy
-
-### 1. Criar os Acessos Administrativos
-
-Após o backend estar rodando, acesse o **Shell** do serviço (no Dashboard da
-Render, entre no serviço `edustock-backend` → **"Shell"** no menu lateral).
-
-São **dois** acessos distintos, para duas finalidades diferentes — crie os dois:
-
-**a) Admin do painel React (dashboard `edustock-frontend`)** — necessário para
-fazer login no dashboard e usar a tela de Módulos (`/admin/modulos`) e a gestão
-de usuários. O acesso a essas telas é controlado pela flag `is_staff` do
-Django — a mesma flag que o Django Admin sempre usou:
-
-```bash
-python manage.py criar_admin <usuario> <senha-forte>
-```
-
-> ℹ️ **`criar_admin` já libera os dois acessos.** Além de marcar o usuário
-> com `is_staff=True` (o que também libera o painel React), o comando cria o
-> `Perfil` com papel `ADMIN`, usado em outras checagens da plataforma. Se você
-> não precisa desse `Perfil`, `python manage.py createsuperuser` continua
-> sendo uma alternativa válida — ele também define `is_staff=True` — mas não
-> cria o `Perfil` correspondente.
-
-**b) Superusuário do Django Admin (`/admin/`)** — necessário para acessar o
-Django Admin, onde se cadastram as Turmas e os PINs de acesso
-(`/admin/core/turma/`, `/admin/core/pinacesso/`):
-
-```bash
-python manage.py createsuperuser
-```
-
-Como `criar_admin` já concede `is_staff=True`, ele sozinho é suficiente para
-os dois acessos (a) e (b). Use `createsuperuser` em vez dele apenas se
-preferir não ter o `Perfil`/papel `ADMIN` associado ao usuário.
-
-### 2. Atualizar CORS no Backend
-
-Se os domínios da Render forem diferentes dos configurados, atualize as variáveis de ambiente do backend:
-
-```
-RENDER_EXTERNAL_HOSTNAME = edustock-backend.onrender.com
-```
-
-O código já está preparado para adicionar os domínios automaticamente.
-
-### 3. Testar os Apps
-
-Acesse cada URL e teste:
-
-- **Admin**: https://edustock-frontend.onrender.com
-- **Cozinha**: https://edustock-cozinha.onrender.com (PIN cadastrado no Django Admin)
-- **Alunos**: https://edustock-alunos.onrender.com (PIN cadastrado no Django Admin, por turma)
-- **Admin Django**: https://edustock-backend.onrender.com/admin
-
-Os apps **Cozinha** e **Alunos** são PWAs. Depois do primeiro acesso por HTTPS,
-podem ser instalados pela opção **Instalar app** do navegador (no iPhone/iPad,
-use **Compartilhar → Adicionar à Tela de Início**). Cada app recebe nome e ícone
-próprios e abre em uma janela independente do navegador.
-
-## ⚡ Plano Gratuito da Render
-
-**Limitações do plano Free:**
-- Serviços "dormem" após 15 minutos de inatividade
-- Primeiro acesso pode demorar 30-60 segundos para "acordar"
-- 750 horas/mês de uso (suficiente para 1 serviço 24/7)
-- PostgreSQL: 256 MB RAM, 1 GB de armazenamento
-
-**Dica**: Para evitar que o backend "durma", configure um serviço de ping (UptimeRobot, Cron-Job.org) para fazer requisições a cada 10 minutos.
-
-## 🔄 Atualizações Futuras
-
-Para atualizar o sistema após mudanças no código:
-
-```bash
-git add .
-git commit -m "Descrição das mudanças"
-git push origin main
-```
-
-A Render detectará o push e fará o redeploy automaticamente!
-
-## 🛠️ Troubleshooting
-
-### Backend não inicia
-- Verifique os logs no Dashboard da Render
-- Confirme que todas as variáveis de ambiente estão configuradas
-- Verifique se o DATABASE_URL está correto
-
-### Frontend mostra erro de API
-- No dashboard administrativo, confirme que `VITE_API_URL` aponta para o backend com o sufixo `/api`
-- Nos apps Cozinha e Alunos, confirme que `VITE_API_BASE` aponta para o backend correto
-- Verifique CORS no backend
-- Aguarde o backend "acordar" (pode levar ~30s)
-
-### Mudanças no .env não aparecem
-- Arquivos .env só são lidos no build
-- Force um novo deploy: **"Manual Deploy" → "Deploy latest commit"**
-
-## 📞 Suporte
-
-Se tiver problemas:
-1. Verifique os logs de cada serviço no Dashboard da Render
-2. Teste as APIs diretamente: `https://edustock-backend.onrender.com/api/produtos/`
-3. Confirme que o banco de dados está online
-
-## ✅ Checklist de Deploy
-
-- [ ] Código commitado no GitHub
-- [ ] Conta criada na Render
-- [ ] PostgreSQL criado
-- [ ] Backend deployado e rodando
-- [ ] Frontend Admin deployado
-- [ ] App Cozinha deployado
-- [ ] App Alunos deployado
-- [ ] Superusuário Django criado
-- [ ] Todas as URLs testadas e funcionando
-
----
-
-**🎉 Parabéns! Seu EduStock está no ar!** 🚀
+- [Deploy gratuito e limitações](https://render.com/docs/free)
+- [Planos do Render Postgres](https://render.com/docs/postgresql-refresh)
+- [Recuperação e backups do PostgreSQL](https://render.com/docs/postgresql-backups)
+- [Deploy de Django na Render](https://render.com/docs/deploy-django)
+- [Referência do Blueprint](https://render.com/docs/blueprint-spec)
+- [Configuração da versão do Node.js](https://render.com/docs/node-version)

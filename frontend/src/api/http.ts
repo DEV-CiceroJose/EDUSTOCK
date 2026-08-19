@@ -67,6 +67,12 @@ async function reqList<T>(path: string): Promise<T[]> {
   return items
 }
 
+async function reqRecent<T>(path: string, pageSize = 100): Promise<T[]> {
+  const separator = path.includes("?") ? "&" : "?"
+  const page = await req<T[] | PaginatedResponse<T>>(`${path}${separator}page_size=${pageSize}`)
+  return Array.isArray(page) ? page : page.results
+}
+
 export const httpProdutos = {
   list: (q?: string) => reqList<Produto>(`/produtos/${q ? `?search=${encodeURIComponent(q)}` : ""}`),
   get: (id: Id) => req<Produto>(`/produtos/${id}/`),
@@ -102,8 +108,9 @@ export const httpFornecedores = {
 }
 
 export const httpMovimentacoes = {
-  list: (qs = "") => reqList<Movimentacao>(`/movimentacoes/${qs ? `?${qs}` : ""}`),
+  list: (qs = "") => reqRecent<Movimentacao>(`/movimentacoes/${qs ? `?${qs}` : ""}`),
   create: (data: Record<string, unknown>) => req<Movimentacao>(`/movimentacoes/`, { method: "POST", body: data }),
+  estornar: (id: Id, motivo: string) => req<Movimentacao>(`/movimentacoes/${id}/estornar/`, { method: "POST", body: { motivo } }),
 }
 
 export const httpEntradas = {

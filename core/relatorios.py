@@ -58,7 +58,7 @@ def _resumo_por_categoria(inicio, fim):
     return cat_totals, cat_names
 
 
-def gerar_prestacao_contas(*, inicio, fim):
+def gerar_prestacao_contas(*, inicio, fim, incluir_financeiro=True):
     entradas = (
         Entrada.objects.filter(data__gte=inicio, data__lte=fim)
         .select_related("fornecedor")
@@ -104,7 +104,7 @@ def gerar_prestacao_contas(*, inicio, fim):
         })
     fornecedores.sort(key=lambda f: f["fornecedor_nome"] or "")
 
-    return {
+    resposta = {
         "periodo": {"inicio": inicio.isoformat(), "fim": fim.isoformat()},
         "resumo_financeiro": {
             "total_geral": _money(total_geral),
@@ -112,3 +112,13 @@ def gerar_prestacao_contas(*, inicio, fim):
         },
         "fornecedores": fornecedores,
     }
+    if not incluir_financeiro:
+        resposta.pop("resumo_financeiro", None)
+        for fornecedor in resposta["fornecedores"]:
+            fornecedor.pop("total_fornecedor", None)
+            for documento in fornecedor["documentos"]:
+                documento.pop("total", None)
+                for item in documento["itens"]:
+                    item.pop("preco_unitario", None)
+                    item.pop("subtotal", None)
+    return resposta

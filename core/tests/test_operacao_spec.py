@@ -19,8 +19,8 @@ from django.utils import timezone
 from rest_framework.test import APIClient, APITestCase
 
 from core.models import (
-    Categoria, FatorConsumo, FrequenciaDiaria, Grupo, Movimentacao, PinAcesso,
-    OperacaoBaixaProducao, Produto, Turma,
+    Categoria, FatorConsumo, FrequenciaDiaria, Grupo, LoteEstoque, Movimentacao,
+    PinAcesso, OperacaoBaixaProducao, Produto, Turma,
 )
 from core.operacao import baixa_de_producao, gerar_plano_do_dia
 from core.operacao_auth import PERFIL_ALUNO, PERFIL_COZINHA, criar_token
@@ -98,6 +98,23 @@ class TestFrequenciaDuplicataBloqueada(TestCase):
         self.assertEqual(r1.status_code, 201, r1.content)
         self.assertEqual(r2.status_code, 201, r2.content)
 
+    def test_nome_completo_da_turma_cabe_na_frequencia(self):
+        """O espelho textual aceita o mesmo tamanho do cadastro de Turma."""
+        nome = "Turma Única - Demonstração"
+        frequencia = FrequenciaDiaria(
+            data=self.hoje,
+            turno=FrequenciaDiaria.INTEGRAL,
+            turma=nome,
+            registrado_por_turma=nome,
+            quantidade_alunos=30,
+        )
+
+        frequencia.full_clean(exclude=["registrado_por"])
+        frequencia.save()
+
+        self.assertEqual(frequencia.turma, nome)
+        self.assertEqual(frequencia.registrado_por_turma, nome)
+
 
 # ---------------------------------------------------------------------------
 # 2. test_previsao_alerta_reducao
@@ -151,7 +168,7 @@ class TestPrevisaoAlertaReducao(TestCase):
 class TestPlanoDoDiaCalculaQuantidades(TestCase):
     """
     gerar_plano_do_dia deve calcular:
-      quantidade_necessaria = gramas_por_aluno × total_alunos / 1000  (para KG)
+      quantidade_necessaria = quantidade_por_aluno × total_alunos / conteudo_por_unidade
     e sinalizar estoque_insuficiente quando saldo < quantidade_necessaria.
     """
 
@@ -161,15 +178,17 @@ class TestPlanoDoDiaCalculaQuantidades(TestCase):
         grupo = Grupo.objects.create(nome="Geral", categoria=cat)
 
         self.arroz = Produto.objects.create(
-            nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50")
+            nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.arroz, gramas_por_aluno=Decimal("80"))
+        FatorConsumo.objects.create(produto=self.arroz, quantidade_por_aluno=Decimal("80"))
 
         # Produto com estoque insuficiente
         self.feijao = Produto.objects.create(
-            nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1")
+            nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.feijao, gramas_por_aluno=Decimal("60"))
+        FatorConsumo.objects.create(produto=self.feijao, quantidade_por_aluno=Decimal("60"))
 
         FrequenciaDiaria.objects.create(
             data=self.hoje, turno="INTEGRAL", turma="Total", quantidade_alunos=100
@@ -224,15 +243,23 @@ class TestBaixaProducaoAtomicaPorItem(TestCase):
 
         # Arroz: saldo suficiente (100g × 100 = 10 kg, saldo=50)
         self.arroz = Produto.objects.create(
-            nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50")
+            nome="Arroz", grupo=grupo, unidade="KG", quantidade=Decimal("50"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.arroz, gramas_por_aluno=Decimal("100"))
+        FatorConsumo.objects.create(produto=self.arroz, quantidade_por_aluno=Decimal("100"))
+        LoteEstoque.objects.create(
+            produto=self.arroz, codigo="ARROZ-BAIXA", quantidade=Decimal("50")
+        )
 
         # Feijão: saldo INSUFICIENTE (60g × 100 = 6 kg, saldo=1)
         self.feijao = Produto.objects.create(
-            nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1")
+            nome="Feijão", grupo=grupo, unidade="KG", quantidade=Decimal("1"),
+            unidade_consumo="G", conteudo_por_unidade=Decimal("1000"),
         )
-        FatorConsumo.objects.create(produto=self.feijao, gramas_por_aluno=Decimal("60"))
+        FatorConsumo.objects.create(produto=self.feijao, quantidade_por_aluno=Decimal("60"))
+        LoteEstoque.objects.create(
+            produto=self.feijao, codigo="FEIJAO-BAIXA", quantidade=Decimal("1")
+        )
 
         FrequenciaDiaria.objects.create(
             data=self.hoje, turno="INTEGRAL", turma="Total", quantidade_alunos=100
@@ -494,6 +521,24 @@ class TestLoginPorPin(APITestCase):
         self.assertEqual(bloqueado.status_code, 429, bloqueado.content)
         self.assertIn("Retry-After", bloqueado.headers)
 
+    def test_falhas_do_app_alunos_nao_bloqueiam_a_cozinha(self):
+        for tentativa in range(5):
+            resposta = self.client.post(
+                "/api/operacao/auth/",
+                {"pin": f"8{tentativa:03d}", "perfil": "ALUNO_REP"},
+                format="json",
+            )
+            self.assertEqual(resposta.status_code, 401, resposta.content)
+
+        cozinha = self.client.post(
+            "/api/operacao/auth/",
+            {"pin": "0099", "perfil": "COZINHA"},
+            format="json",
+        )
+
+        self.assertEqual(cozinha.status_code, 200, cozinha.content)
+        self.assertEqual(cozinha.data["perfil"], "COZINHA")
+
     def test_login_pin_inativo_retorna_401(self):
         resp = self.client.post("/api/operacao/auth/", {
             "pin": "0003", "perfil": "ALUNO_REP",
@@ -534,6 +579,31 @@ class TestLoginPorPin(APITestCase):
         resp = c.post("/api/operacao/contagem/", {"quantidade_alunos": 30}, format="json")
         self.assertEqual(resp.status_code, 401, resp.content)
 
+    def test_desativar_ou_trocar_pin_revoga_sessao_existente(self):
+        login = self.client.post("/api/operacao/auth/", {
+            "pin": "0001", "perfil": "ALUNO_REP",
+        }, format="json")
+        cliente = APIClient()
+        cliente.credentials(HTTP_X_OPERACAO_TOKEN=login.data["token"])
+
+        pin = PinAcesso.objects.get(turma=self.turma, pin_fingerprint=PinAcesso.gerar_fingerprint("0001"))
+        pin.definir_pin("0004")
+        pin.save(update_fields=["pin", "pin_fingerprint"])
+
+        resposta = cliente.get("/api/operacao/status-do-dia/")
+        self.assertEqual(resposta.status_code, 401, resposta.content)
+
+        novo_login = self.client.post("/api/operacao/auth/", {
+            "pin": "0004", "perfil": "ALUNO_REP",
+        }, format="json")
+        novo_cliente = APIClient()
+        novo_cliente.credentials(HTTP_X_OPERACAO_TOKEN=novo_login.data["token"])
+        pin.ativo = False
+        pin.save(update_fields=["ativo"])
+
+        revogada = novo_cliente.get("/api/operacao/status-do-dia/")
+        self.assertEqual(revogada.status_code, 401, revogada.content)
+
 
 # ---------------------------------------------------------------------------
 # GET /api/operacao/contagem/ — acessível pelo app-cozinha
@@ -558,3 +628,92 @@ class TestGetContagemAppCozinha(APITestCase):
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(resp.data["total_alunos"], 55)
         self.assertEqual(len(resp.data["turmas"]), 2)
+
+
+class TestStatusOperacionalDoDia(APITestCase):
+    def setUp(self):
+        self.hoje = timezone.localdate()
+        self.turma = Turma.objects.create(
+            nome="Turma Status Teste",
+            curso=Turma.DS,
+            ano=1,
+        )
+
+    def _cliente_aluno(self):
+        token = criar_token(
+            PERFIL_ALUNO,
+            turma=self.turma.nome,
+            turno=self.turma.turno,
+            turma_id=self.turma.id,
+        )
+        cliente = APIClient()
+        cliente.credentials(HTTP_X_OPERACAO_TOKEN=token)
+        return cliente
+
+    def test_aluno_recupera_frequencia_ja_registrada(self):
+        FrequenciaDiaria.objects.create(
+            data=self.hoje - timedelta(days=1),
+            turno=FrequenciaDiaria.INTEGRAL,
+            turma=self.turma.nome,
+            quantidade_alunos=31,
+        )
+        frequencia = FrequenciaDiaria.objects.create(
+            data=self.hoje,
+            turno=FrequenciaDiaria.INTEGRAL,
+            turma=self.turma.nome,
+            quantidade_alunos=28,
+        )
+
+        resposta = self._cliente_aluno().get("/api/operacao/status-do-dia/")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        self.assertTrue(resposta.data["frequencia_registrada"])
+        self.assertEqual(resposta.data["frequencia"]["id"], frequencia.id)
+        self.assertEqual(resposta.data["frequencia"]["quantidade_alunos"], 28)
+        self.assertIn("sincronizado_em", resposta.data)
+        self.assertEqual(len(resposta.data["historico_recente"]), 2)
+        self.assertEqual(resposta.data["historico_recente"][0]["quantidade_alunos"], 28)
+
+    def test_sessao_reflete_renome_e_bloqueia_turma_desativada(self):
+        cliente = self._cliente_aluno()
+        self.turma.nome = "Turma Status Renomeada"
+        self.turma.save(update_fields=["nome"])
+
+        renomeada = cliente.get("/api/operacao/status-do-dia/")
+        self.assertEqual(renomeada.status_code, 200, renomeada.content)
+        self.assertEqual(renomeada.data["turma"], "Turma Status Renomeada")
+
+        self.turma.ativo = False
+        self.turma.save(update_fields=["ativo"])
+        inativa = cliente.get("/api/operacao/status-do-dia/")
+        self.assertEqual(inativa.status_code, 403, inativa.content)
+        self.assertEqual(inativa.data["codigo"], "turma_inativa")
+
+    def test_cozinha_recebe_estado_das_tres_refeicoes(self):
+        OperacaoBaixaProducao.objects.create(
+            operacao_id=uuid4(),
+            data=self.hoje,
+            refeicao=OperacaoBaixaProducao.CAFE_MANHA,
+            status=OperacaoBaixaProducao.CONCLUIDA,
+        )
+
+        resposta = _client_cozinha().get("/api/operacao/status-do-dia/")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        self.assertEqual(len(resposta.data["refeicoes"]), 3)
+        por_refeicao = {item["refeicao"]: item for item in resposta.data["refeicoes"]}
+        self.assertTrue(por_refeicao["CAFE_MANHA"]["baixa_realizada"])
+        self.assertFalse(por_refeicao["ALMOCO"]["baixa_realizada"])
+        self.assertFalse(por_refeicao["LANCHE_TARDE"]["baixa_realizada"])
+        self.assertEqual(len(resposta.data["historico_recente"]), 1)
+        self.assertEqual(resposta.data["historico_recente"][0]["refeicao"], "CAFE_MANHA")
+
+
+class TestHealthCheck(APITestCase):
+    def test_health_confirma_banco_e_cache_sem_autenticacao(self):
+        resposta = self.client.get("/api/health/")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        self.assertEqual(resposta.data["status"], "ok")
+        self.assertEqual(resposta.data["verificacoes"], {"banco": True, "cache": True})
+        self.assertIn("verificado_em", resposta.data)

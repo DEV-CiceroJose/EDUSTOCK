@@ -3,14 +3,21 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import ContagemView from './ContagemView.jsx'
 import PinLogin from './PinLogin.jsx'
-import { getSessao, limparSessao, registrarContagem } from './api.js'
+import { filaContagens, getSessao, getStatusDoDia, limparSessao, registrarContagem } from './api.js'
 
 vi.mock('./api.js', () => ({
   getSessao: vi.fn(),
+  getStatusDoDia: vi.fn(),
   limparSessao: vi.fn(),
   login: vi.fn(),
   registrarContagem: vi.fn(),
   logout: vi.fn(),
+  filaContagens: {
+    list: vi.fn(),
+    subscribe: vi.fn(),
+    retry: vi.fn(),
+    remove: vi.fn(),
+  },
 }))
 
 function renderView() {
@@ -36,6 +43,17 @@ describe('ContagemView (app-alunos)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     getSessao.mockReturnValue({ turma: '6A', turno: 'INTEGRAL' })
+    filaContagens.list.mockReturnValue([])
+    filaContagens.subscribe.mockReturnValue(() => {})
+    filaContagens.retry.mockResolvedValue({ completed: [], remaining: [] })
+    getStatusDoDia.mockResolvedValue({
+      perfil: 'ALUNO_REP',
+      turma: '6A',
+      turno: 'INTEGRAL',
+      frequencia_registrada: false,
+      frequencia: null,
+      sincronizado_em: '2026-08-02T12:00:00-03:00',
+    })
   })
 
   it('mostra o ícone de sucesso sem emoji ao confirmar a contagem', async () => {
@@ -47,6 +65,7 @@ describe('ContagemView (app-alunos)', () => {
     })
 
     renderView()
+    await screen.findByRole('button', { name: 'Confirmar' })
 
     ;['3', '0'].forEach((digito) => {
       fireEvent.click(screen.getByRole('button', { name: digito }))
@@ -62,6 +81,7 @@ describe('ContagemView (app-alunos)', () => {
     registrarContagem.mockReturnValue(new Promise((resolve) => { resolverContagem = resolve }))
 
     renderView()
+    await screen.findByRole('button', { name: 'Confirmar' })
 
     fireEvent.click(screen.getByRole('button', { name: '3' }))
     const botaoConfirmar = screen.getByRole('button', { name: 'Confirmar' })
@@ -78,6 +98,7 @@ describe('ContagemView (app-alunos)', () => {
     registrarContagem.mockRejectedValue(erro)
 
     renderComRotas()
+    await screen.findByRole('button', { name: 'Confirmar' })
 
     fireEvent.click(screen.getByRole('button', { name: '3' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
@@ -90,6 +111,8 @@ describe('ContagemView (app-alunos)', () => {
     registrarContagem.mockRejectedValue(new TypeError('Failed to fetch'))
 
     renderView()
+    await screen.findByRole('button', { name: 'Confirmar' })
+    await screen.findByRole('button', { name: 'Confirmar' })
 
     fireEvent.click(screen.getByRole('button', { name: '3' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
@@ -99,8 +122,9 @@ describe('ContagemView (app-alunos)', () => {
     )
   })
 
-  it('não permite enviar mais de 45 alunos', () => {
+  it('não permite enviar mais de 45 alunos', async () => {
     renderView()
+    await screen.findByRole('button', { name: 'Confirmar' })
 
     fireEvent.click(screen.getByRole('button', { name: '4' }))
     fireEvent.click(screen.getByRole('button', { name: '6' }))
@@ -108,5 +132,70 @@ describe('ContagemView (app-alunos)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('O limite permitido é 45 alunos.')
     expect(screen.getByRole('button', { name: 'Confirmar' })).toBeDisabled()
     expect(registrarContagem).not.toHaveBeenCalled()
+  })
+
+  it('mostra a contagem já registrada sem permitir um segundo envio', async () => {
+    getStatusDoDia.mockResolvedValue({
+      perfil: 'ALUNO_REP',
+      turma: '6A',
+      turno: 'INTEGRAL',
+      frequencia_registrada: true,
+      frequencia: { quantidade_alunos: 28, registrada_em: '2026-08-02T08:15:00-03:00' },
+      historico_recente: [
+        { data: '2026-08-02', quantidade_alunos: 28, criado_em: '2026-08-02T08:15:00-03:00' },
+        { data: '2026-08-01', quantidade_alunos: 30, criado_em: '2026-08-01T08:10:00-03:00' },
+      ],
+      sincronizado_em: '2026-08-02T12:00:00-03:00',
+    })
+
+    renderView()
+
+    expect(await screen.findByText('A frequência desta turma já foi enviada hoje.')).toBeInTheDocument()
+    expect(screen.getByText('28')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Histórico recente' })).toBeInTheDocument()
+    expect(screen.getByText('01/08/2026')).toBeInTheDocument()
+    expect(screen.getByText('30 alunos')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirmar' })).not.toBeInTheDocument()
+  })
+
+  it('mostra a fila e confirma antes de remover uma contagem rejeitada', async () => {
+    filaContagens.list.mockReturnValue([
+      { id: 'pendente-1', payload: {}, status: 'pending' },
+      { id: 'rejeitada-1', payload: {}, status: 'attention' },
+    ])
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    renderView()
+
+    expect(await screen.findByRole('region', { name: 'Sincronização pendente' })).toHaveTextContent(
+      '1 pendente(s) · 1 requer(em) atenção',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remover registro pendente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remover registro rejeitado' }))
+
+    expect(filaContagens.retry).toHaveBeenCalledTimes(1)
+    expect(confirmar).toHaveBeenCalledTimes(2)
+    expect(filaContagens.remove).toHaveBeenCalledWith('pendente-1')
+    expect(filaContagens.remove).toHaveBeenCalledWith('rejeitada-1')
+    confirmar.mockRestore()
+  })
+
+  it('mantém o resumo da fila visível na tela de sucesso', async () => {
+    filaContagens.list.mockReturnValue([
+      { id: 'pendente-1', payload: {}, status: 'pending' },
+    ])
+    getStatusDoDia.mockResolvedValue({
+      turma: '6A',
+      turno: 'INTEGRAL',
+      frequencia_registrada: true,
+      frequencia: { quantidade_alunos: 28, registrada_em: '2026-08-02T08:15:00-03:00' },
+      sincronizado_em: '2026-08-02T12:00:00-03:00',
+    })
+
+    renderView()
+
+    expect(await screen.findByText('A frequência desta turma já foi enviada hoje.')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Sincronização pendente' })).toBeInTheDocument()
   })
 })

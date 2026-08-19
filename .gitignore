@@ -57,3 +57,6 @@ Thumbs.db
 
 # Render
 .render/
+
+# Isolated development worktrees
+.worktrees/

@@ -10,7 +10,7 @@ describe("PWA do App Alunos", () => {
     const manifest = JSON.parse(ler("public/manifest.webmanifest"))
     const html = ler("index.html")
 
-    expect(manifest.name).toBe("EasyStock Alunos")
+    expect(manifest.name).toBe("EduStock Alunos")
     expect(manifest.start_url).toBe("/login")
     expect(manifest.display).toBe("standalone")
     expect(manifest.icons.map((icone) => icone.sizes)).toEqual(["192x192", "512x512"])
@@ -22,5 +22,14 @@ describe("PWA do App Alunos", () => {
 
     expect(serviceWorker).toContain("url.pathname.startsWith('/api/')")
     expect(serviceWorker).toContain("request.method !== 'GET'")
+    expect(serviceWorker).toContain("`${CACHE_PREFIX}v2`")
+  })
+
+  it("recupera a inicialização sem deixar uma tela branca", () => {
+    const main = ler("src/main.jsx")
+
+    expect(main).toContain("registro.unregister()")
+    expect(main).toContain("mostrarFalhaDeInicializacao()")
+    expect(main).toContain("Recarregar aplicativo")
   })
 })

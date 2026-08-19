@@ -2,17 +2,42 @@ from decimal import Decimal
 
 from django.utils import timezone
 from rest_framework import serializers
+from plataforma.permissions import slugs_modulos_do_usuario
 
 from .models import (
     BemPermanente,
+    Cardapio,
     Categoria,
     Entrada,
     Fornecedor,
     Grupo,
+    LoteEstoque,
     Movimentacao,
     OperacaoBaixaProducao,
     Produto,
+    Receita,
+    ReceitaIngrediente,
 )
+
+
+class CamposFinanceirosProtegidosMixin:
+    campos_financeiros = ()
+
+    def pode_ver_financeiro(self):
+        request = self.context.get("request")
+        return bool(
+            request
+            and request.user
+            and request.user.is_authenticated
+            and "financeiro" in slugs_modulos_do_usuario(request.user)
+        )
+
+    def get_fields(self):
+        fields = super().get_fields()
+        if not self.pode_ver_financeiro():
+            for campo in self.campos_financeiros:
+                fields.pop(campo, None)
+        return fields
 
 
 class BaixaProducaoItemSerializer(serializers.Serializer):
@@ -76,7 +101,8 @@ class CategoriaSerializer(serializers.ModelSerializer):
         fields = ["id", "name"]
 
 
-class ProdutoSerializer(serializers.ModelSerializer):
+class ProdutoSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSerializer):
+    campos_financeiros = ("ultimo_preco",)
     grupo_nome = serializers.CharField(source="grupo.nome", read_only=True)
     categoria = serializers.IntegerField(source="grupo.categoria_id", read_only=True)
     categoria_nome = serializers.CharField(source="grupo.categoria.name", read_only=True)
@@ -92,11 +118,53 @@ class ProdutoSerializer(serializers.ModelSerializer):
             "id", "nome",
             "grupo", "grupo_nome", "fornecedor", "fornecedor_nome",
             "categoria", "categoria_nome",
-            "quantidade", "unidade", "estoque_minimo", "perecivel", "periodicidade",
+            "quantidade", "unidade", "unidade_consumo", "conteudo_por_unidade",
+            "estoque_minimo", "perecivel", "periodicidade",
             "validade", "ultimo_preco",
             "criado_por_nome", "criado_em", "atualizado_em",
         ]
         read_only_fields = ["quantidade", "criado_por_nome", "criado_em", "atualizado_em"]
+
+    def validate(self, attrs):
+        unidade = attrs.get(
+            "unidade",
+            getattr(self.instance, "unidade", None),
+        )
+        unidade_consumo = attrs.get(
+            "unidade_consumo",
+            getattr(self.instance, "unidade_consumo", None),
+        )
+        conteudo_por_unidade = attrs.get(
+            "conteudo_por_unidade",
+            getattr(self.instance, "conteudo_por_unidade", None),
+        )
+        if unidade_consumo and conteudo_por_unidade is None:
+            raise serializers.ValidationError({
+                "conteudo_por_unidade": "Informe o conteúdo por unidade de estoque."
+            })
+        if conteudo_por_unidade is not None and not unidade_consumo:
+            raise serializers.ValidationError({
+                "unidade_consumo": "Informe a unidade usada no consumo."
+            })
+        if not Produto.conversao_dimensional_compativel(unidade, unidade_consumo):
+            raise serializers.ValidationError({
+                "unidade_consumo": (
+                    "A unidade de consumo é incompatível com a unidade de estoque."
+                )
+            })
+        if (
+            not unidade_consumo
+            and conteudo_por_unidade is None
+            and self.instance
+            and self.instance.tem_dependencias_consumo()
+        ):
+            raise serializers.ValidationError({
+                "unidade_consumo": (
+                    "A conversão não pode ser removida enquanto o produto "
+                    "estiver em uso em fatores ou receitas."
+                )
+            })
+        return attrs
 
 
 class GrupoSerializer(serializers.ModelSerializer):
@@ -129,27 +197,37 @@ class FornecedorSerializer(serializers.ModelSerializer):
         read_only_fields = ["criado_em", "atualizado_em"]
 
 
-class MovimentacaoSerializer(serializers.ModelSerializer):
+class MovimentacaoSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSerializer):
+    campos_financeiros = ("preco_unitario",)
     produto_nome = serializers.CharField(source="produto.nome", read_only=True)
+    estorno = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Movimentacao
         fields = [
             "id", "produto", "produto_nome", "tipo", "quantidade",
-            "preco_unitario", "entrada", "motivo", "data", "criado_em",
+            "preco_unitario", "entrada", "corrige_movimentacao", "estorno",
+            "motivo", "data", "criado_em",
         ]
-        read_only_fields = ["entrada", "criado_em"]
+        read_only_fields = ["entrada", "corrige_movimentacao", "estorno", "criado_em"]
 
 
-class EntradaItemSerializer(serializers.ModelSerializer):
+class EntradaItemSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSerializer):
+    campos_financeiros = ("preco_unitario",)
     produto_nome = serializers.CharField(source="produto.nome", read_only=True)
+    codigo_lote = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    validade = serializers.DateField(required=False, allow_null=True)
 
     class Meta:
         model = Movimentacao
-        fields = ["produto", "produto_nome", "quantidade", "preco_unitario"]
+        fields = [
+            "produto", "produto_nome", "quantidade", "preco_unitario",
+            "codigo_lote", "validade",
+        ]
 
 
-class EntradaSerializer(serializers.ModelSerializer):
+class EntradaSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSerializer):
+    campos_financeiros = ("total",)
     fornecedor_nome = serializers.CharField(source="fornecedor.nome", read_only=True, allow_null=True, default=None)
     itens = EntradaItemSerializer(many=True)
     total = serializers.SerializerMethodField()
@@ -178,3 +256,60 @@ class EntradaSerializer(serializers.ModelSerializer):
             observacao=validated_data.get("observacao", ""),
             itens=itens, user=user,
         )
+
+
+class LoteEstoqueSerializer(CamposFinanceirosProtegidosMixin, serializers.ModelSerializer):
+    campos_financeiros = ("preco_unitario",)
+    produto_nome = serializers.CharField(source="produto.nome", read_only=True)
+
+    class Meta:
+        model = LoteEstoque
+        fields = [
+            "id", "produto", "produto_nome", "entrada", "codigo", "validade",
+            "quantidade", "preco_unitario", "criado_em",
+        ]
+
+
+class ReceitaIngredienteSerializer(serializers.ModelSerializer):
+    produto_nome = serializers.CharField(source="produto.nome", read_only=True)
+
+    class Meta:
+        model = ReceitaIngrediente
+        fields = ["id", "produto", "produto_nome", "quantidade_por_aluno"]
+
+    def validate(self, attrs):
+        produto = attrs.get("produto", getattr(self.instance, "produto", None))
+        if not produto.unidade_consumo or produto.conteudo_por_unidade is None:
+            raise serializers.ValidationError({
+                "produto": "Configure a conversão de unidade do produto."
+            })
+        if not Produto.conversao_dimensional_compativel(
+            produto.unidade, produto.unidade_consumo
+        ):
+            raise serializers.ValidationError({
+                "produto": "A conversão de unidade do produto é incompatível."
+            })
+        return attrs
+
+
+class ReceitaSerializer(serializers.ModelSerializer):
+    ingredientes = ReceitaIngredienteSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Receita
+        fields = ["id", "nome", "refeicao", "ativa", "observacao", "ingredientes"]
+
+
+class CardapioSerializer(serializers.ModelSerializer):
+    receita_nome = serializers.CharField(source="receita.nome", read_only=True)
+
+    class Meta:
+        model = Cardapio
+        fields = ["id", "data", "refeicao", "receita", "receita_nome", "observacao"]
+
+    def validate(self, attrs):
+        receita = attrs.get("receita", getattr(self.instance, "receita", None))
+        refeicao = attrs.get("refeicao", getattr(self.instance, "refeicao", None))
+        if receita and refeicao and receita.refeicao != refeicao:
+            raise serializers.ValidationError({"receita": "A receita deve pertencer à mesma refeição."})
+        return attrs

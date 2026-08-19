@@ -5,8 +5,11 @@ import { Icon } from "../../lib/icons.jsx"
 import Modal from "../../components/ui/Modal"
 import { useToast } from "../../components/ui/useToast"
 import { getModulosAtivos } from "../../lib/auth"
+import { dataLocalISO } from "../../lib/date"
 
-const linhaVazia = () => ({ produto: "", quantidade: "", preco_unitario: "" })
+const linhaVazia = () => ({
+  produto: "", quantidade: "", preco_unitario: "", codigo_lote: "", validade: "",
+})
 
 export default function EntradaFormModal({ open, produtos, fornecedores, onClose, onSaved }) {
   if (!open) return null
@@ -25,7 +28,7 @@ function EntradaForm({ produtos, fornecedores, onClose, onSaved }) {
   const [cab, setCab] = useState({
     fornecedor: "",
     numero_nota_fiscal: "",
-    data: new Date().toISOString().slice(0, 10),
+    data: dataLocalISO(),
     observacao: "",
   })
   const [linhas, setLinhas] = useState([linhaVazia()])
@@ -52,6 +55,8 @@ function EntradaForm({ produtos, fornecedores, onClose, onSaved }) {
         produto: Number(l.produto),
         quantidade: Number(l.quantidade),
         preco_unitario: l.preco_unitario === "" ? null : Number(l.preco_unitario),
+        codigo_lote: l.codigo_lote.trim(),
+        validade: l.validade || null,
       }))
     if (itens.length === 0) return setErro("Adicione ao menos um item com produto e quantidade.")
     setSalvando(true)
@@ -108,6 +113,8 @@ function EntradaForm({ produtos, fornecedores, onClose, onSaved }) {
                 {produtos.map((p) => (<option key={p.id} value={p.id}>{p.nome}</option>))}
               </select>
               <input type="number" step="any" min="0" className="field" value={l.quantidade} onChange={setL(i, "quantidade")} placeholder="Qtd" />
+              <input className="field" value={l.codigo_lote} onChange={setL(i, "codigo_lote")} placeholder="Lote (opcional)" aria-label="Código do lote" />
+              <input type="date" className="field" value={l.validade} onChange={setL(i, "validade")} aria-label="Validade do lote" />
               {mostrarPreco && (
                 <input type="number" step="0.01" min="0" className="field" value={l.preco_unitario} onChange={setL(i, "preco_unitario")} placeholder="R$" />
               )}

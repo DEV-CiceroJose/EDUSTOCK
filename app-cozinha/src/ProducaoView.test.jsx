@@ -2,16 +2,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import ProducaoView from './ProducaoView.jsx'
-import { baixaProducao, consultarBaixa, getPlano } from './api.js'
+import { baixaProducao, consultarBaixa, filaBaixas, getPlano, getStatusDoDia } from './api.js'
 
 vi.mock('./api.js', () => ({
   getPlano: vi.fn(),
+  getStatusDoDia: vi.fn(),
   baixaProducao: vi.fn(),
   consultarBaixa: vi.fn(),
   obterOperacaoPendente: vi.fn(() => '11111111-1111-4111-8111-111111111111'),
   concluirOperacaoPendente: vi.fn(),
   limparSessao: vi.fn(),
   logout: vi.fn(),
+  filaBaixas: {
+    list: vi.fn(),
+    subscribe: vi.fn(),
+    retry: vi.fn(),
+    remove: vi.fn(),
+  },
 }))
 
 const PLANO_BASE = {
@@ -47,7 +54,18 @@ function renderView() {
 describe('ProducaoView (app-cozinha)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    filaBaixas.list.mockReturnValue([])
+    filaBaixas.subscribe.mockReturnValue(() => {})
+    filaBaixas.retry.mockResolvedValue({ completed: [], remaining: [] })
     getPlano.mockResolvedValue(PLANO_BASE)
+    getStatusDoDia.mockResolvedValue({
+      sincronizado_em: '2026-08-02T12:00:00-03:00',
+      refeicoes: [
+        { refeicao: 'CAFE_MANHA', baixa_realizada: false, status: null },
+        { refeicao: 'ALMOCO', baixa_realizada: false, status: null },
+        { refeicao: 'LANCHE_TARDE', baixa_realizada: false, status: null },
+      ],
+    })
     const naoEncontrada = new Error('Operação não encontrada')
     naoEncontrada.status = 404
     consultarBaixa.mockRejectedValue(naoEncontrada)
@@ -171,5 +189,67 @@ describe('ProducaoView (app-cozinha)', () => {
     renderView()
 
     expect(await screen.findByRole('button', { name: 'Baixa já realizada' })).toBeDisabled()
+  })
+
+  it('marca visualmente todas as refeições já concluídas no dia', async () => {
+    getStatusDoDia.mockResolvedValue({
+      sincronizado_em: '2026-08-02T12:00:00-03:00',
+      refeicoes: [
+        { refeicao: 'CAFE_MANHA', baixa_realizada: true, status: 'CONCLUIDA' },
+        { refeicao: 'ALMOCO', baixa_realizada: false, status: null },
+        { refeicao: 'LANCHE_TARDE', baixa_realizada: true, status: 'PARCIAL' },
+      ],
+    })
+
+    renderView()
+
+    expect(await screen.findByRole('button', { name: 'Café da manhã' })).toHaveClass('completed')
+    expect(screen.getByRole('button', { name: 'Lanche da tarde' })).toHaveClass('completed')
+    expect(screen.getByRole('button', { name: 'Almoço' })).not.toHaveClass('completed')
+  })
+
+  it('oferece o histórico recente de baixas para consulta', async () => {
+    getStatusDoDia.mockResolvedValue({
+      sincronizado_em: '2026-08-02T12:00:00-03:00',
+      refeicoes: [],
+      historico_recente: [
+        {
+          data: '2026-08-01',
+          refeicao: 'ALMOCO',
+          refeicao_label: 'Almoço',
+          status: 'CONCLUIDA',
+        },
+      ],
+    })
+
+    renderView()
+
+    expect(await screen.findByText('Histórico de baixas')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Histórico de baixas'))
+    expect(screen.getByText('01/08/2026 · Almoço')).toBeInTheDocument()
+    expect(screen.getByText('Concluída')).toBeInTheDocument()
+  })
+
+  it('mostra a fila e confirma antes de remover uma baixa rejeitada', async () => {
+    filaBaixas.list.mockReturnValue([
+      { id: 'pendente-1', payload: {}, status: 'pending' },
+      { id: 'rejeitada-1', payload: {}, status: 'attention' },
+    ])
+    const confirmar = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    renderView()
+
+    expect(await screen.findByRole('region', { name: 'Sincronização pendente' })).toHaveTextContent(
+      '1 pendente(s) · 1 requer(em) atenção',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remover registro pendente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remover registro rejeitado' }))
+
+    expect(filaBaixas.retry).toHaveBeenCalledTimes(1)
+    expect(confirmar).toHaveBeenCalledTimes(2)
+    expect(filaBaixas.remove).toHaveBeenCalledWith('pendente-1')
+    expect(filaBaixas.remove).toHaveBeenCalledWith('rejeitada-1')
+    confirmar.mockRestore()
   })
 })

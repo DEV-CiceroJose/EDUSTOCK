@@ -1,5 +1,7 @@
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
@@ -7,6 +9,13 @@ from django.contrib.auth.models import User
 from django.contrib.auth.hashers import check_password, identify_hasher, make_password
 from django.utils.crypto import salted_hmac
 from django.utils import timezone
+
+
+REFEICAO_CHOICES = [
+    ("CAFE_MANHA", "Café da manhã"),
+    ("ALMOCO", "Almoço"),
+    ("LANCHE_TARDE", "Lanche da tarde"),
+]
 
 
 class Categoria(models.Model):
@@ -47,11 +56,17 @@ class Produto(models.Model):
         ("CX", "Caixa"),
         ("PC", "Pacote"),
     ]
+    UNIDADE_CONSUMO_CHOICES = [
+        ("G", "Grama"),
+        ("ML", "Mililitro"),
+        ("UN", "Unidade"),
+    ]
     PERIODICIDADE_CHOICES = [
         ("SEMANAL", "Semanal"),
         ("MENSAL", "Mensal"),
         ("EVENTUAL", "Eventual"),
     ]
+    CONVERSOES_DIMENSIONAIS_FIXAS = {"KG": "G", "L": "ML", "UN": "UN"}
 
     nome = models.CharField("Nome", max_length=200)
     grupo = models.ForeignKey("Grupo", on_delete=models.PROTECT, related_name="produtos")
@@ -60,6 +75,19 @@ class Produto(models.Model):
     )
     quantidade = models.DecimalField("Quantidade", max_digits=10, decimal_places=3, default=0)
     unidade = models.CharField(max_length=2, choices=UNIDADE_CHOICES)
+    unidade_consumo = models.CharField(
+        max_length=2,
+        choices=UNIDADE_CONSUMO_CHOICES,
+        null=True,
+        blank=True,
+    )
+    conteudo_por_unidade = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
     estoque_minimo = models.DecimalField(
         "Estoque mínimo", max_digits=10, decimal_places=3, default=0
     )
@@ -82,6 +110,49 @@ class Produto(models.Model):
 
     def __str__(self):
         return self.nome
+
+    def tem_dependencias_consumo(self):
+        if not self.pk:
+            return False
+        return hasattr(self, "fator_consumo") or self.usos_em_receitas.exists()
+
+    @classmethod
+    def conversao_dimensional_compativel(cls, unidade, unidade_consumo):
+        """Caixas e pacotes usam a unidade do conteúdo declarada pelo cadastro."""
+        if not unidade_consumo:
+            return True
+        unidade_esperada = cls.CONVERSOES_DIMENSIONAIS_FIXAS.get(unidade)
+        return unidade_esperada is None or unidade_consumo == unidade_esperada
+
+    def clean(self):
+        super().clean()
+        if self.unidade_consumo and self.conteudo_por_unidade is None:
+            raise ValidationError(
+                {"conteudo_por_unidade": "Informe o conteúdo por unidade de estoque."}
+            )
+        if self.conteudo_por_unidade is not None and not self.unidade_consumo:
+            raise ValidationError(
+                {"unidade_consumo": "Informe a unidade usada no consumo."}
+            )
+        if not self.conversao_dimensional_compativel(
+            self.unidade, self.unidade_consumo
+        ):
+            raise ValidationError({
+                "unidade_consumo": (
+                    "A unidade de consumo é incompatível com a unidade de estoque."
+                )
+            })
+        if (
+            not self.unidade_consumo
+            and self.conteudo_por_unidade is None
+            and self.tem_dependencias_consumo()
+        ):
+            raise ValidationError({
+                "unidade_consumo": (
+                    "A conversão não pode ser removida enquanto o produto "
+                    "estiver em uso em fatores ou receitas."
+                )
+            })
 
 
 class Fornecedor(models.Model):
@@ -177,6 +248,34 @@ class Entrada(models.Model):
         )
 
 
+class LoteEstoque(models.Model):
+    produto = models.ForeignKey(Produto, on_delete=models.PROTECT, related_name="lotes")
+    entrada = models.ForeignKey(
+        Entrada,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lotes",
+    )
+    codigo = models.CharField(max_length=80)
+    validade = models.DateField(null=True, blank=True, db_index=True)
+    quantidade = models.DecimalField(max_digits=10, decimal_places=3, default=0)
+    preco_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = [models.F("validade").asc(nulls_last=True), "criado_em"]
+        constraints = [
+            models.UniqueConstraint(fields=["produto", "codigo"], name="unique_lote_por_produto"),
+            models.CheckConstraint(condition=Q(quantidade__gte=0), name="lote_quantidade_nao_negativa"),
+        ]
+        verbose_name = "Lote de estoque"
+        verbose_name_plural = "Lotes de estoque"
+
+    def __str__(self):
+        return f"{self.produto.nome} · {self.codigo}"
+
+
 class Movimentacao(models.Model):
     ENTRADA = "ENTRADA"
     SAIDA = "SAIDA"
@@ -188,6 +287,13 @@ class Movimentacao(models.Model):
     preco_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     entrada = models.ForeignKey(
         Entrada, on_delete=models.CASCADE, null=True, blank=True, related_name="itens"
+    )
+    corrige_movimentacao = models.OneToOneField(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="estorno",
     )
     motivo = models.CharField(max_length=120, blank=True)
     data = models.DateField(default=timezone.localdate, db_index=True)
@@ -205,6 +311,34 @@ class Movimentacao(models.Model):
         return f"{self.tipo} {self.quantidade:.3f} {self.produto.nome}"
 
 
+class AlocacaoLoteMovimentacao(models.Model):
+    movimentacao = models.ForeignKey(
+        Movimentacao,
+        on_delete=models.CASCADE,
+        related_name="alocacoes_lote",
+    )
+    lote = models.ForeignKey(
+        LoteEstoque,
+        on_delete=models.PROTECT,
+        related_name="alocacoes",
+    )
+    quantidade = models.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        validators=[MinValueValidator(Decimal("0.001"))],
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["movimentacao", "lote"],
+                name="unique_alocacao_lote_movimentacao",
+            )
+        ]
+        verbose_name = "Alocação de lote"
+        verbose_name_plural = "Alocações de lotes"
+
+
 class FrequenciaDiaria(models.Model):
     MANHA = "MANHA"
     TARDE = "TARDE"
@@ -217,12 +351,13 @@ class FrequenciaDiaria(models.Model):
 
     data = models.DateField(default=timezone.localdate)
     turno = models.CharField(max_length=8, choices=TURNO_CHOICES)
-    turma = models.CharField(max_length=20)
+    turma = models.CharField(max_length=100)
     quantidade_alunos = models.PositiveIntegerField()
+    operacao_id = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     # Identificador do PIN/turma que enviou via app-alunos (vazio quando
     # o registro foi feito pelo painel administrativo).
     registrado_por_turma = models.CharField(
-        max_length=20,
+        max_length=100,
         blank=True,
         default="",
         verbose_name="Registrado pela turma (PIN)",
@@ -251,7 +386,7 @@ class FatorConsumo(models.Model):
     produto = models.OneToOneField(
         Produto, on_delete=models.CASCADE, related_name="fator_consumo"
     )
-    gramas_por_aluno = models.DecimalField(max_digits=6, decimal_places=2)
+    quantidade_por_aluno = models.DecimalField(max_digits=6, decimal_places=2)
     ativo = models.BooleanField(default=True)
 
     class Meta:
@@ -259,7 +394,98 @@ class FatorConsumo(models.Model):
         verbose_name_plural = "Fatores de consumo"
 
     def __str__(self):
-        return f"{self.produto.nome}: {self.gramas_por_aluno}/aluno"
+        return f"{self.produto.nome}: {self.quantidade_por_aluno}/aluno"
+
+    def clean(self):
+        super().clean()
+        if self.produto_id and (
+            not self.produto.unidade_consumo
+            or self.produto.conteudo_por_unidade is None
+        ):
+            raise ValidationError(
+                {"produto": "Configure a conversão de unidade do produto."}
+            )
+        if self.produto_id and not Produto.conversao_dimensional_compativel(
+            self.produto.unidade, self.produto.unidade_consumo
+        ):
+            raise ValidationError(
+                {"produto": "A conversão de unidade do produto é incompatível."}
+            )
+
+
+class Receita(models.Model):
+    nome = models.CharField(max_length=150, unique=True)
+    refeicao = models.CharField(max_length=12, choices=REFEICAO_CHOICES)
+    ativa = models.BooleanField(default=True)
+    observacao = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["refeicao", "nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class ReceitaIngrediente(models.Model):
+    receita = models.ForeignKey(Receita, on_delete=models.CASCADE, related_name="ingredientes")
+    produto = models.ForeignKey(Produto, on_delete=models.PROTECT, related_name="usos_em_receitas")
+    quantidade_por_aluno = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+
+    class Meta:
+        ordering = ["produto__nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["receita", "produto"],
+                name="unique_ingrediente_por_receita",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.receita}: {self.produto}"
+
+    def clean(self):
+        super().clean()
+        if self.produto_id and (
+            not self.produto.unidade_consumo
+            or self.produto.conteudo_por_unidade is None
+        ):
+            raise ValidationError(
+                {"produto": "Configure a conversão de unidade do produto."}
+            )
+        if self.produto_id and not Produto.conversao_dimensional_compativel(
+            self.produto.unidade, self.produto.unidade_consumo
+        ):
+            raise ValidationError(
+                {"produto": "A conversão de unidade do produto é incompatível."}
+            )
+
+
+class Cardapio(models.Model):
+    data = models.DateField(db_index=True)
+    refeicao = models.CharField(max_length=12, choices=REFEICAO_CHOICES)
+    receita = models.ForeignKey(Receita, on_delete=models.PROTECT, related_name="cardapios")
+    observacao = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-data", "refeicao"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data", "refeicao"],
+                name="unique_cardapio_por_refeicao_dia",
+            )
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.receita_id and self.refeicao != self.receita.refeicao:
+            raise ValidationError({"receita": "A receita deve pertencer à mesma refeição."})
+
+    def __str__(self):
+        return f"{self.data} · {self.get_refeicao_display()} · {self.receita}"
 
 
 class OperacaoBaixaProducao(models.Model):

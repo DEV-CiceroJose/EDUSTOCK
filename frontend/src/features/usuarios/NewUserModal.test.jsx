@@ -11,7 +11,7 @@ describe("NewUserModal", () => {
     expect(screen.queryByText("Novo usuário")).not.toBeInTheDocument()
   })
 
-  it("botão Criar usuário começa desabilitado e só habilita com usuário e senha preenchidos", async () => {
+  it("exige ao menos um módulo ao criar um operador", async () => {
     const user = userEvent.setup()
     render(<NewUserModal open onClose={vi.fn()} onCreated={vi.fn()} />)
     const botao = screen.getByRole("button", { name: /criar usuário/i })
@@ -19,6 +19,8 @@ describe("NewUserModal", () => {
     await user.type(screen.getByLabelText(/^usuário$/i), "maria")
     expect(botao).toBeDisabled()
     await user.type(screen.getByLabelText(/senha/i), "senha-boa-123")
+    expect(botao).toBeDisabled()
+    await user.click(screen.getByLabelText("inventario"))
     expect(botao).toBeEnabled()
   })
 
@@ -33,6 +35,7 @@ describe("NewUserModal", () => {
     render(<NewUserModal open onClose={onClose} onCreated={onCreated} />)
     await user.type(screen.getByLabelText(/^usuário$/i), "maria")
     await user.type(screen.getByLabelText(/senha/i), "senha-boa-123")
+    await user.click(screen.getByLabelText("inventario"))
     await user.click(screen.getByRole("button", { name: /criar usuário/i }))
     await waitFor(() => expect(onCreated).toHaveBeenCalledWith({ id: 7, username: "maria", papel: "OPERADOR" }))
     await waitFor(() => expect(onClose).toHaveBeenCalled())
@@ -48,6 +51,7 @@ describe("NewUserModal", () => {
     render(<NewUserModal open onClose={onClose} onCreated={vi.fn()} />)
     await user.type(screen.getByLabelText(/^usuário$/i), "maria")
     await user.type(screen.getByLabelText(/senha/i), "senha-boa-123")
+    await user.click(screen.getByLabelText("inventario"))
     await user.click(screen.getByRole("button", { name: /criar usuário/i }))
     await waitFor(() => expect(screen.getByText("user with this username already exists.")).toBeInTheDocument())
     expect(onClose).not.toHaveBeenCalled()
@@ -60,6 +64,7 @@ describe("NewUserModal", () => {
     render(<NewUserModal open onClose={onClose} onCreated={vi.fn()} />)
     await user.type(screen.getByLabelText(/^usuário$/i), "maria")
     await user.type(screen.getByLabelText(/senha/i), "senha-boa-123")
+    await user.click(screen.getByLabelText("inventario"))
     await user.click(screen.getByRole("button", { name: /criar usuário/i }))
     await waitFor(() => expect(screen.getByText("Falha na conexão. Tente novamente.")).toBeInTheDocument())
     expect(onClose).not.toHaveBeenCalled()

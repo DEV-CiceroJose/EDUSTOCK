@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
-  <title id="title">EasyStock Alunos</title>
+  <title id="title">EduStock Alunos</title>
   <rect width="512" height="512" fill="#214d3f"/>
   <circle cx="256" cy="256" r="166" fill="#f3efe4"/>
-  <path d="M130 224 256 153l126 71-126 71-126-71Z" fill="#2f7a5b" stroke="#214d3f" stroke-width="18" stroke-linejoin="round"/>
-  <path d="M177 255v69c0 22 36 42 79 42s79-20 79-42v-69" fill="none" stroke="#214d3f" stroke-width="20" stroke-linecap="round"/>
-  <path d="M382 225v87" fill="none" stroke="#e07a3e" stroke-width="18" stroke-linecap="round"/>
-  <circle cx="382" cy="329" r="13" fill="#e07a3e"/>
+  <g transform="translate(128 128)" fill="#214d3f">
+    <path d="M251.76,88.94l-120-64a8,8,0,0,0-7.52,0l-120,64a8,8,0,0,0,0,14.12L32,117.87v48.42a15.91,15.91,0,0,0,4.06,10.65C49.16,191.53,78.51,216,128,216a130,130,0,0,0,48-8.76V240a8,8,0,0,0,16,0V199.51a115.63,115.63,0,0,0,27.94-22.57A15.91,15.91,0,0,0,224,166.29V117.87l27.76-14.81a8,8,0,0,0,0-14.12ZM128,200c-43.27,0-68.72-21.14-80-33.71V126.4l76.24,40.66a8,8,0,0,0,7.52,0L176,143.47v46.34C163.4,195.69,147.52,200,128,200Zm80-33.75a97.83,97.83,0,0,1-16,14.25V134.93l16-8.53ZM188,118.94l-.22-.13-56-29.87a8,8,0,0,0-7.52,14.12L171,128l-43,22.93L25,96,128,41.07,231,96Z"/>
+  </g>
 </svg>

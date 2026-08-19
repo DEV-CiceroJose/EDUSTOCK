@@ -4,6 +4,13 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 
 
+def _restore_latest_schema():
+    """Restaura todos os apps antes do flush do TransactionTestCase."""
+    executor = MigrationExecutor(connection)
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
+
+
 class RepointDataMigrationTest(TransactionTestCase):
     migrate_from = ("core", "0004_fundacao_grupo_bempermanente")
     migrate_to = ("core", "0005_repoint_produtos_para_grupo")
@@ -40,8 +47,7 @@ class RepointDataMigrationTest(TransactionTestCase):
         self.assertEqual(Grupo.objects.filter(nome="Geral").count(), 0)
 
     def tearDown(self):
-        # deixa o banco de teste na migração mais recente
-        self._migrate(("core", "0005_repoint_produtos_para_grupo"))
+        _restore_latest_schema()
 
 
 class SaldoInicialMigrationTest(TransactionTestCase):
@@ -76,7 +82,7 @@ class SaldoInicialMigrationTest(TransactionTestCase):
         self.assertEqual(mov.quantidade, Decimal("10.000"))
 
     def tearDown(self):
-        self._migrate(("core", "0009_saldo_inicial"))
+        _restore_latest_schema()
 
 
 class ProtecaoPinMigrationTest(TransactionTestCase):
@@ -115,4 +121,47 @@ class ProtecaoPinMigrationTest(TransactionTestCase):
         self.assertEqual(len(protegido.pin_fingerprint), 64)
 
     def tearDown(self):
-        self._migrate(self.migrate_to)
+        _restore_latest_schema()
+
+
+class MaterializaLotesLegadosMigrationTest(TransactionTestCase):
+    migrate_from = ("core", "0023_estorno_movimentacao")
+    migrate_to = ("core", "0024_materializa_lotes_legados")
+
+    def _migrate(self, target):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate([target])
+        return executor.loader.project_state([target]).apps
+
+    def test_materializa_apenas_diferenca_entre_saldo_e_lotes(self):
+        apps = self._migrate(self.migrate_from)
+        Categoria = apps.get_model("core", "Categoria")
+        Grupo = apps.get_model("core", "Grupo")
+        Produto = apps.get_model("core", "Produto")
+        LoteEstoque = apps.get_model("core", "LoteEstoque")
+        categoria = Categoria.objects.create(name="Legado")
+        grupo = Grupo.objects.create(nome="Geral", categoria=categoria)
+        produto = Produto.objects.create(
+            nome="Arroz legado", grupo=grupo, quantidade=Decimal("10"), unidade="KG"
+        )
+        LoteEstoque.objects.create(
+            produto=produto, codigo="LOTE-EXISTENTE", quantidade=Decimal("3")
+        )
+
+        apps = self._migrate(self.migrate_to)
+        LoteEstoque = apps.get_model("core", "LoteEstoque")
+        legado = LoteEstoque.objects.get(
+            produto_id=produto.pk, codigo=f"LEGADO-0024-{produto.pk}"
+        )
+        self.assertEqual(legado.quantidade, Decimal("7.000"))
+
+        apps = self._migrate(self.migrate_from)
+        LoteEstoque = apps.get_model("core", "LoteEstoque")
+        self.assertFalse(
+            LoteEstoque.objects.filter(codigo=f"LEGADO-0024-{produto.pk}").exists()
+        )
+        self.assertTrue(LoteEstoque.objects.filter(codigo="LOTE-EXISTENTE").exists())
+
+    def tearDown(self):
+        _restore_latest_schema()

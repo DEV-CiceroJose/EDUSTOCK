@@ -3,12 +3,16 @@
  * política de retry ficam no pacote compartilhado dos apps operacionais.
  */
 
-import { createOperacaoHttpClient } from "@edustock/operacao-shared"
+import { createOfflineQueue, createOperacaoHttpClient } from "@edustock/operacao-shared"
 
 const OPERACOES_PENDENTES_KEY = "cozinha_operacoes_pendentes"
 const http = createOperacaoHttpClient({
   baseUrl: import.meta.env.VITE_API_BASE ?? "",
   tokenKey: "cozinha_token",
+})
+export const filaBaixas = createOfflineQueue({
+  storageKey: "edustock:cozinha:fila-baixas",
+  send: (body) => http.request("POST", "/api/operacao/baixa-de-producao/", body, { retry: false }),
 })
 
 export async function login(pin) {
@@ -22,6 +26,7 @@ export async function login(pin) {
   }
 
   http.setToken(data.token)
+  void sincronizarBaixasPendentes()
   return data
 }
 
@@ -82,15 +87,33 @@ export async function getPlano(data, refeicao) {
   )
 }
 
+export async function getStatusDoDia(data) {
+  return http.request(
+    "GET",
+    `/api/operacao/status-do-dia/?data=${encodeURIComponent(data)}`,
+    undefined,
+    { retry: true },
+  )
+}
+
 export async function baixaProducao(data, refeicao, itens, operacaoId = obterOperacaoPendente(data, refeicao)) {
   const body = { data, refeicao, operacao_id: operacaoId }
   if (itens) body.itens = itens
-  return http.request(
-    "POST",
-    "/api/operacao/baixa-de-producao/",
-    body,
-    { retry: false },
-  )
+  try {
+    return await http.request("POST", "/api/operacao/baixa-de-producao/", body, { retry: false })
+  } catch (error) {
+    if (!error.status) {
+      filaBaixas.add(body)
+      error.enfileirada = true
+    }
+    throw error
+  }
+}
+
+export const sincronizarBaixasPendentes = () => filaBaixas.flush()
+
+if (typeof window !== "undefined") {
+  window.addEventListener("online", () => void sincronizarBaixasPendentes())
 }
 
 export async function consultarBaixa(operacaoId) {

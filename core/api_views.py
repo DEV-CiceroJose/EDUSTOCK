@@ -1,21 +1,27 @@
 from datetime import datetime
 
 from rest_framework import viewsets, filters, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import OuterRef, Subquery
-from plataforma.permissions import LeituraOuAdmin, RequerModuloAtivo
-from .models import Produto, Categoria, Grupo, BemPermanente, Fornecedor, Entrada, Movimentacao
+from plataforma.permissions import EhAdmin, LeituraOuAdmin, RequerModuloAtivo
+from .models import (
+    BemPermanente, Cardapio, Categoria, Entrada, Fornecedor, Grupo,
+    LoteEstoque, Movimentacao, Produto, Receita,
+)
 from .serializers import (
     ProdutoSerializer, CategoriaSerializer, GrupoSerializer,
     BemPermanenteSerializer, FornecedorSerializer,
-    MovimentacaoSerializer, EntradaSerializer,
+    MovimentacaoSerializer, EntradaSerializer, LoteEstoqueSerializer,
+    ReceitaSerializer, CardapioSerializer,
 )
-from .services import registrar_movimentacao
+from .services import registrar_estorno, registrar_movimentacao
 from .alerts import coletar_alertas
 from .relatorios import gerar_prestacao_contas
+from plataforma.permissions import slugs_modulos_do_usuario
 
 
 def _parse_date_param(value, label):
@@ -72,7 +78,11 @@ class PrestacaoContasView(APIView):
                 {"detail": "inicio não pode ser posterior a fim."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return Response(gerar_prestacao_contas(inicio=inicio, fim=fim))
+        return Response(gerar_prestacao_contas(
+            inicio=inicio,
+            fim=fim,
+            incluir_financeiro="financeiro" in slugs_modulos_do_usuario(request.user),
+        ))
 
 
 class CategoriaViewSet(viewsets.ModelViewSet):
@@ -197,6 +207,22 @@ class MovimentacaoViewSet(viewsets.ModelViewSet):
         out = self.get_serializer(mov)
         return Response(out.data, status=status.HTTP_201_CREATED)
 
+    @action(
+        detail=True,
+        methods=["post"],
+        permission_classes=[IsAuthenticated, RequerModuloAtivo("movimentacoes"), EhAdmin],
+    )
+    def estornar(self, request, pk=None):
+        try:
+            movimento = registrar_estorno(
+                movimentacao=self.get_object(),
+                motivo=str(request.data.get("motivo", "")).strip(),
+                user=request.user,
+            )
+        except DjangoValidationError as e:
+            return Response({"detail": e.messages}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(self.get_serializer(movimento).data, status=status.HTTP_201_CREATED)
+
 
 class EntradaViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RequerModuloAtivo("movimentacoes")]
@@ -215,3 +241,28 @@ class EntradaViewSet(viewsets.ModelViewSet):
             return Response({"detail": e.messages}, status=status.HTTP_400_BAD_REQUEST)
         out = self.get_serializer(entrada)
         return Response(out.data, status=status.HTTP_201_CREATED)
+
+
+class LoteEstoqueViewSet(viewsets.ReadOnlyModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("inventario")]
+    serializer_class = LoteEstoqueSerializer
+
+    def get_queryset(self):
+        qs = LoteEstoque.objects.select_related("produto", "entrada").all()
+        if self.request.query_params.get("produto"):
+            qs = qs.filter(produto_id=self.request.query_params["produto"])
+        if self.request.query_params.get("ativos") in ("1", "true"):
+            qs = qs.filter(quantidade__gt=0)
+        return qs
+
+
+class ReceitaViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("merenda"), LeituraOuAdmin]
+    serializer_class = ReceitaSerializer
+    queryset = Receita.objects.prefetch_related("ingredientes__produto").all()
+
+
+class CardapioViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("merenda"), LeituraOuAdmin]
+    serializer_class = CardapioSerializer
+    queryset = Cardapio.objects.select_related("receita").all()

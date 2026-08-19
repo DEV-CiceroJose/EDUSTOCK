@@ -49,3 +49,8 @@ class LegacyProductDataMigrationTest(TransactionTestCase):
         self.assertEqual(ConfiguracaoAlertas.objects.get(pk=1).estoque_percentual, 20)
         self.assertFalse(hasattr(produto, "preco"))
         self.assertFalse(hasattr(produto, "numero_nota_fiscal"))
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())

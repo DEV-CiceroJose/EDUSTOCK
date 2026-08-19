@@ -3,25 +3,29 @@ import {
   baixaProducao,
   concluirOperacaoPendente,
   consultarBaixa,
+  filaBaixas,
   getPlano,
   login,
   logout,
   obterOperacaoPendente,
+  sincronizarBaixasPendentes,
 } from './api.js'
 
 const originalFetch = global.fetch
 
-function respostaJson(status, data) {
+function respostaJson(status, data, headers = { get: () => null }) {
   return {
     ok: status >= 200 && status < 300,
     status,
     json: async () => data,
+    headers,
   }
 }
 
 describe('api.js — retry de rede', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -57,12 +61,48 @@ describe('api.js — retry de rede', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('preserva uma baixa em fila local quando a rede está indisponível', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+
+    await expect(baixaProducao(
+      '2026-07-17',
+      'ALMOCO',
+      undefined,
+      '11111111-1111-4111-8111-111111111111',
+    )).rejects.toMatchObject({ enfileirada: true })
+
+    const fila = JSON.parse(localStorage.getItem('edustock:cozinha:fila-baixas'))
+    expect(fila).toMatchObject({ version: 1 })
+    expect(fila.entries).toHaveLength(1)
+    expect(fila.entries[0].payload).toMatchObject({ refeicao: 'ALMOCO' })
+  })
+
   it('erro HTTP de aplicação (4xx) nunca é reenviado, mesmo em endpoint com retry:true', async () => {
     const fetchMock = vi.fn().mockResolvedValue(respostaJson(403, { detail: 'Módulo inativo' }))
     global.fetch = fetchMock
 
     await expect(getPlano('2026-07-17', 'ALMOCO')).rejects.toThrow('Módulo inativo')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('propaga Retry-After do servidor para a fila offline', async () => {
+    filaBaixas.add({
+      data: '2026-07-17',
+      refeicao: 'ALMOCO',
+      operacao_id: '11111111-1111-4111-8111-111111111111',
+    })
+    global.fetch = vi.fn().mockResolvedValue(respostaJson(
+      429,
+      { detail: 'Muitas tentativas' },
+      { get: (name) => name.toLowerCase() === 'retry-after' ? '120' : null },
+    ))
+
+    await sincronizarBaixasPendentes()
+
+    const [entry] = filaBaixas.list()
+    expect(entry.status).toBe('pending')
+    expect(entry.retryAt - Date.now()).toBeGreaterThan(115_000)
+    expect(entry.retryAt - Date.now()).toBeLessThanOrEqual(120_000)
   })
 
   it('preserva o mesmo identificador até a operação ser concluída', () => {

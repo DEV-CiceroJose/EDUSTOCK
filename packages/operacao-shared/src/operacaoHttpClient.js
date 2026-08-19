@@ -5,6 +5,14 @@ function esperar(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function parseRetryAfter(value, now = Date.now()) {
+  if (!value) return null
+  const seconds = Number(value)
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000)
+  const date = Date.parse(value)
+  return Number.isFinite(date) ? Math.max(0, date - now) : null
+}
+
 export function createOperacaoHttpClient({
   baseUrl = "",
   tokenKey,
@@ -46,6 +54,8 @@ export function createOperacaoHttpClient({
         const error = new Error(data.detail ?? `HTTP ${response.status}`)
         error.status = response.status
         error.data = data
+        const retryAfterMs = parseRetryAfter(response.headers?.get?.("Retry-After"))
+        if (retryAfterMs !== null) error.retryAfterMs = retryAfterMs
         throw error
       }
 

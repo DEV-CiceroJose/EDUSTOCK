@@ -1,5 +1,6 @@
 import { dataBR } from "./format"
 import { getModulosAtivos } from "./auth"
+import { dataLocalISO } from "./date"
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -7,20 +8,20 @@ const MESES = [
 ]
 
 export function isoHoje() {
-  return new Date().toISOString().slice(0, 10)
+  return dataLocalISO()
 }
 
 export function periodoMesAtual() {
   const hoje = new Date()
   const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-  return { inicio: inicio.toISOString().slice(0, 10), fim: isoHoje() }
+  return { inicio: dataLocalISO(inicio), fim: isoHoje() }
 }
 
 export function periodoTrimestre() {
   const hoje = new Date()
   const trimInicio = Math.floor(hoje.getMonth() / 3) * 3
   const inicio = new Date(hoje.getFullYear(), trimInicio, 1)
-  return { inicio: inicio.toISOString().slice(0, 10), fim: isoHoje() }
+  return { inicio: dataLocalISO(inicio), fim: isoHoje() }
 }
 
 export function formatPeriodoLabel(inicio, fim) {

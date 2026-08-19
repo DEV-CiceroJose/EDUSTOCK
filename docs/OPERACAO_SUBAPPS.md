@@ -20,6 +20,7 @@ Atualizado em 2 de agosto de 2026.
 - `VITE_IDLE_TIMEOUT_MIN` aceita um número positivo de minutos.
 - Sair ou atingir o limite de inatividade limpa o estado local e tenta
   invalidar o token no servidor.
+- Trocar ou desativar o PIN revoga imediatamente as sessões abertas por ele.
 - Nenhum PIN deve ficar em arquivo `.env`, código-fonte ou bundle.
 
 ## Endpoints
@@ -30,9 +31,11 @@ Atualizado em 2 de agosto de 2026.
 | DELETE | `/api/operacao/auth/logout/` | Invalidação da sessão |
 | POST | `/api/operacao/contagem/` | Registro da presença integral |
 | GET | `/api/operacao/contagem/` | Consulta das frequências do dia |
+| GET | `/api/operacao/status-do-dia/` | Sincronização e histórico operacional |
 | GET | `/api/operacao/plano-do-dia/?data=YYYY-MM-DD&refeicao=...` | Plano da refeição |
 | POST | `/api/operacao/baixa-de-producao/` | Baixa idempotente do estoque |
 | GET | `/api/operacao/baixa-de-producao/?operacao_id=...` | Reconciliação de uma baixa |
+| GET | `/api/health/` | Saúde do banco e do cache |
 
 Refeições aceitas: `CAFE_MANHA`, `ALMOCO` e `LANCHE_TARDE`.
 
@@ -61,7 +64,9 @@ Refeições aceitas: `CAFE_MANHA`, `ALMOCO` e `LANCHE_TARDE`.
 7. Abrir e cancelar a confirmação de baixa sem alterar estoque.
 8. Em ambiente descartável, baixar uma refeição e conferir as movimentações.
 9. Atualizar a página e confirmar `Baixa já realizada` na refeição processada.
-10. Conferir logout manual, expiração de sessão e mensagem de conexão offline.
+10. Abrir os históricos recentes nos dois aplicativos.
+11. Conferir logout manual, expiração de sessão e mensagem de conexão offline.
+12. Confirmar que `/api/health/` responde com banco e cache disponíveis.
 
 ## Riscos e decisões pendentes
 
@@ -71,8 +76,8 @@ Refeições aceitas: `CAFE_MANHA`, `ALMOCO` e `LANCHE_TARDE`.
   exigiria outra regra operacional.
 - Frequências históricas mantêm os turnos antigos para preservar os dados;
   novas turmas e sessões são integrais.
-- O PIN identifica o perfil operacional, mas ainda não registra o nome da
-  pessoa que executou cada baixa.
+- O campo `titular` identifica o responsável pelo PIN, mas a baixa ainda não
+  registra separadamente qual pessoa usou um PIN compartilhado.
 - Redis continua recomendado para sessões compartilhadas em produção; sem
   `REDIS_URL`, o cache utiliza a tabela do banco.
 

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import PinLogin from './PinLogin.jsx'
 import { login } from './api.js'
@@ -11,9 +11,10 @@ vi.mock('./api.js', () => ({
 describe('PinLogin (app-cozinha)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
   })
 
-  it('mostra o ícone ChefHat no cabeçalho, sem emoji', () => {
+  it('mostra o ícone Phosphor no cabeçalho, sem emoji', () => {
     render(
       <MemoryRouter>
         <PinLogin />
@@ -21,6 +22,7 @@ describe('PinLogin (app-cozinha)', () => {
     )
 
     expect(screen.getByTestId('icone-cabecalho')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'EduStock Cozinha' })).toBeInTheDocument()
     expect(screen.queryByText('🍽️')).not.toBeInTheDocument()
     expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'false')
   })
@@ -39,5 +41,18 @@ describe('PinLogin (app-cozinha)', () => {
     })
 
     expect(login).toHaveBeenCalledWith('1234')
+  })
+
+  it('bloqueia o teclado quando o dispositivo está sem conexão', () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+
+    render(
+      <MemoryRouter>
+        <PinLogin />
+      </MemoryRouter>
+    )
+
+    expect(screen.getByText('Sem conexão. Conecte o dispositivo à internet para entrar.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '1' })).toBeDisabled()
   })
 })

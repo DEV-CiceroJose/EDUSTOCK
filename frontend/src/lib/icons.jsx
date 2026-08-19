@@ -7,6 +7,8 @@ const base = (s) => ({
 export const Icon = {
   menu: (s = 22) => (<svg {...base(s)}><path d="M3 6h18M3 12h18M3 18h18" /></svg>),
   search: (s = 20) => (<svg {...base(s)}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>),
+  eye: (s = 20) => (<svg {...base(s)}><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.8" /></svg>),
+  eyeOff: (s = 20) => (<svg {...base(s)}><path d="m3 3 18 18" /><path d="M10.6 6.2A10.8 10.8 0 0 1 12 6c6 0 9.5 6 9.5 6a15 15 0 0 1-2.1 2.8M6.3 6.3C3.8 8 2.5 12 2.5 12s3.5 6 9.5 6a9.7 9.7 0 0 0 3.1-.5" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>),
   plus: (s = 18) => (<svg {...base(s)}><path d="M12 5v14M5 12h14" /></svg>),
   minus: (s = 18) => (<svg {...base(s)}><path d="M5 12h14" /></svg>),
   report: (s = 18) => (<svg {...base(s)}><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /><path d="M9 13h6M9 17h4" /></svg>),
