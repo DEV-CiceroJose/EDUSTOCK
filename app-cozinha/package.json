@@ -12,7 +12,7 @@
   "dependencies": {
     "@edustock/operacao-shared": "file:../packages/operacao-shared",
     "@phosphor-icons/react": "^2.1.10",
-    "@tailwindcss/vite": "^4.3.0",
+    "@tailwindcss/vite": "^4.3.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.18.2",
