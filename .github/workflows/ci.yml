@@ -82,7 +82,7 @@ jobs:
           cache-dependency-path: ${{ matrix.app }}/package-lock.json
       - name: Instalar dependências
         working-directory: ${{ matrix.app }}
-        run: npm ci
+        run: npm ci --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=2
       - name: Validar lint
         if: matrix.app == 'frontend'
         working-directory: frontend
@@ -114,9 +114,9 @@ jobs:
             app-cozinha/package-lock.json
       - name: Instalar dependências
         run: |
-          npm ci --prefix frontend
-          npm ci --prefix app-alunos
-          npm ci --prefix app-cozinha
+          npm ci --prefix frontend --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=2
+          npm ci --prefix app-alunos --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=2
+          npm ci --prefix app-cozinha --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=2
       - name: Instalar navegador de testes
         working-directory: frontend
         run: npx playwright install --with-deps chromium
