@@ -29,6 +29,39 @@ jobs:
       - name: Rodar testes
         run: python manage.py test
 
+  postgres:
+    name: Backend PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: edustock_ci
+          POSTGRES_USER: edustock_ci
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U edustock_ci -d edustock_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://edustock_ci:ci-only-password@127.0.0.1:5432/edustock_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+      - name: Aplicar migrações no PostgreSQL vazio
+        run: python manage.py migrate --noinput
+      - name: Rodar testes no PostgreSQL
+        run: python manage.py test --noinput
+
   frontend:
     name: ${{ matrix.app }}
     runs-on: ubuntu-latest
