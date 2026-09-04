@@ -95,6 +95,23 @@ ambiente. Não versionar o arquivo preenchido nem senhas/backups.
 
 ## Limites e acompanhamento
 
+### Verificação adicional em PostgreSQL — 04/09/2026
+
+A branch `edustock-vps` inclui o job `Backend PostgreSQL` no GitHub Actions.
+Ele inicia um PostgreSQL 16 temporário, aplica todas as migrações em um banco
+vazio e executa a suíte completa do servidor. As credenciais declaradas nesse job
+são exclusivas do banco descartável de CI.
+
+A primeira execução aplicou as migrações, mas revelou dados de teste fora do
+contrato de `Turma.curso` e restauração incompleta do banco nos testes históricos
+de migração. Esses testes agora usam um curso válido e restauram as migrações
+atuais de todos os apps antes da limpeza do banco.
+
+Conferir o resultado da revisão a publicar em
+[Actions da branch](https://github.com/DEV-CiceroJose/EDUSTOCK/actions?query=branch%3Aedustock-vps).
+Essa execução não substitui a migração dos dados existentes, a restauração de
+backup nem os testes nos domínios reais da VPS.
+
 ### Segunda revisão: sessão, falhas de rede e isolamento
 
 Foram encontrados e corrigidos problemas adicionais antes da publicação:

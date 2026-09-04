@@ -52,6 +52,6 @@ class SeedModulosMigrationTest(TransactionTestCase):
         self.assertFalse(Modulo.objects.filter(slug="financeiro").exists())
 
     def tearDown(self):
-        # deixa o banco de teste na migração mais recente, como as demais
-        # suítes de migration deste projeto (core.tests.test_migrations)
-        self._migrate(("plataforma", "0004_seed_modulo_financeiro"))
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()

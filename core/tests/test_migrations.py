@@ -40,8 +40,10 @@ class RepointDataMigrationTest(TransactionTestCase):
         self.assertEqual(Grupo.objects.filter(nome="Geral").count(), 0)
 
     def tearDown(self):
-        # deixa o banco de teste na migração mais recente
-        self._migrate(("core", "0005_repoint_produtos_para_grupo"))
+        # Restaura todas as tabelas antes do flush, inclusive dependências entre apps.
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
 
 
 class SaldoInicialMigrationTest(TransactionTestCase):
@@ -76,7 +78,9 @@ class SaldoInicialMigrationTest(TransactionTestCase):
         self.assertEqual(mov.quantidade, Decimal("10.000"))
 
     def tearDown(self):
-        self._migrate(("core", "0009_saldo_inicial"))
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
 
 
 class ProtecaoPinMigrationTest(TransactionTestCase):
@@ -115,4 +119,6 @@ class ProtecaoPinMigrationTest(TransactionTestCase):
         self.assertEqual(len(protegido.pin_fingerprint), 64)
 
     def tearDown(self):
-        self._migrate(self.migrate_to)
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()

@@ -170,7 +170,7 @@ class PinMultiEscolaTest(TestCase):
         self.escola_b = Escola.objects.create(municipio=municipio, nome="B", slug="b")
         for escola in (self.escola_a, self.escola_b):
             turma = Turma.objects.create(
-                escola=escola, nome="6A", curso="Fundamental", ano=6, turno="INTEGRAL"
+                escola=escola, nome="6A", curso=Turma.DS, ano=6, turno=Turma.INTEGRAL
             )
             acesso = PinAcesso(escola=escola, papel=PinAcesso.ALUNO_REP, turma=turma)
             acesso.definir_pin("1234")
