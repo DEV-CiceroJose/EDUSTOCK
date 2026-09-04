@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.db import models
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
@@ -12,6 +13,8 @@ def garantir_vinculo_padrao(user):
     existente = user.vinculos_rede.filter(ativo=True).select_related("municipio", "escola").first()
     if existente:
         return existente
+    if user.vinculos_rede.exists():
+        return None
     escola = Escola.objects.select_related("municipio").get(pk=escola_padrao_id())
     try:
         papel_legado = user.perfil.papel
@@ -49,6 +52,16 @@ def escolas_autorizadas_do_usuario(user):
     else:
         consulta = consulta.filter(pk__in=ids_escolas)
     return consulta.distinct()
+
+
+def usuarios_administraveis(user):
+    municipios = list(vinculos_ativos_do_usuario(user).values_list("municipio_id", flat=True))
+    filtro = models.Q(vinculos_rede__municipio_id__in=municipios)
+    # Contas anteriores ao multi-escola pertencem implicitamente à rede piloto.
+    if Escola.objects.filter(pk=escola_padrao_id(), municipio_id__in=municipios).exists():
+        filtro |= models.Q(vinculos_rede__isnull=True)
+    externos = VinculoUsuario.objects.exclude(municipio_id__in=municipios).values("user_id")
+    return User.objects.filter(filtro).exclude(pk__in=externos).distinct()
 
 
 def escola_do_request(request):

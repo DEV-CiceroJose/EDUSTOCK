@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from .models import Escola, Modulo, Municipio, Perfil, VinculoUsuario
+from .permissions import usuarios_administraveis
 
 
 class MunicipioSerializer(serializers.ModelSerializer):
@@ -12,6 +13,11 @@ class MunicipioSerializer(serializers.ModelSerializer):
 
 class EscolaSerializer(serializers.ModelSerializer):
     municipio_nome = serializers.CharField(source="municipio.nome", read_only=True)
+
+    def validate_municipio(self, municipio):
+        if self.instance and municipio.pk != self.instance.municipio_id:
+            raise serializers.ValidationError("Não é permitido transferir a escola para outro município.")
+        return municipio
 
     class Meta:
         model = Escola
@@ -35,7 +41,13 @@ class VinculoUsuarioSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context.get("request")
-        municipio = getattr(getattr(request, "auth", None), "municipio", None)
+        municipio = getattr(self.instance, "municipio", None) or getattr(getattr(request, "auth", None), "municipio", None)
+        informado = attrs.get("municipio")
+        if municipio and informado and informado.pk != municipio.pk:
+            raise serializers.ValidationError({"municipio": "Município fora do escopo autorizado."})
+        usuario = attrs.get("user")
+        if usuario and request and not usuarios_administraveis(request.user).filter(pk=usuario.pk).exists():
+            raise serializers.ValidationError({"user": "Usuário fora do escopo autorizado."})
         escola = attrs.get("escola", getattr(self.instance, "escola", None))
         if municipio and escola and escola.municipio_id != municipio.pk:
             raise serializers.ValidationError({"escola": "Escola fora do município autorizado."})

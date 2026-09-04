@@ -20,6 +20,7 @@ from .permissions import (
     garantir_vinculo_padrao,
     slugs_modulos_do_usuario,
     vinculos_ativos_do_usuario,
+    usuarios_administraveis,
 )
 from .serializers import (
     EscolaSerializer,
@@ -65,6 +66,8 @@ class LoginView(APIView):
                 {"detail": "Credenciais inválidas."}, status=status.HTTP_401_UNAUTHORIZED
             )
 
+        if user.vinculos_rede.exists() and not user.vinculos_rede.filter(ativo=True).exists():
+            return Response({"detail": "Usuário sem vínculo ativo."}, status=status.HTTP_403_FORBIDDEN)
         ttl_horas = getattr(settings, "LOGIN_TOKEN_TTL_HORAS", 12)
         cache.delete(chave)
         TokenAcesso.objects.filter(expira_em__lte=timezone.now()).delete()
@@ -206,6 +209,9 @@ class UsuarioViewSet(viewsets.ModelViewSet):
     authentication_classes = [TokenAcessoAuthentication]
     permission_classes = [EhAdmin]
     http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_queryset(self):
+        return usuarios_administraveis(self.request.user).select_related("perfil").order_by("username")
 
     def perform_create(self, serializer):
         usuario = serializer.save()

@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 import dj_database_url
+from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 from pathlib import Path
 
@@ -35,8 +36,12 @@ if not SECRET_KEY:
 
 # Seguro por padrão: desenvolvimento com debug precisa ser habilitado explicitamente.
 DEBUG = os.environ.get("DEBUG", "False").strip().lower() in ("1", "true", "yes")
+if IS_PRODUCTION and DEBUG:
+    raise ImproperlyConfigured("DEBUG deve ser False quando APP_ENV=production.")
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [host.strip() for host in os.environ.get(
+    'ALLOWED_HOSTS', 'localhost,127.0.0.1'
+).split(',') if host.strip()]
 
 
 # Application definition
@@ -92,10 +97,13 @@ WSGI_APPLICATION = "easystock.wsgi.application"
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 # Use PostgreSQL in production (Render), SQLite in development
-if 'DATABASE_URL' in os.environ:
+DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+if IS_PRODUCTION and not DATABASE_URL:
+    raise ImproperlyConfigured("DATABASE_URL é obrigatória quando APP_ENV=production.")
+if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.config(
-            default=os.environ.get('DATABASE_URL'),
+            default=DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
         )
@@ -147,7 +155,10 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # WhiteNoise configuration
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -185,7 +196,7 @@ REST_FRAMEWORK = {
 
 # Origem do dev server do Vite (React) e produção
 # Em produção, adicione os domínios da Render
-CORS_ALLOWED_ORIGINS = [
+CORS_ALLOWED_ORIGINS = [] if IS_PRODUCTION else [
     "http://localhost:5173",  # frontend admin (dev)
     "http://127.0.0.1:5173",
     "http://localhost:5174",  # app-alunos (dev)
@@ -193,6 +204,11 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5175",  # app-cozinha (dev)
     "http://127.0.0.1:5175",
 ]
+CORS_ALLOWED_ORIGINS.extend(
+    origin.strip() for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+)
+CORS_ALLOW_HEADERS = (*default_headers, "x-operacao-token")
 
 # Em produção, adicione dinamicamente os domínios do Render
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
@@ -212,7 +228,11 @@ CORS_ALLOW_CREDENTIALS = True
 # login por PIN em /api/operacao/auth/) recebe 403 "CSRF Failed: Origin
 # checking failed", mesmo com CORS liberado — CORS e CSRF são checagens
 # independentes. Mesma lista de origens que CORS_ALLOWED_ORIGINS.
-CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([
+    *CORS_ALLOWED_ORIGINS,
+    *(origin.strip() for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+      if origin.strip()),
+]))
 
 # ------------------------------------------------------------------
 # Módulo de Operação da Merenda

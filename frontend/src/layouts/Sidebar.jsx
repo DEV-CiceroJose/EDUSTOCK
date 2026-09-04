@@ -2,6 +2,7 @@ import { useState } from "react"
 import { NavLink } from "react-router-dom"
 import { Icon } from "../lib/icons.jsx"
 import { getModulosAtivos, ehAdmin, podeVerRede } from "../lib/auth"
+import LogoutButton from "../components/LogoutButton"
 
 const navItems = [
   { to: "/inventario", label: "Inventário", icon: "grid", section: "Operacional", modulo: "inventario" },
@@ -20,11 +21,7 @@ const navItems = [
 export default function Sidebar({ mobile = false, onNavigate, onClose }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const expanded = mobile || isExpanded
-  const labelVisibility = mobile
-    ? "inline"
-    : expanded
-      ? "lg:inline"
-      : "lg:hidden"
+  const labelVisibility = expanded ? "opacity-100" : "opacity-0"
   const modulosAtivos = getModulosAtivos()
   const itensVisiveis = navItems.filter((item) => {
     if (item.somenteAdmin && !ehAdmin()) return false
@@ -40,10 +37,14 @@ export default function Sidebar({ mobile = false, onNavigate, onClose }) {
       className={
         mobile
           ? "fixed inset-y-0 left-0 z-50 flex w-72 flex-col gap-4 overflow-y-auto border-r border-line bg-surface px-3 py-4 shadow-[var(--shadow-pop)] lg:hidden"
-          : `sticky top-0 hidden h-screen ${expanded ? "lg:w-56" : "lg:w-16"} shrink-0 flex-col gap-4 border-r border-line bg-surface/60 px-2 py-4 transition-all duration-300 ease-in-out lg:flex`
+          : `sticky top-0 hidden h-screen ${expanded ? "lg:w-56" : "lg:w-16"} shrink-0 flex-col gap-4 overflow-x-hidden overflow-y-auto border-r border-line bg-surface/60 px-2 py-4 transition-[width] duration-300 ease-in-out lg:flex`
       }
       onMouseEnter={mobile ? undefined : () => setIsExpanded(true)}
       onMouseLeave={mobile ? undefined : () => setIsExpanded(false)}
+      onFocus={mobile ? undefined : () => setIsExpanded(true)}
+      onBlur={mobile ? undefined : (event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setIsExpanded(false)
+      }}
     >
       {mobile && (
         <div className="flex items-center justify-between border-b border-line px-2 pb-3">
@@ -62,8 +63,8 @@ export default function Sidebar({ mobile = false, onNavigate, onClose }) {
         const items = itensVisiveis.filter(item => item.section === section)
         if (items.length === 0) return null
         return (
-          <div key={section} className="flex flex-col gap-1">
-            <h3 className={`${labelVisibility} px-3 py-1 text-xs font-medium uppercase tracking-wider text-neutral-400`}>
+          <div key={section} className="flex shrink-0 flex-col gap-1">
+            <h3 className={`${labelVisibility} h-6 whitespace-nowrap px-3 py-1 text-xs font-medium uppercase tracking-wider text-neutral-400`}>
               {section}
             </h3>
             {items.map((item) => (
@@ -71,9 +72,10 @@ export default function Sidebar({ mobile = false, onNavigate, onClose }) {
                 key={item.to}
                 to={item.to}
                 title={item.label}
+                aria-label={item.label}
                 onClick={onNavigate}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
+                  `flex h-11 shrink-0 items-center gap-3 overflow-hidden px-3 py-2.5 rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-brand ${
                     isActive
                       ? "bg-brand text-[#f4f1e7]"
                       : "text-neutral-600 hover:bg-neutral-100"
@@ -83,7 +85,7 @@ export default function Sidebar({ mobile = false, onNavigate, onClose }) {
                 <span className="shrink-0">
                   {Icon[item.icon](21)}
                 </span>
-                <span className={`${labelVisibility} text-sm font-medium`}>
+                <span className={`${labelVisibility} whitespace-nowrap text-sm font-medium`}>
                   {item.label}
                 </span>
               </NavLink>
@@ -91,6 +93,12 @@ export default function Sidebar({ mobile = false, onNavigate, onClose }) {
           </div>
         )
       })}
+      <div className="mt-auto shrink-0 border-t border-line pt-3">
+        <LogoutButton
+          className="flex h-11 w-full items-center gap-3 overflow-hidden rounded-xl px-3 text-neutral-600 transition-colors hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-brand"
+          labelClassName={`${labelVisibility} whitespace-nowrap text-sm font-medium`}
+        />
+      </div>
     </aside>
   )
 }

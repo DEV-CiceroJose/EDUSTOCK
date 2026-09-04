@@ -10,6 +10,7 @@ export default function Header({
   onMenu,
   menuOpen = false,
   canManage = true,
+  showSearch = true,
 }) {
   const nomeUsuario = getNome()?.trim() || getUsername()?.trim() || "Usuário"
   const papelUsuario = getPapel() === "ADMIN" ? "Administrador" : "Operador"
@@ -33,7 +34,7 @@ export default function Header({
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand text-[#f4f1e7]">
             {Icon.box(22)}
           </div>
-          <div className="leading-none">
+          <div className="hidden leading-none sm:block">
             <div className="font-display text-lg font-bold tracking-tight">Gestor Escolar</div>
             <div className="font-mono text-[0.58rem] uppercase tracking-[0.18em] text-ink-faint">
               Estoque & Refeitório
@@ -42,7 +43,7 @@ export default function Header({
         </div>
 
         {/* Busca global */}
-        <div className="relative mx-1 hidden flex-1 md:block">
+        {showSearch && <div className="relative mx-1 hidden flex-1 md:block">
           <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint">
             {Icon.search(18)}
           </span>
@@ -52,20 +53,21 @@ export default function Header({
             placeholder="Buscar item no estoque…"
             className="field pl-10 relative z-10"
           />
-        </div>
+        </div>}
 
         {/* Ações */}
-        <div className="ml-auto flex items-center gap-2 md:ml-0">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {canManage && (
-            <button onClick={onAddItem} className="btn btn-brand">
+            <button onClick={onAddItem} className="btn btn-brand" aria-label="Adicionar item">
               {Icon.plus(18)} <span className="hidden sm:inline">Adicionar Item</span>
             </button>
           )}
-          <button onClick={onReport} className="btn btn-ghost">
+          <button onClick={onReport} className="btn btn-ghost" aria-label="Relatório">
             {Icon.report(18)} <span className="hidden lg:inline">Relatório</span>
           </button>
           <Link 
             to="/perfil" 
+            aria-label={`Abrir perfil de ${nomeUsuario}`}
             className="ml-1 flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-3 transition-colors hover:bg-surface-2 cursor-pointer"
           >
             <span className="grid h-8 w-8 place-items-center rounded-full bg-brand-tint font-display text-sm font-bold text-brand">
@@ -80,7 +82,7 @@ export default function Header({
       </div>
 
       {/* Busca mobile */}
-      <div className="px-4 pb-3 md:hidden">
+      {showSearch && <div className="px-4 pb-3 md:hidden">
         <div className="relative">
           <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint">
             {Icon.search(18)}
@@ -92,7 +94,7 @@ export default function Header({
             className="field pl-10 relative z-10"
           />
         </div>
-      </div>
+      </div>}
     </header>
   )
 }

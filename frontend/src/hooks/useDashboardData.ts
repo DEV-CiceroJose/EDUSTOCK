@@ -43,7 +43,7 @@ function flattenAlertas(alertas: Alertas): DashboardAlert[] {
   ]
 }
 
-export function useDashboardData() {
+export function useDashboardData(externalSearch?: string) {
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [grupos, setGrupos] = useState<Grupo[]>([])
@@ -54,7 +54,8 @@ export function useDashboardData() {
   const [loadingBase, setLoadingBase] = useState(true)
   const [error, setError] = useState<unknown>(null)
   const [revision, setRevision] = useState(0)
-  const [search, setSearch] = useState("")
+  const [localSearch, setSearch] = useState("")
+  const search = externalSearch ?? localSearch
   const [termo, setTermo] = useState("")
 
   useEffect(() => {

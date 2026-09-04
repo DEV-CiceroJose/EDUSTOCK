@@ -40,6 +40,18 @@ class TokenAcessoAuthenticationTest(TestCase):
         with self.assertRaises(AuthenticationFailed):
             self.auth.authenticate(request)
 
+    def test_usuario_desativado_nao_reutiliza_token_valido(self):
+        token = TokenAcesso.objects.create(
+            user=self.user, expira_em=timezone.now() + timedelta(hours=1)
+        )
+        self.user.is_active = False
+        self.user.save(update_fields=["is_active"])
+        request = self.factory.get(
+            "/api/produtos/", HTTP_AUTHORIZATION=f"Token {token.token}"
+        )
+        with self.assertRaises(AuthenticationFailed):
+            self.auth.authenticate(request)
+
     def test_token_invalido_levanta_erro(self):
         request = self.factory.get(
             "/api/produtos/", HTTP_AUTHORIZATION="Token nao-existe-e-nao-e-uuid"

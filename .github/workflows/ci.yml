@@ -78,10 +78,12 @@ jobs:
           cache-dependency-path: |
             frontend/package-lock.json
             app-alunos/package-lock.json
+            app-cozinha/package-lock.json
       - name: Instalar dependências
         run: |
           npm ci --prefix frontend
           npm ci --prefix app-alunos
+          npm ci --prefix app-cozinha
       - name: Instalar navegador de testes
         working-directory: frontend
         run: npx playwright install --with-deps chromium

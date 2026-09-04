@@ -20,6 +20,7 @@ const ModuloIndisponivelPage = lazy(() => import("./pages/ModuloIndisponivelPage
 const AdminModulosPage = lazy(() => import("./pages/AdminModulosPage"))
 const AdminUsuariosPage = lazy(() => import("./pages/AdminUsuariosPage"))
 const RedeMunicipalPage = lazy(() => import("./pages/RedeMunicipalPage"))
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage"))
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<NotFoundPage />} />
         <Route element={<RequireAuth />}>
           <Route element={<MainLayout />}>
             <Route path="app" element={<Navigate to="/inventario" replace />} />

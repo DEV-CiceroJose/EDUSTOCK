@@ -11,12 +11,13 @@ import NewCategoryModal from "../features/inventario/NewCategoryModal"
 import NewGroupModal from "../features/inventario/NewGroupModal"
 import ConfirmDialog from "../components/ui/ConfirmDialog"
 import { useToast } from "../components/ui/useToast"
-import { useLocation, useNavigate } from "react-router-dom"
+import { useLocation, useNavigate, useOutletContext } from "react-router-dom"
 import { podeGerenciarCadastros } from "../lib/auth"
 import DataLoadError from "../components/ui/DataLoadError"
 
 export default function InventarioPage() {
-  const { produtos, categorias, grupos, fornecedores, loading, error, carregar, counts, visiveis, search } = useDashboardData()
+  const layout = useOutletContext()
+  const { produtos, categorias, grupos, fornecedores, loading, error, carregar, counts, visiveis, search } = useDashboardData(layout?.search)
   const location = useLocation()
   const navigate = useNavigate()
   const canManage = podeGerenciarCadastros()

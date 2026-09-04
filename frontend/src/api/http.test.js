@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { httpProdutos } from "./http"
+import { getToken, salvarSessao } from "../lib/auth"
 
 function resposta(data) {
   return {
@@ -10,7 +11,33 @@ function resposta(data) {
 }
 
 describe("cliente HTTP paginado", () => {
+  beforeEach(() => sessionStorage.clear())
   afterEach(() => vi.unstubAllGlobals())
+
+  it("encerra uma sessão rejeitada pela API", async () => {
+    salvarSessao({ token: "expirado", papel: "ADMIN", modulos_ativos: [] })
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ detail: "Token expirado." }) }))
+    await expect(httpProdutos.list()).rejects.toThrow()
+    expect(getToken()).toBeNull()
+  })
+
+  it("preserva a sessão ao receber falta de permissão", async () => {
+    salvarSessao({ token: "valido", papel: "OPERADOR", modulos_ativos: [] })
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ detail: "Sem permissão." }) }))
+    await expect(httpProdutos.list()).rejects.toThrow()
+    expect(getToken()).toBe("valido")
+  })
+
+  it("uma resposta atrasada não encerra um novo login", async () => {
+    salvarSessao({ token: "antigo", papel: "ADMIN", modulos_ativos: [] })
+    let responder
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => new Promise(resolve => { responder = resolve })))
+    const consulta = httpProdutos.list()
+    salvarSessao({ token: "novo", papel: "ADMIN", modulos_ativos: [] })
+    responder({ ok: false, status: 401, json: async () => ({ detail: "Token expirado." }) })
+    await expect(consulta).rejects.toThrow()
+    expect(getToken()).toBe("novo")
+  })
 
   it("reúne todas as páginas sem mudar o contrato de lista do frontend", async () => {
     const fetchMock = vi.fn()

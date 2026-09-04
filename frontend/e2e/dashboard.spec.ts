@@ -112,7 +112,7 @@ async function entrar(page: Page) {
   await page.goto("/")
   await page.getByRole("link", { name: "Acessar sistema" }).first().click()
   await page.getByLabel("Usuário").fill("gestor")
-  await page.getByLabel("Senha").fill("segredo")
+  await page.getByLabel("Senha", { exact: true }).fill("segredo")
   await page.getByRole("button", { name: "Entrar" }).click()
   await expect(page).toHaveURL(/\/inventario$/)
   await expect(page.getByRole("heading", { name: "Inventário" })).toBeVisible()
@@ -126,6 +126,69 @@ test("landing pública e login do gestor", async ({ page }) => {
   await expect(page.getByText("Estoque sob controle")).toBeVisible()
 
   await entrar(page)
+})
+
+test("sessão expirada retorna ao login com uma explicação", async ({ page }) => {
+  await prepararApi(page)
+  await entrar(page)
+  await page.route("**/api/**", route => json(route, { detail: "Token expirado." }, 401))
+  await page.reload()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByRole("status")).toHaveText("Sua sessão expirou. Entre novamente.")
+  await page.reload()
+  await expect(page.getByRole("status")).toHaveText("Sua sessão expirou. Entre novamente.")
+  expect(await page.evaluate(() => sessionStorage.getItem("edustock:auth:token"))).toBeNull()
+})
+
+test("endereço inexistente oferece retorno ao sistema", async ({ page }) => {
+  await page.goto("/pagina-inexistente")
+  await expect(page.getByRole("heading", { name: "Página não encontrada" })).toBeVisible()
+  await page.getByRole("link", { name: "Voltar ao sistema" }).click()
+  await expect(page).toHaveURL(/\/login$/)
+})
+
+test("menu mantém os destinos no lugar ao expandir e permite sair", async ({ page }) => {
+  await prepararApi(page)
+  await entrar(page)
+  await page.mouse.move(600, 100)
+  const menu = page.locator("aside").first()
+  await expect(menu).toHaveCSS("width", "64px")
+  const merenda = menu.getByRole("link", { name: "Merenda", exact: true })
+  const antes = await merenda.boundingBox()
+  expect(antes).not.toBeNull()
+  await page.mouse.move(antes!.x + 20, antes!.y + antes!.height / 2)
+  await expect(menu).toHaveCSS("width", "224px")
+  const depois = await merenda.boundingBox()
+  expect(depois!.y).toBe(antes!.y)
+  await page.mouse.click(antes!.x + 20, antes!.y + antes!.height / 2)
+  await expect(page).toHaveURL(/\/merenda$/)
+  await menu.getByRole("button", { name: "Sair da conta" }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await page.goto("/inventario")
+  await expect(page).toHaveURL(/\/login$/)
+})
+
+test("menu e logout funcionam no celular sem transbordamento", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await prepararApi(page)
+  await entrar(page)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  await page.getByRole("button", { name: "Abrir menu" }).click()
+  await page.locator("#mobile-navigation").getByRole("button", { name: "Sair da conta" }).click()
+  await expect(page).toHaveURL(/\/login$/)
+})
+
+test("busca do cabeçalho filtra os itens do inventário", async ({ page }) => {
+  await prepararApi(page)
+  await page.route("**/api/produtos/**", async (route) => {
+    const termo = new URL(route.request().url()).searchParams.get("search") || ""
+    return json(route, produto.nome.toLowerCase().includes(termo.toLowerCase()) ? [produto] : [])
+  })
+  await entrar(page)
+  await page.getByPlaceholder("Buscar item no estoque…").fill("feijão")
+  await expect(page.getByText("Nenhum item por aqui")).toBeVisible()
+  await page.getByPlaceholder("Buscar item no estoque…").fill("arroz")
+  await expect(page.getByText("Arroz", { exact: true }).first()).toBeVisible()
 })
 
 test("cria produto e registra o saldo inicial", async ({ page }) => {
@@ -156,7 +219,7 @@ test("registra uma entrada de estoque com nota fiscal", async ({ page }) => {
   await page.getByTitle("Movimentações").click()
   await expect(page.getByRole("heading", { name: "Movimentações" })).toBeVisible()
   await page.getByRole("button", { name: "Nova entrada" }).click()
-  await page.getByLabel("Fornecedor").selectOption("1")
+  await page.getByRole("combobox", { name: /Fornecedor/ }).selectOption("1")
   await page.getByLabel("Nota Fiscal").fill("NF-E2E-01")
   await page.locator("select").filter({ has: page.locator('option[value="1"]') }).last().selectOption("1")
   await page.getByPlaceholder("Qtd").fill("4")

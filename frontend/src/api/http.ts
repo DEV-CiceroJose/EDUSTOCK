@@ -1,3 +1,4 @@
+import { fetchAutenticado } from "../lib/authenticatedFetch"
 /* ------------------------------------------------------------------
    Cliente HTTP para a API REST real do Django (DRF).
    Ativado quando VITE_USE_MOCK=false.
@@ -36,7 +37,7 @@ type PaginatedResponse<T> = {
 async function req<T>(path: string, { method = "GET", body }: RequestOptions = {}): Promise<T> {
   const token = getToken()
   const url = /^https?:\/\//.test(path) ? path : `${BASE}${path}`
-  const res = await fetch(url, {
+  const res = await fetchAutenticado(url, {
     method,
     headers: {
       "Content-Type": "application/json",
@@ -174,7 +175,7 @@ export const httpRede = {
     form.append("arquivo", arquivo)
     form.append("escola_id", String(escola_id))
     const token = getToken()
-    const res = await fetch(`${BASE}/rede/importar-produtos/`, {
+    const res = await fetchAutenticado(`${BASE}/rede/importar-produtos/`, {
       method: "POST",
       headers: token ? { Authorization: `Token ${token}` } : {},
       body: form,

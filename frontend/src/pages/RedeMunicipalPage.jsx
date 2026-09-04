@@ -18,12 +18,24 @@ export default function RedeMunicipalPage() {
     try { setDados(await redeApi.indicadores()) } catch { setErro("Não foi possível carregar os indicadores da rede.") }
   }
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => {
+    let ativo = true
+    redeApi.indicadores()
+      .then((resultado) => { if (ativo) setDados(resultado) })
+      .catch(() => { if (ativo) setErro("Não foi possível carregar os indicadores da rede.") })
+    return () => { ativo = false }
+  }, [])
 
   async function usarEscola() {
-    const resposta = await redeApi.trocarEscola(Number(selecionada))
-    atualizarEscola(resposta.escola)
-    setMensagem("Escola operacional alterada com segurança.")
+    setErro("")
+    setMensagem("")
+    try {
+      const resposta = await redeApi.trocarEscola(Number(selecionada))
+      atualizarEscola(resposta.escola)
+      setMensagem("Escola operacional alterada com segurança.")
+    } catch {
+      setErro("Não foi possível trocar de escola. Tente novamente.")
+    }
   }
 
   async function importar(evento) {

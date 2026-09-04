@@ -12,6 +12,15 @@ describe("AdminUsuariosPage", () => {
   })
   afterEach(() => vi.restoreAllMocks())
 
+  it("informa falha de rede ao carregar e permite tentar novamente", async () => {
+    global.fetch = vi.fn().mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ ok: true, json: async () => ([{ id: 1, username: "maria", papel: "OPERADOR" }]) })
+    render(<ToastProvider><AdminUsuariosPage /></ToastProvider>)
+    await screen.findByRole("alert")
+    fireEvent.click(screen.getByRole("button", { name: /tentar novamente/i }))
+    expect(await screen.findByText("maria")).toBeInTheDocument()
+  })
+
   it("lista usuários e permite trocar o papel", async () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
