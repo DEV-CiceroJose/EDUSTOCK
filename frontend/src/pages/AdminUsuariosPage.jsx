@@ -1,9 +1,11 @@
+import { fetchAutenticado } from "../lib/authenticatedFetch"
 import { useEffect, useState } from "react"
 import { getToken, ehAdmin } from "../lib/auth"
 import { useToast } from "../components/ui/useToast"
 import { Icon } from "../lib/icons.jsx"
 import NewUserModal from "../features/usuarios/NewUserModal"
 import ResetPasswordModal from "../features/usuarios/ResetPasswordModal"
+import DataLoadError from "../components/ui/DataLoadError"
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 const PAPEIS = [
@@ -17,33 +19,47 @@ export default function AdminUsuariosPage() {
   const [carregando, setCarregando] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [usuarioParaRedefinir, setUsuarioParaRedefinir] = useState(null)
+  const [erro, setErro] = useState(null)
+  const [revision, setRevision] = useState(0)
   const toast = useToast()
 
   useEffect(() => {
     if (!ehAdmin()) return undefined
     let active = true
-    fetch(`${BASE}/usuarios/?page_size=500`, {
+    fetchAutenticado(`${BASE}/usuarios/?page_size=500`, {
       headers: { Authorization: `Token ${getToken()}` },
     })
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) throw new Error("Falha ao carregar usuários.")
+        return response.json()
+      })
       .then((data) => {
         if (active) setUsuarios(Array.isArray(data) ? data : (data.results ?? []))
       })
+      .catch((error) => { if (active) setErro(error) })
       .finally(() => {
         if (active) setCarregando(false)
       })
     return () => { active = false }
-  }, [])
+  }, [revision])
+
+  function recarregar() {
+    setErro(null)
+    setCarregando(true)
+    setRevision((value) => value + 1)
+  }
 
   async function trocarPapel(usuario, novoPapel) {
     const anterior = usuario.papel
     setUsuarios((lista) => lista.map((u) => (u.id === usuario.id ? { ...u, papel: novoPapel } : u)))
-    const resp = await fetch(`${BASE}/usuarios/${usuario.id}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
-      body: JSON.stringify({ papel: novoPapel }),
-    })
-    if (!resp.ok) {
+    try {
+      const resp = await fetchAutenticado(`${BASE}/usuarios/${usuario.id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
+        body: JSON.stringify({ papel: novoPapel }),
+      })
+      if (!resp.ok) throw new Error("Falha ao alterar papel.")
+    } catch {
       setUsuarios((lista) => lista.map((u) => (u.id === usuario.id ? { ...u, papel: anterior } : u)))
       toast("Não foi possível alterar o papel.", "danger")
     }
@@ -55,12 +71,14 @@ export default function AdminUsuariosPage() {
       ? anteriores.filter((item) => item !== slug)
       : [...anteriores, slug]
     setUsuarios((lista) => lista.map((u) => (u.id === usuario.id ? { ...u, modulos: novos } : u)))
-    const resp = await fetch(`${BASE}/usuarios/${usuario.id}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
-      body: JSON.stringify({ modulos: novos }),
-    })
-    if (!resp.ok) {
+    try {
+      const resp = await fetchAutenticado(`${BASE}/usuarios/${usuario.id}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
+        body: JSON.stringify({ modulos: novos }),
+      })
+      if (!resp.ok) throw new Error("Falha ao alterar módulos.")
+    } catch {
       setUsuarios((lista) => lista.map((u) => (u.id === usuario.id ? { ...u, modulos: anteriores } : u)))
       toast("Não foi possível alterar os módulos.", "danger")
     }
@@ -75,7 +93,7 @@ export default function AdminUsuariosPage() {
       setUsuarios((lista) => lista.map((item) => (item.id === usuario.id ? { ...item, is_active: true } : item)))
     }
     try {
-      const resposta = await fetch(`${BASE}/usuarios/${usuario.id}/`, {
+      const resposta = await fetchAutenticado(`${BASE}/usuarios/${usuario.id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
         body: JSON.stringify({ is_active: !ativo }),
@@ -103,7 +121,7 @@ export default function AdminUsuariosPage() {
   async function revogarSessoes(usuario) {
     if (!window.confirm(`Deseja revogar todas as sessões de ${usuario.username}?`)) return
     try {
-      const resposta = await fetch(`${BASE}/usuarios/${usuario.id}/revogar-sessoes/`, {
+      const resposta = await fetchAutenticado(`${BASE}/usuarios/${usuario.id}/revogar-sessoes/`, {
         method: "POST",
         headers: { Authorization: `Token ${getToken()}` },
       })
@@ -127,6 +145,7 @@ export default function AdminUsuariosPage() {
     return <p className="p-6 text-ink-soft">Apenas administradores acessam esta página.</p>
   }
   if (carregando) return <p className="p-6 text-ink-soft">Carregando usuários…</p>
+  if (erro) return <div className="p-6"><DataLoadError error={erro} onRetry={recarregar} /></div>
 
   return (
     <div className="p-6">

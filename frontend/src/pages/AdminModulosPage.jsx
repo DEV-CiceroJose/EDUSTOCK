@@ -1,46 +1,63 @@
+import { fetchAutenticado } from "../lib/authenticatedFetch"
 import { useEffect, useState } from "react"
 import { getToken, ehAdmin } from "../lib/auth"
 import { useToast } from "../components/ui/useToast"
+import DataLoadError from "../components/ui/DataLoadError"
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
 export default function AdminModulosPage() {
   const [modulos, setModulos] = useState([])
   const [carregando, setCarregando] = useState(true)
+  const [erro, setErro] = useState(null)
+  const [revision, setRevision] = useState(0)
   const toast = useToast()
 
   useEffect(() => {
-    if (ehAdmin()) carregar()
-  }, [])
-
-  async function carregar() {
-    setCarregando(true)
-    const resp = await fetch(`${BASE}/modulos/?page_size=500`, {
+    if (!ehAdmin()) return undefined
+    let active = true
+    fetchAutenticado(`${BASE}/modulos/?page_size=500`, {
       headers: { Authorization: `Token ${getToken()}` },
     })
-    const data = await resp.json()
-    setModulos(Array.isArray(data) ? data : (data.results ?? []))
-    setCarregando(false)
+      .then((response) => {
+        if (!response.ok) throw new Error("Falha ao carregar módulos.")
+        return response.json()
+      })
+      .then((data) => { if (active) setModulos(Array.isArray(data) ? data : (data.results ?? [])) })
+      .catch((error) => { if (active) setErro(error) })
+      .finally(() => { if (active) setCarregando(false) })
+    return () => { active = false }
+  }, [revision])
+
+  function carregar() {
+    setErro(null)
+    setCarregando(true)
+    setRevision((value) => value + 1)
   }
 
   async function togglear(slug, ativo) {
-    const resp = await fetch(`${BASE}/modulos/${slug}/`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
-      body: JSON.stringify({ ativo: !ativo }),
-    })
-    if (!resp.ok) {
-      const data = await resp.json()
-      toast(data.detail || "Não foi possível alterar o módulo.", "danger")
-      return
+    try {
+      const resp = await fetchAutenticado(`${BASE}/modulos/${slug}/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
+        body: JSON.stringify({ ativo: !ativo }),
+      })
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}))
+        toast(data.detail || "Não foi possível alterar o módulo.", "danger")
+        return
+      }
+      carregar()
+    } catch {
+      toast("Não foi possível alterar o módulo. Verifique a conexão.", "danger")
     }
-    carregar()
   }
 
   if (!ehAdmin()) {
     return <p className="p-6 text-ink-soft">Apenas administradores acessam esta página.</p>
   }
   if (carregando) return <p className="p-6 text-ink-soft">Carregando módulos…</p>
+  if (erro) return <div className="p-6"><DataLoadError error={erro} onRetry={carregar} /></div>
 
   return (
     <div className="p-6">

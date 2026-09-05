@@ -3,8 +3,11 @@ from django import forms
 from .models import (
     BemPermanente,
     Cardapio,
+    CardapioModeloMunicipal,
+    CatalogoProdutoMunicipal,
     Categoria,
     ConfiguracaoAlertas,
+    ContagemEstoque,
     Entrada,
     FatorConsumo,
     Fornecedor,
@@ -17,8 +20,46 @@ from .models import (
     Produto,
     Receita,
     ReceitaIngrediente,
+    RegistroRefeicao,
     Turma,
 )
+
+
+@admin.register(ContagemEstoque)
+class ContagemEstoqueAdmin(admin.ModelAdmin):
+    list_display = ("data", "escola", "produto", "quantidade_sistema", "quantidade_fisica", "divergencia")
+    list_filter = ("escola", "data")
+    search_fields = ("produto__nome",)
+    readonly_fields = ("escola", "produto", "data", "quantidade_sistema", "quantidade_fisica", "observacao", "criado_por", "criado_em")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CatalogoProdutoMunicipal)
+class CatalogoProdutoMunicipalAdmin(admin.ModelAdmin):
+    list_display = ("nome", "municipio", "categoria", "grupo", "unidade", "ativo")
+    list_filter = ("municipio", "categoria", "ativo")
+    search_fields = ("nome", "categoria", "grupo")
+
+
+@admin.register(CardapioModeloMunicipal)
+class CardapioModeloMunicipalAdmin(admin.ModelAdmin):
+    list_display = ("nome", "municipio", "refeicao", "ativo")
+    list_filter = ("municipio", "refeicao", "ativo")
+
+
+@admin.register(RegistroRefeicao)
+class RegistroRefeicaoAdmin(admin.ModelAdmin):
+    list_display = ("data", "escola", "refeicao", "porcoes_planejadas", "porcoes_produzidas", "porcoes_servidas", "descarte_kg")
+    list_filter = ("escola", "refeicao", "fonte", "cardapio_atendido")
+    date_hierarchy = "data"
 
 
 class PinAcessoForm(forms.ModelForm):
@@ -33,7 +74,7 @@ class PinAcessoForm(forms.ModelForm):
 
     class Meta:
         model = PinAcesso
-        fields = ("papel", "turma", "novo_pin", "titular", "ativo")
+        fields = ("escola", "papel", "turma", "novo_pin", "titular", "ativo")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,8 +87,9 @@ class PinAcessoForm(forms.ModelForm):
         if not (len(pin) == 4 and pin.isdigit()):
             raise forms.ValidationError("PIN deve ter exatamente 4 dígitos.")
         fingerprint = PinAcesso.gerar_fingerprint(pin)
+        escola = self.cleaned_data.get("escola") or self.instance.escola
         if PinAcesso.objects.exclude(pk=self.instance.pk).filter(
-            pin_fingerprint=fingerprint
+            escola=escola, pin_fingerprint=fingerprint
         ).exists():
             raise forms.ValidationError("Este PIN já está em uso.")
         return pin
@@ -66,15 +108,16 @@ class PinAcessoForm(forms.ModelForm):
 # 🔹 Categoria
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('id', 'escola', 'name')
+    list_filter = ('escola',)
     search_fields = ('name',)
     ordering = ('name',)
 
 
 @admin.register(Grupo)
 class GrupoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "categoria")
-    list_filter = ("categoria",)
+    list_display = ("nome", "escola", "categoria")
+    list_filter = ("escola", "categoria",)
     search_fields = ("nome", "categoria__name")
     ordering = ("categoria__name", "nome")
 
@@ -86,6 +129,7 @@ class ProdutoAdmin(admin.ModelAdmin):
     # 📋 Colunas exibidas na lista
     list_display = (
         'nome',
+        'escola',
         'grupo',
         'quantidade',
         'unidade',
@@ -99,6 +143,7 @@ class ProdutoAdmin(admin.ModelAdmin):
 
     # 🔍 Filtros laterais
     list_filter = (
+        'escola',
         'grupo',
         'unidade',
         'validade',
@@ -125,7 +170,7 @@ class ProdutoAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Informações do Produto', {
             'fields': (
-                'nome', 'grupo', 'fornecedor', 'quantidade', 'unidade',
+                'escola', 'nome', 'grupo', 'fornecedor', 'quantidade', 'unidade',
                 'unidade_consumo', 'conteudo_por_unidade',
             )
         }),
@@ -149,13 +194,14 @@ class ProdutoAdmin(admin.ModelAdmin):
 class FornecedorAdmin(admin.ModelAdmin):
     list_display = (
         "nome",
+        "escola",
         "documento",
         "telefone",
         "emite_nota_fiscal",
         "aceita_fiado",
         "ativo",
     )
-    list_filter = ("ativo", "emite_nota_fiscal", "aceita_fiado")
+    list_filter = ("escola", "ativo", "emite_nota_fiscal", "aceita_fiado")
     search_fields = ("nome", "documento", "email", "telefone")
     ordering = ("nome",)
 
@@ -229,13 +275,14 @@ class MovimentacaoAdmin(RegistroEstoqueSomenteLeituraAdmin):
 class FrequenciaDiariaAdmin(admin.ModelAdmin):
     list_display = (
         "data",
+        "escola",
         "turno",
         "turma",
         "quantidade_alunos",
         "registrado_por_turma",
         "registrado_por",
     )
-    list_filter = ("turno", "data")
+    list_filter = ("escola", "turno", "data")
     search_fields = ("turma", "registrado_por_turma")
     date_hierarchy = "data"
 
@@ -256,16 +303,16 @@ class ReceitaIngredienteInline(admin.TabularInline):
 
 @admin.register(Receita)
 class ReceitaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "refeicao", "ativa")
-    list_filter = ("refeicao", "ativa")
+    list_display = ("nome", "escola", "refeicao", "ativa")
+    list_filter = ("escola", "refeicao", "ativa")
     search_fields = ("nome",)
     inlines = (ReceitaIngredienteInline,)
 
 
 @admin.register(Cardapio)
 class CardapioAdmin(admin.ModelAdmin):
-    list_display = ("data", "refeicao", "receita")
-    list_filter = ("refeicao", "data")
+    list_display = ("data", "escola", "refeicao", "receita")
+    list_filter = ("escola", "refeicao", "data")
     date_hierarchy = "data"
     autocomplete_fields = ("receita",)
 
@@ -321,8 +368,8 @@ class PinAcessoInline(admin.TabularInline):
 # 🔹 Turma
 @admin.register(Turma)
 class TurmaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "curso", "ano", "turno", "ativo")
-    list_filter = ("curso", "turno", "ativo")
+    list_display = ("nome", "escola", "curso", "ano", "turno", "ativo")
+    list_filter = ("escola", "curso", "turno", "ativo")
     ordering = ("curso", "ano", "nome")
     inlines = [PinAcessoInline]
 
@@ -331,8 +378,8 @@ class TurmaAdmin(admin.ModelAdmin):
 @admin.register(PinAcesso)
 class PinAcessoAdmin(admin.ModelAdmin):
     form = PinAcessoForm
-    list_display = ("identificacao", "papel", "turma", "titular", "ativo")
-    list_filter = ("papel", "ativo")
+    list_display = ("identificacao", "escola", "papel", "turma", "titular", "ativo")
+    list_filter = ("escola", "papel", "ativo")
     search_fields = ("titular", "turma__nome")
 
     @admin.display(description="Acesso")
@@ -343,6 +390,7 @@ class PinAcessoAdmin(admin.ModelAdmin):
 @admin.register(ConfiguracaoAlertas)
 class ConfiguracaoAlertasAdmin(admin.ModelAdmin):
     fieldsets = (
+        ("Escola", {"fields": ("escola",)}),
         ("Validade", {"fields": ("critico_dias", "alerta_dias")}),
         ("Estoque", {"fields": ("estoque_percentual",)}),
         ("Auditoria", {"fields": ("atualizado_em",)}),
@@ -350,7 +398,7 @@ class ConfiguracaoAlertasAdmin(admin.ModelAdmin):
     readonly_fields = ("atualizado_em",)
 
     def has_add_permission(self, request):
-        return not ConfiguracaoAlertas.objects.exists()
+        return True
 
     def has_delete_permission(self, request, obj=None):
         return False

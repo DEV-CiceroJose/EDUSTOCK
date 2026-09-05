@@ -54,7 +54,14 @@ def criar_token(
     turma_id: int | None = None,
     pin_acesso_id: int | None = None,
     pin_versao: str = "",
+    escola_id: int | None = None,
+    escola_nome: str = "",
+    escola_slug: str = "",
 ) -> str:
+    if escola_id is None:
+        from plataforma.models import escola_padrao_id
+
+        escola_id = escola_padrao_id()
     token = str(uuid.uuid4())
     cache.set(_chave_sessao(token), {
         "perfil": perfil,
@@ -63,6 +70,9 @@ def criar_token(
         "turma_id": turma_id,
         "pin_acesso_id": pin_acesso_id,
         "pin_versao": pin_versao,
+        "escola_id": escola_id,
+        "escola_nome": escola_nome,
+        "escola_slug": escola_slug,
     }, timeout=TOKEN_TTL_SEGUNDOS)
     return token
 
@@ -80,7 +90,9 @@ def validar_token(token: str) -> dict | None:
 
     from core.models import PinAcesso
 
-    pin_atual = PinAcesso.objects.filter(pk=pin_acesso_id, ativo=True).only(
+    pin_atual = PinAcesso.objects.filter(
+        pk=pin_acesso_id, ativo=True, escola_id=sessao.get("escola_id")
+    ).only(
         "pin_fingerprint"
     ).first()
     if not pin_atual or pin_atual.pin_fingerprint != sessao.get("pin_versao"):
@@ -97,15 +109,29 @@ def invalidar_token(token: str) -> None:
 # Leitura dos PINs no banco (Turma / PinAcesso)
 # --------------------------------------------------------------------------
 
-def _dados_pin_aluno(pin: str) -> dict | None:
+def _consulta_pin(pin: str, papel: str, escola: str = ""):
+    from core.models import PinAcesso
+
+    qs = PinAcesso.objects.filter(
+        papel=papel,
+        ativo=True,
+        pin_fingerprint=PinAcesso.gerar_fingerprint(pin),
+    ).select_related("escola")
+    if escola:
+        qs = qs.filter(escola__slug=escola) | qs.filter(escola__codigo_inep=escola)
+    elif qs.count() > 1:
+        # O mesmo PIN pode existir em redes distintas; sem escola não há escolha segura.
+        return None
+    return qs.first()
+
+
+def _dados_pin_aluno(pin: str, escola: str = "") -> dict | None:
     """Localiza um PIN ativo sem expor nem manter o segredo em texto puro."""
     from core.models import PinAcesso
 
-    pin_acesso = PinAcesso.objects.filter(
-        papel=PinAcesso.ALUNO_REP,
-        ativo=True,
-        pin_fingerprint=PinAcesso.gerar_fingerprint(pin),
-    ).select_related("turma").first()
+    pin_acesso = _consulta_pin(pin, PinAcesso.ALUNO_REP, escola)
+    if pin_acesso:
+        pin_acesso = PinAcesso.objects.select_related("turma", "escola").get(pk=pin_acesso.pk)
     if not pin_acesso or not pin_acesso.confere_pin(pin):
         return None
     return {
@@ -114,17 +140,16 @@ def _dados_pin_aluno(pin: str) -> dict | None:
         "turma_id": pin_acesso.turma_id,
         "turma": pin_acesso.turma.nome,
         "turno": pin_acesso.turma.turno,
+        "escola_id": pin_acesso.escola_id,
+        "escola_nome": pin_acesso.escola.nome,
+        "escola_slug": pin_acesso.escola.slug,
     }
 
 
-def _pin_cozinha(pin: str):
+def _pin_cozinha(pin: str, escola: str = ""):
     from core.models import PinAcesso
 
-    pin_acesso = PinAcesso.objects.filter(
-        papel=PinAcesso.COZINHA,
-        ativo=True,
-        pin_fingerprint=PinAcesso.gerar_fingerprint(pin),
-    ).only("id", "pin", "pin_fingerprint").first()
+    pin_acesso = _consulta_pin(pin, PinAcesso.COZINHA, escola)
     return pin_acesso if pin_acesso and pin_acesso.confere_pin(pin) else None
 
 
@@ -132,19 +157,19 @@ def _pin_cozinha(pin: str):
 # Login via PIN
 # --------------------------------------------------------------------------
 
-def autenticar_pin(perfil: str, pin: str) -> dict | None:
+def autenticar_pin(perfil: str, pin: str, escola: str = "") -> dict | None:
     """
     Valida o PIN para o perfil informado.
     Retorna dict com dados da sessão ou None se inválido.
     """
     if perfil == PERFIL_ALUNO:
-        dados = _dados_pin_aluno(pin)
+        dados = _dados_pin_aluno(pin, escola)
         if not dados:
             return None
         return {"perfil": PERFIL_ALUNO, **dados}
 
     if perfil == PERFIL_COZINHA:
-        pin_acesso = _pin_cozinha(pin)
+        pin_acesso = _pin_cozinha(pin, escola)
         if not pin_acesso:
             return None
         return {
@@ -153,6 +178,9 @@ def autenticar_pin(perfil: str, pin: str) -> dict | None:
             "turno": "",
             "pin_acesso_id": pin_acesso.id,
             "pin_versao": pin_acesso.pin_fingerprint,
+            "escola_id": pin_acesso.escola_id,
+            "escola_nome": pin_acesso.escola.nome,
+            "escola_slug": pin_acesso.escola.slug,
         }
 
     return None

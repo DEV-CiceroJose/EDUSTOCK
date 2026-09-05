@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Outlet, useNavigate } from "react-router-dom"
+import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { ToastProvider } from "../components/ui/Toast"
 import Sidebar from "./Sidebar"
 import Header from "./Header"
@@ -12,6 +12,7 @@ export default function MainLayout() {
   const config = useAppConfig()
   const canManage = podeGerenciarCadastros()
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     if (!mobileMenuOpen) return undefined
@@ -49,7 +50,7 @@ export default function MainLayout() {
             />
           </>
         )}
-        <div className="flex flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           <Header 
             search={search} 
             setSearch={setSearch}
@@ -58,9 +59,10 @@ export default function MainLayout() {
             onMenu={() => setMobileMenuOpen((aberto) => !aberto)}
             menuOpen={mobileMenuOpen}
             canManage={canManage}
+            showSearch={location.pathname === "/inventario"}
           />
           <main className="flex-1 overflow-auto overflow-x-hidden">
-            <Outlet />
+            <Outlet context={{ search }} />
           </main>
         </div>
       </div>

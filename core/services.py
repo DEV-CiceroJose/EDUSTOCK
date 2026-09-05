@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 @transaction.atomic
 def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitario=None,
                            entrada=None, data=None, user=None, lote=None,
-                           corrige_movimentacao=None):
+                           corrige_movimentacao=None, escola=None):
     try:
         quantidade = Decimal(str(quantidade))
     except (InvalidOperation, TypeError, ValueError):
@@ -41,7 +41,11 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
     if tipo not in {Movimentacao.ENTRADA, Movimentacao.SAIDA}:
         raise ValidationError("O tipo da movimentação é inválido.")
 
-    p = Produto.objects.select_for_update().get(pk=produto.pk)
+    escola = escola or produto.escola
+    p = Produto.objects.select_for_update().get(pk=produto.pk, escola=escola)
+    if entrada is not None and entrada.escola_id != escola.pk:
+        raise ValidationError("A entrada e o produto devem pertencer à mesma escola.")
+
     lote_bloqueado = None
     lotes_bloqueados = []
     if tipo == Movimentacao.ENTRADA:
@@ -55,7 +59,9 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
                 "Entradas de estoque precisam ser registradas com um lote."
             )
         if lote is not None:
-            lote_bloqueado = LoteEstoque.objects.select_for_update().get(pk=lote.pk)
+            lote_bloqueado = LoteEstoque.objects.select_for_update().get(
+                pk=lote.pk, escola=escola
+            )
             if lote_bloqueado.produto_id != p.pk:
                 raise ValidationError("O lote informado não pertence ao produto.")
     if tipo == Movimentacao.SAIDA:
@@ -92,13 +98,14 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
     p.save(update_fields=["quantidade", "atualizado_em"])
 
     movimentacao = Movimentacao.objects.create(
-        produto=p, tipo=tipo, quantidade=quantidade, motivo=motivo,
+        escola=escola, produto=p, tipo=tipo, quantidade=quantidade, motivo=motivo,
         preco_unitario=preco_unitario, entrada=entrada,
         data=data or timezone.localdate(), criado_por=user,
         corrige_movimentacao=corrige_movimentacao,
     )
     RegistroAuditoria.objects.create(
         user=user,
+        escola=escola,
         acao="MOVIMENTOU",
         recurso="estoque",
         objeto_id=str(movimentacao.pk),
@@ -111,7 +118,7 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
     )
 
     if tipo == Movimentacao.ENTRADA and lote is not None:
-        lote_bloqueado = LoteEstoque.objects.select_for_update().get(pk=lote.pk)
+        lote_bloqueado = LoteEstoque.objects.select_for_update().get(pk=lote.pk, escola=escola)
         if lote_bloqueado.produto_id != p.pk:
             raise ValidationError("O lote informado não pertence ao produto.")
         lote_bloqueado.quantidade += quantidade
@@ -125,7 +132,7 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
         restante = quantidade
         lotes = (
             LoteEstoque.objects.select_for_update()
-            .filter(produto=p, quantidade__gt=0)
+            .filter(escola=escola, produto=p, quantidade__gt=0)
             .order_by(F("validade").asc(nulls_last=True), "criado_em", "id")
         )
         for lote_bloqueado in lotes:
@@ -144,12 +151,12 @@ def registrar_movimentacao(*, produto, tipo, quantidade, motivo="", preco_unitar
                 break
 
     menor_validade = (
-        LoteEstoque.objects.filter(produto=p, quantidade__gt=0, validade__isnull=False)
+        LoteEstoque.objects.filter(escola=escola, produto=p, quantidade__gt=0, validade__isnull=False)
         .order_by("validade")
         .values_list("validade", flat=True)
         .first()
     )
-    possui_lotes = LoteEstoque.objects.filter(produto=p).exists()
+    possui_lotes = LoteEstoque.objects.filter(escola=escola, produto=p).exists()
     if possui_lotes and p.validade != menor_validade:
         p.validade = menor_validade
         p.save(update_fields=["validade", "atualizado_em"])
@@ -232,19 +239,26 @@ def registrar_estorno(*, movimentacao, motivo, user):
 
 @transaction.atomic
 def registrar_entrada(*, fornecedor=None, numero_nota_fiscal="", data=None, observacao="",
-                      itens, user=None):
+                      itens, user=None, escola=None):
     if not itens:
         logger.warning(
             "Entrada rejeitada: nenhum item informado",
             extra={"fornecedor_id": getattr(fornecedor, "pk", None)},
         )
         raise ValidationError("Informe ao menos um item.")
+    escola = escola or getattr(fornecedor, "escola", None) or itens[0]["produto"].escola
+    if fornecedor is not None and fornecedor.escola_id != escola.pk:
+        raise ValidationError("O fornecedor deve pertencer à escola da entrada.")
+    if any(item["produto"].escola_id != escola.pk for item in itens):
+        raise ValidationError("Todos os itens da entrada devem pertencer à mesma escola.")
     entrada = Entrada.objects.create(
+        escola=escola,
         fornecedor=fornecedor, numero_nota_fiscal=numero_nota_fiscal,
         data=data or timezone.localdate(), observacao=observacao, criado_por=user,
     )
     RegistroAuditoria.objects.create(
         user=user,
+        escola=escola,
         acao="CRIOU",
         recurso="entrada",
         objeto_id=str(entrada.pk),
@@ -254,6 +268,7 @@ def registrar_entrada(*, fornecedor=None, numero_nota_fiscal="", data=None, obse
         produto = item["produto"]
         codigo_lote = str(item.get("codigo_lote") or f"ENT-{entrada.pk}-{produto.pk}").strip()
         lote, _ = LoteEstoque.objects.get_or_create(
+            escola=escola,
             produto=produto,
             codigo=codigo_lote,
             defaults={
@@ -266,14 +281,17 @@ def registrar_entrada(*, fornecedor=None, numero_nota_fiscal="", data=None, obse
             produto=produto, tipo=Movimentacao.ENTRADA,
             quantidade=item["quantidade"], preco_unitario=item.get("preco_unitario"),
             entrada=entrada, motivo="entrada", data=entrada.data, user=user, lote=lote,
+            escola=escola,
         )
     return entrada
 
 
-def _media_diaria_frequencia(*, data, turno=None, dias=30):
+def _media_diaria_frequencia(*, data, turno=None, dias=30, escola=None):
     """Média dos totais diários de alunos nos últimos `dias` antes de `data`."""
     inicio = data - timedelta(days=dias)
     qs = FrequenciaDiaria.objects.filter(data__gte=inicio, data__lt=data)
+    if escola is not None:
+        qs = qs.filter(escola=escola)
     if turno:
         qs = qs.filter(turno=turno)
     totais_por_dia = qs.values("data").annotate(total=Sum("quantidade_alunos"))
@@ -283,16 +301,18 @@ def _media_diaria_frequencia(*, data, turno=None, dias=30):
     return Decimal(sum(valores)) / Decimal(len(valores))
 
 
-def total_frequencia(*, data, turno=None):
+def total_frequencia(*, data, turno=None, escola=None):
     qs = FrequenciaDiaria.objects.filter(data=data)
+    if escola is not None:
+        qs = qs.filter(escola=escola)
     if turno:
         qs = qs.filter(turno=turno)
     return qs.aggregate(total=Sum("quantidade_alunos"))["total"] or 0
 
 
-def calcular_previsao_producao(data, turno):
-    total_alunos = total_frequencia(data=data, turno=turno)
-    media_historica = _media_diaria_frequencia(data=data, turno=turno)
+def calcular_previsao_producao(data, turno, escola=None):
+    total_alunos = total_frequencia(data=data, turno=turno, escola=escola)
+    media_historica = _media_diaria_frequencia(data=data, turno=turno, escola=escola)
     alerta_reducao = False
     if media_historica > 0:
         alerta_reducao = Decimal(total_alunos) < media_historica * Decimal("0.5")
@@ -303,16 +323,19 @@ def calcular_previsao_producao(data, turno):
     }
 
 
-def calcular_resumo_dia(data):
+def calcular_resumo_dia(data, escola=None):
     """Resumo agregado do dia (todos os turnos) para o widget do dashboard."""
-    total_alunos = total_frequencia(data=data)
+    total_alunos = total_frequencia(data=data, escola=escola)
+    turmas_qs = FrequenciaDiaria.objects.filter(data=data)
+    if escola is not None:
+        turmas_qs = turmas_qs.filter(escola=escola)
     turmas = list(
-        FrequenciaDiaria.objects.filter(data=data)
+        turmas_qs
         .values("turma")
         .annotate(quantidade_alunos=Sum("quantidade_alunos"))
         .order_by("turma")
     )
-    media_historica = _media_diaria_frequencia(data=data, turno=None)
+    media_historica = _media_diaria_frequencia(data=data, turno=None, escola=escola)
     variacao_pct = None
     alerta_reducao = False
     if media_historica > 0:

@@ -74,6 +74,7 @@ class SeedModulosMigrationTest(TransactionTestCase):
         self.assertFalse(Perfil.objects.get(pk=explicito.pk).acesso_legado)
 
     def tearDown(self):
-        # deixa o banco de teste na migração mais recente, como as demais
-        # suítes de migration deste projeto (core.tests.test_migrations)
-        self._migrate(("plataforma", "0006_perfil_acesso_legado"))
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()

@@ -37,7 +37,7 @@ def _documento_from_entrada(entrada):
     }
 
 
-def _resumo_por_categoria(inicio, fim):
+def _resumo_por_categoria(inicio, fim, escola=None):
     rows = (
         Movimentacao.objects.filter(
             entrada__isnull=False,
@@ -45,6 +45,7 @@ def _resumo_por_categoria(inicio, fim):
             entrada__data__lte=fim,
             tipo=Movimentacao.ENTRADA,
             preco_unitario__isnull=False,
+            **({"escola": escola} if escola is not None else {}),
         )
         .values("produto__grupo__categoria_id", "produto__grupo__categoria__name")
         .annotate(total=Coalesce(Sum(LINE_TOTAL), Decimal("0")))
@@ -58,9 +59,13 @@ def _resumo_por_categoria(inicio, fim):
     return cat_totals, cat_names
 
 
-def gerar_prestacao_contas(*, inicio, fim, incluir_financeiro=True):
+def gerar_prestacao_contas(*, inicio, fim, incluir_financeiro=True, escola=None):
     entradas = (
-        Entrada.objects.filter(data__gte=inicio, data__lte=fim)
+        Entrada.objects.filter(
+            data__gte=inicio,
+            data__lte=fim,
+            **({"escola": escola} if escola is not None else {}),
+        )
         .select_related("fornecedor")
         .prefetch_related("itens__produto__grupo__categoria")
         .order_by("data", "id")
@@ -81,7 +86,7 @@ def gerar_prestacao_contas(*, inicio, fim, incluir_financeiro=True):
         por_fornecedor[fid]["documentos"].append(doc)
         por_fornecedor[fid]["total_fornecedor"] += Decimal(doc["total"])
 
-    cat_totals, cat_names = _resumo_por_categoria(inicio, fim)
+    cat_totals, cat_names = _resumo_por_categoria(inicio, fim, escola=escola)
     total_geral = sum(cat_totals.values(), Decimal("0"))
 
     por_categoria = [

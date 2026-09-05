@@ -1,3 +1,4 @@
+import { fetchAutenticado } from "../../lib/authenticatedFetch"
 import { useState } from "react"
 import Modal from "../../components/ui/Modal"
 import { getToken } from "../../lib/auth"
@@ -23,7 +24,7 @@ function NewUserForm({ onClose, onCreated }) {
     setErro("")
     setSalvando(true)
     try {
-      const resp = await fetch(`${BASE}/usuarios/`, {
+      const resp = await fetchAutenticado(`${BASE}/usuarios/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
         body: JSON.stringify({ username, password, papel, modulos }),

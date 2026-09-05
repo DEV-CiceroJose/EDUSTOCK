@@ -5,6 +5,7 @@ const base = (s) => ({
 })
 
 export const Icon = {
+  logout: (s = 20) => (<svg {...base(s)}><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M10 12h10m-4-4 4 4-4 4" /></svg>),
   menu: (s = 22) => (<svg {...base(s)}><path d="M3 6h18M3 12h18M3 18h18" /></svg>),
   search: (s = 20) => (<svg {...base(s)}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>),
   eye: (s = 20) => (<svg {...base(s)}><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.8" /></svg>),
