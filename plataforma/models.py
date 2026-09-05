@@ -1,6 +1,7 @@
 import hashlib
 import secrets
 
+from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
@@ -22,6 +23,128 @@ class Modulo(models.Model):
 
     def __str__(self):
         return self.nome
+
+
+class Municipio(models.Model):
+    """Entidade compradora e limite superior de isolamento da plataforma."""
+
+    nome = models.CharField(max_length=150)
+    uf = models.CharField(max_length=2, default="CE")
+    slug = models.SlugField(unique=True)
+    codigo_ibge = models.CharField(max_length=7, unique=True, null=True, blank=True)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nome"]
+        verbose_name = "Município"
+        verbose_name_plural = "Municípios"
+
+    def __str__(self):
+        return f"{self.nome}/{self.uf}"
+
+
+class Escola(models.Model):
+    """Unidade operacional cujos dados nunca podem vazar para outra escola."""
+
+    municipio = models.ForeignKey(
+        Municipio, on_delete=models.PROTECT, related_name="escolas"
+    )
+    nome = models.CharField(max_length=180)
+    slug = models.SlugField()
+    codigo_inep = models.CharField(max_length=8, unique=True, null=True, blank=True)
+    ativa = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["municipio__nome", "nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["municipio", "slug"], name="unique_escola_slug_municipio"
+            )
+        ]
+        verbose_name = "Escola"
+        verbose_name_plural = "Escolas"
+
+    def __str__(self):
+        return f"{self.nome} · {self.municipio}"
+
+
+def escola_padrao_id():
+    """Compatibilidade para instalações e integrações anteriores ao multi-escola."""
+
+    municipio, _ = Municipio.objects.get_or_create(
+        slug="municipio-piloto",
+        defaults={"nome": "Município Piloto", "uf": "CE"},
+    )
+    escola, _ = Escola.objects.get_or_create(
+        municipio=municipio,
+        slug="escola-piloto",
+        defaults={"nome": "Escola Piloto"},
+    )
+    return escola.pk
+
+
+class VinculoUsuario(models.Model):
+    GESTOR_REDE = "GESTOR_REDE"
+    GESTOR_ESCOLA = "GESTOR_ESCOLA"
+    NUTRICIONISTA = "NUTRICIONISTA"
+    OPERADOR = "OPERADOR"
+    PAPEL_CHOICES = [
+        (GESTOR_REDE, "Gestor da rede"),
+        (GESTOR_ESCOLA, "Gestor escolar"),
+        (NUTRICIONISTA, "Nutricionista"),
+        (OPERADOR, "Operador"),
+    ]
+    PAPEIS_COM_ESCOPO_DE_REDE = {GESTOR_REDE, NUTRICIONISTA}
+    PAPEIS_COM_ESCOLA_OBRIGATORIA = {GESTOR_ESCOLA, OPERADOR}
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="vinculos_rede")
+    municipio = models.ForeignKey(
+        Municipio, on_delete=models.CASCADE, related_name="vinculos_usuarios"
+    )
+    escola = models.ForeignKey(
+        Escola,
+        on_delete=models.CASCADE,
+        related_name="vinculos_usuarios",
+        null=True,
+        blank=True,
+    )
+    papel = models.CharField(max_length=16, choices=PAPEL_CHOICES)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["user__username", "municipio__nome", "escola__nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "municipio", "escola", "papel"],
+                condition=models.Q(escola__isnull=False),
+                name="unique_vinculo_usuario_escola_papel",
+            ),
+            models.UniqueConstraint(
+                fields=["user", "municipio", "papel"],
+                condition=models.Q(escola__isnull=True),
+                name="unique_vinculo_usuario_rede_papel",
+            )
+        ]
+        verbose_name = "Vínculo de usuário"
+        verbose_name_plural = "Vínculos de usuários"
+
+    def clean(self):
+        super().clean()
+        if self.escola_id and self.escola.municipio_id != self.municipio_id:
+            raise ValidationError({"escola": "A escola deve pertencer ao município informado."})
+        if self.papel in self.PAPEIS_COM_ESCOLA_OBRIGATORIA and not self.escola_id:
+            raise ValidationError({"escola": "Este papel exige uma escola vinculada."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        escopo = self.escola.nome if self.escola_id else self.municipio.nome
+        return f"{self.user.username} · {self.get_papel_display()} · {escopo}"
 
 
 class Perfil(models.Model):
@@ -68,6 +191,13 @@ class TokenAcesso(models.Model):
     token_hash = models.CharField(max_length=64, unique=True, editable=False)
     token_prefixo = models.CharField(max_length=12, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tokens_acesso")
+    municipio = models.ForeignKey(
+        Municipio, on_delete=models.CASCADE, related_name="tokens_acesso", null=True, blank=True
+    )
+    escola = models.ForeignKey(
+        Escola, on_delete=models.CASCADE, related_name="tokens_acesso", null=True, blank=True
+    )
+    papel_rede = models.CharField(max_length=16, choices=VinculoUsuario.PAPEL_CHOICES, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
     expira_em = models.DateTimeField()
     objects = TokenAcessoManager()
@@ -84,13 +214,24 @@ class TokenAcesso(models.Model):
         return hashlib.sha256(str(token).encode("utf-8")).hexdigest()
 
     @classmethod
-    def emitir(cls, *, user, expira_em):
+    def emitir(
+        cls,
+        *,
+        user,
+        expira_em,
+        municipio=None,
+        escola=None,
+        papel_rede="",
+    ):
         token = secrets.token_urlsafe(32)
         registro = cls.objects.create(
             token_hash=cls.calcular_hash(token),
             token_prefixo=token[:12],
             user=user,
             expira_em=expira_em,
+            municipio=municipio,
+            escola=escola,
+            papel_rede=papel_rede,
         )
         return registro, token
 
@@ -102,6 +243,13 @@ class TokenAcesso(models.Model):
 class RegistroAuditoria(models.Model):
     user = models.ForeignKey(
         User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="registros_auditoria",
+    )
+    escola = models.ForeignKey(
+        Escola,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

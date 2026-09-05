@@ -10,6 +10,11 @@ from .operacao_views import (
     ContagemView, ResumoFrequenciaView, PlanoDoDiaView, BaixaProducaoView,
     HealthCheckView, OperacaoLoginView, OperacaoLogoutView, StatusDoDiaView,
 )
+from .rede_views import (
+    CardapioModeloMunicipalViewSet, CatalogoProdutoMunicipalViewSet,
+    ContagemEstoqueViewSet, ImportacaoProdutosView, IndicadoresRedeView,
+    RegistroRefeicaoViewSet,
+)
 
 router = DefaultRouter()
 router.register(r"produtos", ProdutoViewSet, basename="produto")
@@ -22,11 +27,17 @@ router.register(r"entradas", EntradaViewSet, basename="entrada")
 router.register(r"lotes", LoteEstoqueViewSet, basename="lote")
 router.register(r"receitas", ReceitaViewSet, basename="receita")
 router.register(r"cardapios", CardapioViewSet, basename="cardapio")
+router.register(r"registros-refeicao", RegistroRefeicaoViewSet, basename="registro-refeicao")
+router.register(r"contagens-estoque", ContagemEstoqueViewSet, basename="contagem-estoque")
+router.register(r"rede/catalogo-produtos", CatalogoProdutoMunicipalViewSet, basename="catalogo-municipal")
+router.register(r"rede/cardapios-modelo", CardapioModeloMunicipalViewSet, basename="cardapio-modelo")
 
 urlpatterns = [
     path("health/", HealthCheckView.as_view(), name="health-check"),
     path("alertas/", AlertasView.as_view(), name="alertas"),
     path("relatorios/prestacao-contas/", PrestacaoContasView.as_view(), name="prestacao-contas"),
+    path("rede/indicadores/", IndicadoresRedeView.as_view(), name="indicadores-rede"),
+    path("rede/importar-produtos/", ImportacaoProdutosView.as_view(), name="importar-produtos-rede"),
 
     # --- Módulo de Operação da Merenda (Sub-projeto E) ---
     # Autenticação por PIN (não usa Django auth)

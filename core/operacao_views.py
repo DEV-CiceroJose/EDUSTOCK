@@ -17,7 +17,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import BaseThrottle
 
 from plataforma.authentication import TokenAcessoAuthentication
-from plataforma.permissions import RequerModuloAtivo
+from plataforma.permissions import RequerModuloAtivo, escola_do_request
+from plataforma.models import Escola
 
 from .models import FrequenciaDiaria, OperacaoBaixaProducao, Turma
 from .operacao import (
@@ -44,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 def _turma_ativa_da_sessao(sessao):
     """Resolve o cadastro atual para refletir renomes e desativações."""
-    consulta = Turma.objects.filter(ativo=True)
+    consulta = Turma.objects.filter(ativo=True, escola_id=sessao.get("escola_id"))
     if sessao.get("turma_id"):
         return consulta.filter(pk=sessao["turma_id"]).first()
     turma = consulta.filter(nome=sessao.get("turma", "")).first()
@@ -167,6 +168,7 @@ class OperacaoLoginView(APIView):
     def post(self, request):
         pin = str(request.data.get("pin", "")).strip()
         perfil = str(request.data.get("perfil", "")).strip().upper()
+        escola = str(request.data.get("escola", "")).strip()
 
         if not pin or not perfil:
             return Response(
@@ -186,7 +188,7 @@ class OperacaoLoginView(APIView):
                 headers={"Retry-After": str(settings.PIN_LOGIN_JANELA_SEGUNDOS)},
             )
 
-        dados = autenticar_pin(perfil, pin)
+        dados = autenticar_pin(perfil, pin, escola=escola)
         if not dados:
             tentativas = _registrar_falha_pin(request, perfil)
             logger.warning(
@@ -210,12 +212,20 @@ class OperacaoLoginView(APIView):
             turma_id=dados.get("turma_id"),
             pin_acesso_id=dados.get("pin_acesso_id"),
             pin_versao=dados.get("pin_versao", ""),
+            escola_id=dados.get("escola_id"),
+            escola_nome=dados.get("escola_nome", ""),
+            escola_slug=dados.get("escola_slug", ""),
         )
         return Response({
             "token": token,
             "perfil": dados["perfil"],
             "turma": dados.get("turma", ""),
             "turno": dados.get("turno", ""),
+            "escola": {
+                "id": dados.get("escola_id"),
+                "nome": dados.get("escola_nome", ""),
+                "slug": dados.get("escola_slug", ""),
+            },
         })
 
 
@@ -253,6 +263,7 @@ class ContagemView(APIView):
     @requer_perfil_operacao(PERFIL_ALUNO)
     def post(self, request):
         sessao = request.sessao_operacao
+        escola_id = sessao["escola_id"]
         turma_atual = _turma_ativa_da_sessao(sessao)
         if not turma_atual:
             return Response(
@@ -305,7 +316,7 @@ class ContagemView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        existente = FrequenciaDiaria.objects.filter(operacao_id=operacao_id).first()
+        existente = FrequenciaDiaria.objects.filter(escola_id=escola_id, operacao_id=operacao_id).first()
         if existente:
             mesma_operacao = (
                 existente.data == data
@@ -318,7 +329,7 @@ class ContagemView(APIView):
                     {"codigo": "operacao_id_reutilizado", "detail": "Este identificador já foi usado em outro registro."},
                     status=status.HTTP_409_CONFLICT,
                 )
-            previsao = calcular_previsao_producao(data, turno)
+            previsao = calcular_previsao_producao(data, turno, escola=escola_id)
             return Response({
                 "id": existente.id,
                 "operacao_id": str(operacao_id),
@@ -332,6 +343,7 @@ class ContagemView(APIView):
 
         try:
             freq = FrequenciaDiaria.objects.create(
+                escola_id=escola_id,
                 data=data,
                 turno=turno,
                 turma=turma,
@@ -352,7 +364,7 @@ class ContagemView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        previsao = calcular_previsao_producao(data, turno)
+        previsao = calcular_previsao_producao(data, turno, escola=escola_id)
         return Response(
             {
                 "id": freq.id,
@@ -374,13 +386,14 @@ class ContagemView(APIView):
         if err:
             return err
         turno = request.query_params.get("turno")
+        escola_id = request.sessao_operacao["escola_id"]
         if turno and turno not in dict(FrequenciaDiaria.TURNO_CHOICES):
             return Response({"detail": "Turno inválido."}, status=status.HTTP_400_BAD_REQUEST)
 
-        total = total_frequencia(data=data, turno=turno if turno else None)
+        total = total_frequencia(data=data, turno=turno if turno else None, escola=escola_id)
         detalhes = (
             FrequenciaDiaria.objects
-            .filter(data=data, **({} if not turno else {"turno": turno}))
+            .filter(escola_id=escola_id, data=data, **({} if not turno else {"turno": turno}))
             .values("turma", "turno", "quantidade_alunos")
             .order_by("turno", "turma")
         )
@@ -405,6 +418,7 @@ class StatusDoDiaView(APIView):
             return err
 
         sessao = request.sessao_operacao
+        escola_id = sessao["escola_id"]
         resposta = {
             "data": data.isoformat(),
             "perfil": sessao["perfil"],
@@ -422,6 +436,7 @@ class StatusDoDiaView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
             frequencia = FrequenciaDiaria.objects.filter(
+                escola_id=escola_id,
                 data=data,
                 turno=turma.turno,
                 turma=turma.nome,
@@ -436,7 +451,7 @@ class StatusDoDiaView(APIView):
                     "registrada_em": frequencia.criado_em.isoformat(),
                 },
                 "historico_recente": list(
-                    FrequenciaDiaria.objects.filter(turma=turma.nome)
+                    FrequenciaDiaria.objects.filter(escola_id=escola_id, turma=turma.nome)
                     .order_by("-data", "-criado_em")
                     .values("data", "quantidade_alunos", "criado_em")[:7]
                 ),
@@ -445,7 +460,7 @@ class StatusDoDiaView(APIView):
 
         operacoes = {
             item.refeicao: item
-            for item in OperacaoBaixaProducao.objects.filter(data=data)
+            for item in OperacaoBaixaProducao.objects.filter(escola_id=escola_id, data=data)
         }
         resposta["refeicoes"] = [
             {
@@ -468,7 +483,7 @@ class StatusDoDiaView(APIView):
                 "status": item.status,
                 "atualizada_em": item.atualizado_em.isoformat(),
             }
-            for item in OperacaoBaixaProducao.objects.order_by("-data", "-atualizado_em")[:15]
+            for item in OperacaoBaixaProducao.objects.filter(escola_id=escola_id).order_by("-data", "-atualizado_em")[:15]
         ]
         return Response(resposta)
 
@@ -485,7 +500,7 @@ class ResumoFrequenciaView(APIView):
         data, err = _parse_date(request.query_params.get("data"), default_today=True)
         if err:
             return err
-        return Response(calcular_resumo_dia(data))
+        return Response(calcular_resumo_dia(data, escola=escola_do_request(request)))
 
 
 # --------------------------------------------------------------------------
@@ -510,12 +525,15 @@ class PlanoDoDiaView(APIView):
             )
 
         dados = serializer.validated_data
+        escola_id = request.sessao_operacao["escola_id"]
         plano = gerar_plano_do_dia(
             data=dados["data"],
             turno=FrequenciaDiaria.INTEGRAL,
             refeicao=dados["refeicao"],
+            escola=escola_id,
         )
         operacao = OperacaoBaixaProducao.objects.filter(
+            escola_id=escola_id,
             data=dados["data"],
             refeicao=dados["refeicao"],
         ).first()
@@ -550,6 +568,7 @@ class BaixaProducaoView(APIView):
             )
 
         dados = serializer.validated_data
+        escola_id = request.sessao_operacao["escola_id"]
         try:
             resultado = executar_baixa_idempotente(
                 operacao_id=dados["operacao_id"],
@@ -557,6 +576,7 @@ class BaixaProducaoView(APIView):
                 refeicao=dados["refeicao"],
                 itens=dados.get("itens"),
                 user=None,
+                escola=escola_id,
             )
         except OperacaoIdReutilizado as exc:
             return Response(
@@ -597,6 +617,7 @@ class BaixaProducaoView(APIView):
             )
 
         operacao = OperacaoBaixaProducao.objects.filter(
+            escola_id=request.sessao_operacao["escola_id"],
             operacao_id=serializer.validated_data["operacao_id"]
         ).first()
         if not operacao:

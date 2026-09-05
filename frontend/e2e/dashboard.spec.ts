@@ -156,7 +156,7 @@ test("registra uma entrada de estoque com nota fiscal", async ({ page }) => {
   await page.getByTitle("Movimentações").click()
   await expect(page.getByRole("heading", { name: "Movimentações" })).toBeVisible()
   await page.getByRole("button", { name: "Nova entrada" }).click()
-  await page.getByLabel("Fornecedor").selectOption("1")
+  await page.locator("label").filter({ hasText: "Fornecedor" }).locator("select").selectOption("1")
   await page.getByLabel("Nota Fiscal").fill("NF-E2E-01")
   await page.locator("select").filter({ has: page.locator('option[value="1"]') }).last().selectOption("1")
   await page.getByPlaceholder("Qtd").fill("4")

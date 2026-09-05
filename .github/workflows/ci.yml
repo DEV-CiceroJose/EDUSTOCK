@@ -86,10 +86,12 @@ jobs:
           cache: pip
       - name: Instalar dependências
         run: pip install -r requirements.txt
+      - name: Aplicar migrações no PostgreSQL vazio
+        run: python manage.py migrate --noinput
       - name: Validar migrações
         run: python manage.py makemigrations --check --dry-run
       - name: Rodar suíte completa no PostgreSQL
-        run: python manage.py test
+        run: python manage.py test --noinput
 
   frontend:
     name: ${{ matrix.app }}
@@ -143,9 +145,9 @@ jobs:
             app-cozinha/package-lock.json
       - name: Instalar dependências
         run: |
-          npm ci --prefix frontend
-          npm ci --prefix app-alunos
-          npm ci --prefix app-cozinha
+          npm ci --prefix frontend --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=2
+          npm ci --prefix app-alunos --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=2
+          npm ci --prefix app-cozinha --no-audit --no-fund --fetch-timeout=30000 --fetch-retries=2
       - name: Instalar navegador de testes
         working-directory: frontend
         run: npx playwright install --with-deps chromium

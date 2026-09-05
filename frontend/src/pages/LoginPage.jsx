@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { salvarSessao } from "../lib/auth"
+import { useLocation, useNavigate } from "react-router-dom"
+import { salvarSessao, sessaoFoiExpirada } from "../lib/auth"
 import { Icon } from "../lib/icons"
 
 async function mensagemDeErro(resp) {
@@ -29,6 +29,8 @@ export default function LoginPage() {
   const [erro, setErro] = useState("")
   const [carregando, setCarregando] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+  const aviso = sessaoFoiExpirada() ? "Sua sessão expirou. Entre novamente." : location.state?.message
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -59,6 +61,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
       <form onSubmit={handleSubmit} className="card w-full max-w-sm p-8">
         <h1 className="mb-6 font-display text-2xl font-bold">Entrar no EduStock</h1>
+        {aviso && <p role="status" className="mb-4 text-sm text-ink-soft">{aviso}</p>}
         <label className="mb-1 block text-sm font-semibold" htmlFor="login-username">
           Usuário
         </label>

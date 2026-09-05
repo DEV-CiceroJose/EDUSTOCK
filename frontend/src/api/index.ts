@@ -1,5 +1,5 @@
 import { mockProdutos, mockGrupos, mockCategorias, mockFornecedores, mockMovimentacoes, mockEntradas, mockAlertas, mockRelatorios, mockOperacao } from "./mock"
-import { httpProdutos, httpGrupos, httpCategorias, httpBensPermanentes, httpFornecedores, httpMovimentacoes, httpEntradas, httpAlertas, httpRelatorios, httpOperacao } from "./http"
+import { httpProdutos, httpGrupos, httpCategorias, httpBensPermanentes, httpFornecedores, httpMovimentacoes, httpEntradas, httpAlertas, httpRelatorios, httpOperacao, httpRede } from "./http"
 import { getConfig } from "../lib/config"
 import { getRuntimeMode } from "../lib/runtimeMode"
 import type { Alertas, Categoria, Fornecedor, Grupo, Movimentacao, Produto } from "./types"
@@ -20,4 +20,5 @@ export const alertasApi = (USE_MOCK ? mockAlertas : httpAlertas) as AlertasApi
 export const relatoriosApi = USE_MOCK ? mockRelatorios : httpRelatorios
 export const operacaoApi = USE_MOCK ? mockOperacao : httpOperacao
 export const bensApi = USE_MOCK ? null : httpBensPermanentes
+export const redeApi = httpRede
 export const isMock = USE_MOCK

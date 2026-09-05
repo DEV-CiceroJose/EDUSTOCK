@@ -517,47 +517,7 @@ describe('Preservation Property Tests - Existing Correct Behaviors', () => {
       expect(sidebar.classList.contains('h-screen')).toBe(true)
     })
 
-    it('should preserve sidebar section headers hidden on small screens', () => {
-      const { container } = render(
-        <BrowserRouter>
-          <Sidebar />
-        </BrowserRouter>
-      )
-
-      // Find all section headers (h3 elements)
-      const headers = container.querySelectorAll('h3')
-      expect(headers.length).toBeGreaterThan(0)
-
-      // After Bug 5 fix: Headers use conditional classes based on hover state
-      // Preservation check: Headers should still control visibility appropriately
-      // They now use dynamic classes: ${isExpanded ? 'lg:inline' : 'lg:hidden'}
-      headers.forEach((header) => {
-        // Check that header has visibility control classes (either lg:inline or lg:hidden)
-        const classStr = header.className
-        const hasVisibilityControl = classStr.includes('lg:inline') || classStr.includes('lg:hidden')
-        expect(hasVisibilityControl).toBe(true)
-      })
-    })
-
-    it('should preserve navigation label visibility behavior', () => {
-      const { container } = render(
-        <BrowserRouter>
-          <Sidebar />
-        </BrowserRouter>
-      )
-
-      // Find navigation labels (span elements with text inside links)
-      const labels = container.querySelectorAll('a span:not(.shrink-0)')
-      expect(labels.length).toBeGreaterThan(0)
-
-      // After Bug 5 fix: Labels use conditional classes based on hover state
-      // Preservation check: Labels should still have visibility control for responsive behavior
-      // They now use dynamic classes: ${isExpanded ? 'lg:inline' : 'lg:hidden'}
-      labels.forEach((label) => {
-        const classStr = label.className
-        const hasVisibilityControl = classStr.includes('lg:inline') || classStr.includes('lg:hidden')
-        expect(hasVisibilityControl).toBe(true)
-      })
-    })
+    // A geometria e os cliques durante a expansão são verificados no navegador
+    // em e2e/dashboard.spec.ts; jsdom não calcula o layout responsivo.
   })
 })

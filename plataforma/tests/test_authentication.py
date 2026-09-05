@@ -55,7 +55,6 @@ class TokenAcessoAuthenticationTest(TestCase):
 
         self.assertEqual(str(erro.exception.detail), "Usuário inativo.")
         self.assertFalse(TokenAcesso.objects.filter(pk=token.pk).exists())
-
     def test_token_invalido_levanta_erro(self):
         request = self.factory.get(
             "/api/produtos/", HTTP_AUTHORIZATION="Token nao-existe-e-nao-e-uuid"

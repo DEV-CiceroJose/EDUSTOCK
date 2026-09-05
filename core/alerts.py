@@ -38,19 +38,20 @@ def is_estoque_critico(quantidade, estoque_minimo, estoque_percentual=20):
     return False, None
 
 
-def _base_qs():
-    return Produto.objects.select_related("grupo", "grupo__categoria", "fornecedor")
+def _base_qs(escola=None):
+    qs = Produto.objects.select_related("grupo", "grupo__categoria", "fornecedor")
+    return qs.filter(escola=escola) if escola is not None else qs
 
 
-def queryset_validade(hoje=None, dias_alerta=ALERTA_DIAS):
+def queryset_validade(hoje=None, dias_alerta=ALERTA_DIAS, escola=None):
     hoje = hoje or timezone.localdate()
     limite = hoje + timedelta(days=dias_alerta)
-    return _base_qs().filter(validade__isnull=False, validade__lte=limite)
+    return _base_qs(escola).filter(validade__isnull=False, validade__lte=limite)
 
 
-def queryset_estoque_critico(estoque_percentual=20):
+def queryset_estoque_critico(estoque_percentual=20, escola=None):
     """Retorna esgotados e itens no/abaixo do estoque mínimo configurado."""
-    return _base_qs().filter(
+    return _base_qs(escola).filter(
         Q(quantidade__lte=0)
         | Q(estoque_minimo__gt=0, quantidade__lte=F("estoque_minimo"))
     )
@@ -102,22 +103,22 @@ def _serializar_estoque(produto, estoque_percentual):
     }
 
 
-def coletar_alertas(*, tipo=None, urgencia=None, hoje=None, dias_alerta=None):
+def coletar_alertas(*, tipo=None, urgencia=None, hoje=None, dias_alerta=None, escola=None):
     hoje = hoje or timezone.localdate()
-    configuracao = ConfiguracaoAlertas.carregar()
+    configuracao = ConfiguracaoAlertas.carregar(escola=escola)
     dias_alerta = dias_alerta or configuracao.alerta_dias
 
     validade_items = []
     estoque_items = []
 
     if tipo in (None, "validade"):
-        for p in queryset_validade(hoje, dias_alerta=dias_alerta):
+        for p in queryset_validade(hoje, dias_alerta=dias_alerta, escola=escola):
             item = _serializar_validade(p, hoje, configuracao.critico_dias)
             if urgencia is None or item["urgencia"] == urgencia:
                 validade_items.append(item)
 
     if tipo in (None, "estoque"):
-        for p in queryset_estoque_critico(configuracao.estoque_percentual):
+        for p in queryset_estoque_critico(configuracao.estoque_percentual, escola=escola):
             item = _serializar_estoque(p, configuracao.estoque_percentual)
             if urgencia is None or item["urgencia"] == urgencia:
                 estoque_items.append(item)

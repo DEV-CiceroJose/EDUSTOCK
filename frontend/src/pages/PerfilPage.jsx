@@ -1,12 +1,12 @@
+import { fetchAutenticado } from "../lib/authenticatedFetch"
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { getToken, getUsername, getNome, atualizarNome, limparSessao } from "../lib/auth"
+import { getToken, getUsername, getNome, atualizarNome } from "../lib/auth"
+import LogoutButton from "../components/LogoutButton"
 import { useToast } from "../components/ui/useToast"
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:8000/api"
 
 export default function PerfilPage() {
-  const navigate = useNavigate()
   const toast = useToast()
   const [nome, setNome] = useState(getNome() || "")
   const [salvando, setSalvando] = useState(false)
@@ -21,7 +21,7 @@ export default function PerfilPage() {
     setErro("")
     setSalvando(true)
     try {
-      const resp = await fetch(`${BASE}/auth/me/`, {
+      const resp = await fetchAutenticado(`${BASE}/auth/me/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Token ${getToken()}` },
         body: JSON.stringify({ nome: valor }),
@@ -39,23 +39,6 @@ export default function PerfilPage() {
     } finally {
       setSalvando(false)
     }
-  }
-
-  const handleLogout = async () => {
-    const token = getToken()
-    if (token) {
-      try {
-        await fetch(`${BASE}/auth/logout/`, {
-          method: "POST",
-          headers: { Authorization: `Token ${token}` },
-        })
-      } catch {
-        // Falha de rede não deve impedir o logout local
-      }
-    }
-
-    limparSessao()
-    navigate("/login")
   }
 
   return (
@@ -101,12 +84,7 @@ export default function PerfilPage() {
         </form>
 
         <div className="flex justify-end border-t border-line pt-6">
-          <button
-            onClick={handleLogout}
-            className="rounded-lg bg-danger px-4 py-2 font-medium text-white transition-colors hover:bg-danger/90"
-          >
-            Sair
-          </button>
+          <LogoutButton />
         </div>
       </div>
     </div>

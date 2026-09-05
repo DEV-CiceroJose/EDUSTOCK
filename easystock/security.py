@@ -83,7 +83,10 @@ def validate_production_env(env: Mapping[str, str]) -> dict[str, object]:
 
     allowed_hosts = csv_env("ALLOWED_HOSTS", env)
     cors_origins = csv_env("CORS_ALLOWED_ORIGINS", env)
-    csrf_origins = csv_env("CSRF_TRUSTED_ORIGINS", env) or list(cors_origins)
+    csrf_origins = list(dict.fromkeys([
+        *cors_origins,
+        *csv_env("CSRF_TRUSTED_ORIGINS", env),
+    ]))
     database_url = env["DATABASE_URL"].strip()
     if urlparse(database_url).scheme not in {"postgres", "postgresql"}:
         raise ImproperlyConfigured("DATABASE_URL deve apontar para PostgreSQL em produ\u00e7\u00e3o.")

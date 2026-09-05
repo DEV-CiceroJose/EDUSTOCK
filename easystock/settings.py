@@ -204,19 +204,20 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Origem do dev server do Vite (React) e produção
-# Em produção, adicione os domínios da Render
+# Origens dos frontends. Fora de produção, valores explícitos de ambiente
+# substituem os padrões locais para permitir o mesmo preflight usado no deploy.
+LOCAL_FRONTEND_ORIGINS = [
+    "http://localhost:5173",  # frontend admin (dev)
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",  # app-alunos (dev)
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",  # app-cozinha (dev)
+    "http://127.0.0.1:5175",
+]
 CORS_ALLOWED_ORIGINS = (
     PRODUCTION_ENV["CORS_ALLOWED_ORIGINS"]
     if IS_PRODUCTION
-    else [
-        "http://localhost:5173",  # frontend admin (dev)
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",  # app-alunos (dev)
-        "http://127.0.0.1:5174",
-        "http://localhost:5175",  # app-cozinha (dev)
-        "http://127.0.0.1:5175",
-    ]
+    else csv_env("CORS_ALLOWED_ORIGINS") or LOCAL_FRONTEND_ORIGINS
 )
 
 # Em produção, adicione dinamicamente os domínios do Render
@@ -241,7 +242,10 @@ CORS_ALLOW_HEADERS = (*default_headers, "x-operacao-token")
 CSRF_TRUSTED_ORIGINS = (
     PRODUCTION_ENV["CSRF_TRUSTED_ORIGINS"]
     if IS_PRODUCTION
-    else list(CORS_ALLOWED_ORIGINS)
+    else list(dict.fromkeys([
+        *CORS_ALLOWED_ORIGINS,
+        *csv_env("CSRF_TRUSTED_ORIGINS"),
+    ]))
 )
 
 SECURE_CSP = {
