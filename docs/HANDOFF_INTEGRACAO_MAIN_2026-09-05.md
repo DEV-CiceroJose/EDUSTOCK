@@ -36,6 +36,8 @@ a infraestrutura, os dados, a operação e a governança descritos abaixo.
   ativar, desativar e revogar sessões.
 - O CI preserva a verificação de segurança e o PostgreSQL e executa migrações
   explicitamente antes dos testes.
+- Django e Django REST Framework foram atualizados para os patches de segurança
+  6.0.8 e 3.17.2 após o auditor de dependências bloquear as versões anteriores.
 
 ## Evidências locais
 
