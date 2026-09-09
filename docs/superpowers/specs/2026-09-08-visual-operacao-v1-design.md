@@ -2,7 +2,7 @@
 
 Data: 8 de setembro de 2026  
 Responsável: DEV-CiceroJose  
-Status: desenho aprovado em conversa, aguardando revisão do documento
+Status: documento aprovado em 8 de setembro de 2026
 
 ## 1. Objetivo
 
@@ -183,6 +183,11 @@ operacionais e as chamadas para acessar o sistema ou solicitar um piloto.
 Os grupos acima, seus significados e os tipos consumidos pelo frontend formam o
 contrato da Fase 1.
 
+Quando o usuário não possui o módulo necessário, a seção correspondente é
+`null`: `presenca` e `refeicoes` exigem `merenda`; `estoque` exige `inventario`
+ou `alertas`. A ausência por permissão não é serializada como zero e o frontend
+não renderiza o bloco.
+
 ### 7.3 Cálculos
 
 - Presença reutiliza a regra de `calcular_resumo_dia` e a quantidade de turmas
@@ -199,6 +204,8 @@ contrato da Fase 1.
 - Atividade recente traz no máximo os oito registros mais novos de
   `RegistroAuditoria`, filtrados por escola e pelas permissões do solicitante,
   sem incluir segredos ou conteúdo sensível.
+- Ações, tendência e auditoria também são filtradas pelos módulos do usuário;
+  esconder um card somente no frontend não é considerado proteção suficiente.
 
 ## 8. Componentes de frontend
 
