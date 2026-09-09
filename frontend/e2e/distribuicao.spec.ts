@@ -22,7 +22,7 @@ for (const width of [1280, 390]) {
     await page.goto('http://127.0.0.1:4173/distribuicao')
     await expect(page.getByText('2 alunos ativos na escola')).toBeVisible()
     await page.getByRole('navigation', { name: 'Seções de distribuição' }).getByRole('button', { name: 'Relatório', exact: true }).click()
-    await page.getByLabel('Situação', { exact: true }).selectOption('PENDENTE')
+    await page.getByRole('combobox', { name: 'Situação', exact: true }).selectOption('PENDENTE')
     await page.getByRole('button', { name: 'Gerar relatório' }).click()
     await expect(page.getByRole('cell', { name: 'Ana · #3' })).toBeVisible()
     const download = page.waitForEvent('download')

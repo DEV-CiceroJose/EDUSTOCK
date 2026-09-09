@@ -2,6 +2,17 @@
 
 ## Atualização — 08/09/2026
 
+Os quatro cenários novos de navegador passaram em 21,1 segundos, em 1280 e
+390 pixels, após corrigir a seleção do filtro pelo papel acessível do campo.
+As falhas anteriores não eram apenas ambientais: o seletor do filtro era
+inadequado e também falhava no Linux da CI. Capturas de gestão e protagonistas
+foram inspecionadas. Os 16 testes de preservação passaram após incluir o novo
+link de navegação na lista esperada.
+
+Na CI da revisão 66cdb9f, as suítes SQLite e PostgreSQL, os três frontends e a
+auditoria de dependências passaram. O seletor E2E corrigido e o pacote Docker
+seguem para nova execução completa. A publicação real permanece pendente.
+
 A revisão independente identificou e foram corrigidos o acesso de PINs com
 turma/perfil alterados e a leitura de XLSX sem dimensões declaradas. Os testes
 reproduziram as falhas antes da correção. Após as correções, os 35 testes de

@@ -1,0 +1,37 @@
+(frontend) {
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        X-Frame-Options DENY
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://{$API_HOST}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        Cache-Control "no-cache"
+    }
+    try_files {path} /index.html
+    file_server
+}
+
+{$PAINEL_HOST} {
+    root * /srv/painel
+    import frontend
+}
+
+{$ALUNOS_HOST} {
+    root * /srv/alunos
+    import frontend
+}
+
+{$COZINHA_HOST} {
+    root * /srv/cozinha
+    import frontend
+}
+
+{$API_HOST} {
+    request_body {
+        max_size 6MB
+    }
+    reverse_proxy api:8000 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-For {remote_host}
+    }
+}
