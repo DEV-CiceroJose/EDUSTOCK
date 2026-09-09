@@ -5,6 +5,7 @@ import { getModulosAtivos, ehAdmin, podeVerRede } from "../lib/auth"
 import LogoutButton from "../components/LogoutButton"
 
 const navItems = [
+  { to: "/distribuicao", label: "Alunos e entregas", icon: "users", section: "Gestão", modulo: "inventario", somenteGestaoEscolar: true },
   { to: "/inventario", label: "Inventário", icon: "grid", section: "Operacional", modulo: "inventario" },
   { to: "/movimentacoes", label: "Movimentações", icon: "refresh", section: "Operacional", modulo: "movimentacoes" },
   { to: "/alertas", label: "Alertas", icon: "alert", section: "Operacional", modulo: "alertas" },
@@ -24,6 +25,7 @@ export default function Sidebar({ mobile = false, onNavigate, onClose }) {
   const labelVisibility = expanded ? "opacity-100" : "opacity-0"
   const modulosAtivos = getModulosAtivos()
   const itensVisiveis = navItems.filter((item) => {
+    if (item.somenteGestaoEscolar && !["GESTOR_REDE", "GESTOR_ESCOLA"].includes(sessionStorage.getItem("edustock:auth:papel_rede")) && !ehAdmin()) return false
     if (item.somenteAdmin && !ehAdmin()) return false
     if (item.somenteRede && !podeVerRede()) return false
     return !item.modulo || modulosAtivos.includes(item.modulo)

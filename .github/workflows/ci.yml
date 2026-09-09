@@ -154,3 +154,10 @@ jobs:
       - name: Validar fluxos críticos
         working-directory: frontend
         run: npm run test:e2e
+      - name: Guardar evidências dos testes de navegador
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencias-navegador
+          path: frontend/test-results/
+          retention-days: 7

@@ -21,6 +21,7 @@ const AdminModulosPage = lazy(() => import("./pages/AdminModulosPage"))
 const AdminUsuariosPage = lazy(() => import("./pages/AdminUsuariosPage"))
 const RedeMunicipalPage = lazy(() => import("./pages/RedeMunicipalPage"))
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"))
+const DistribuicaoPage = lazy(() => import("./pages/DistribuicaoPage"))
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="app" element={<Navigate to="/inventario" replace />} />
 
             <Route element={<RequireModule slug="inventario" />}>
+              <Route path="distribuicao" element={<DistribuicaoPage />} />
               <Route path="inventario" element={<InventarioPage />} />
             </Route>
             <Route element={<RequireModule slug="movimentacoes" />}>

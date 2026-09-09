@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, NavLink } from 'react-router-dom'
+import EntregasView from './EntregasView.jsx'
 import PinLogin from './PinLogin.jsx'
 import ContagemView from './ContagemView.jsx'
 import { getSessao, logout } from './api.js'
@@ -17,7 +18,7 @@ function Protegido({ children }) {
     })
   })
 
-  return getSessao() ? children : <Navigate to="/login" replace />
+  return getSessao() ? <><nav aria-label="Serviços da turma" className="mx-auto flex max-w-xl gap-3 px-4 pt-4"><NavLink className="rounded-lg border border-line px-4 py-2" to="/registrar">Presença</NavLink><NavLink className="rounded-lg border border-line px-4 py-2" to="/entregas">Entregas</NavLink></nav>{children}</> : <Navigate to="/login" replace />
 }
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<PinLogin />} />
+        <Route path="/entregas" element={<Protegido><EntregasView /></Protegido>} />
         <Route
           path="/registrar"
           element={

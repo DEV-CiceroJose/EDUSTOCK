@@ -1,0 +1,20 @@
+@media print {
+  body:has(.distribuicao-page) aside,
+  body:has(.distribuicao-page) main ~ *,
+  body:has(.distribuicao-page) header:not(.distribuicao-page header),
+  body:has(.distribuicao-page) .print\:hidden {
+    display: none !important;
+  }
+  body:has(.distribuicao-page),
+  body:has(.distribuicao-page) #root,
+  body:has(.distribuicao-page) main,
+  body:has(.distribuicao-page) .h-screen {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+  .distribuicao-page { padding: 0; max-width: none; font-size: 10pt; }
+  .distribuicao-page .overflow-x-auto { overflow: visible; }
+  .distribuicao-page tr { break-inside: avoid; }
+  .distribuicao-page thead { display: table-header-group; }
+}

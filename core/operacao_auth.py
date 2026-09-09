@@ -93,9 +93,14 @@ def validar_token(token: str) -> dict | None:
     pin_atual = PinAcesso.objects.filter(
         pk=pin_acesso_id, ativo=True, escola_id=sessao.get("escola_id")
     ).only(
-        "pin_fingerprint"
+        "pin_fingerprint", "papel", "turma_id"
     ).first()
-    if not pin_atual or pin_atual.pin_fingerprint != sessao.get("pin_versao"):
+    if (
+        not pin_atual
+        or pin_atual.pin_fingerprint != sessao.get("pin_versao")
+        or pin_atual.papel != sessao.get("perfil")
+        or (pin_atual.papel == PinAcesso.ALUNO_REP and pin_atual.turma_id != sessao.get("turma_id"))
+    ):
         cache.delete(chave)
         return None
     return sessao
