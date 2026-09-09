@@ -178,6 +178,11 @@ def registrar_estorno(*, movimentacao, motivo, user):
     )
     if original.corrige_movimentacao_id is not None:
         raise ValidationError("Não é permitido estornar uma movimentação de estorno.")
+    if original.destinatario_set.exists():
+        raise ValidationError(
+            "Esta movimentação pertence a uma entrega de aluno e não pode ser "
+            "estornada isoladamente. O registro de entrega deve permanecer consistente com o estoque."
+        )
     produto = Produto.objects.select_for_update().get(pk=original.produto_id)
     if Movimentacao.objects.filter(corrige_movimentacao=original).exists():
         raise ValidationError("Esta movimentação já foi estornada.")

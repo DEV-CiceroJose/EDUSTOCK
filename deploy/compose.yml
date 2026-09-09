@@ -1,0 +1,80 @@
+name: edustock
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: edustock
+      POSTGRES_USER: edustock
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Informe a senha do banco}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U edustock -d edustock"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  api:
+    image: edustock-api:${IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?Informe SECRET_KEY}
+      PIN_LOOKUP_SECRET: ${PIN_LOOKUP_SECRET:?Informe PIN_LOOKUP_SECRET}
+      APP_ENV: production
+      DEBUG: 'False'
+      DATABASE_URL: postgresql://edustock:${POSTGRES_PASSWORD}@db:5432/edustock
+      ALLOWED_HOSTS: ${API_HOST}
+      CORS_ALLOWED_ORIGINS: https://${PAINEL_HOST},https://${ALUNOS_HOST},https://${COZINHA_HOST}
+      CSRF_TRUSTED_ORIGINS: https://${API_HOST}
+      TRUSTED_PROXY_COUNT: '1'
+      SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-3600}
+      SECURE_HSTS_PRELOAD: 'False'
+      DEMO_MODE: 'False'
+    depends_on:
+      db:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  web:
+    image: edustock-web:${IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        API_ORIGIN: https://${API_HOST:?Informe o host da API}
+    restart: unless-stopped
+    environment:
+      API_HOST: ${API_HOST}
+      PAINEL_HOST: ${PAINEL_HOST}
+      ALUNOS_HOST: ${ALUNOS_HOST}
+      COZINHA_HOST: ${COZINHA_HOST}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    logging:
+      options:
+        max-size: 10m
+        max-file: '3'
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

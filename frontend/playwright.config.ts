@@ -33,6 +33,11 @@ export default defineConfig({
   ],
   projects: [
     {
+      name: "distribuicao",
+      testMatch: /distribuicao\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
       name: "dashboard",
       testMatch: /dashboard\.spec\.ts/,
       use: {

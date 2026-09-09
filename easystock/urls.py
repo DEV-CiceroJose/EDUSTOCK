@@ -20,6 +20,7 @@ from django.urls import path, include
 
 
 urlpatterns = [
+    path("api/distribuicao/", include("distribuicao.urls")),
     path("admin/", admin.site.urls),
 
     # 🔐 Autenticação e módulos da plataforma
