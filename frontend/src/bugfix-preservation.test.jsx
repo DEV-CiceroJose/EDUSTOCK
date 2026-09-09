@@ -86,6 +86,7 @@ describe('Preservation Property Tests - Existing Correct Behaviors', () => {
       { label: 'Fornecedores', expectedRoute: '/fornecedores' },
       { label: 'Relatórios', expectedRoute: '/relatorios' },
       { label: 'Merenda', expectedRoute: '/merenda' },
+      { label: 'Alunos e entregas', expectedRoute: '/distribuicao' },
       { label: 'Perfil', expectedRoute: '/perfil' },
       { label: 'Configurações', expectedRoute: '/configuracoes' },
     ]
@@ -117,7 +118,7 @@ describe('Preservation Property Tests - Existing Correct Behaviors', () => {
 
       // Verify links have proper structure (icon + label)
       const links = container.querySelectorAll('a[href]')
-      expect(links.length).toBe(10) // 8 itens gerais + "Módulos" e "Usuários" para papel ADMIN
+      expect(links.length).toBe(navigationItems.length + 2) // Mais "Módulos" e "Usuários" para ADMIN
 
       // Each link should have icon and label structure
       links.forEach((link) => {
