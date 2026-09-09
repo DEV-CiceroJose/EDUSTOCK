@@ -20,6 +20,7 @@ services:
         max-file: '3'
 
   api:
+    image: edustock-api:${IMAGE_TAG:-local}
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
@@ -48,6 +49,7 @@ services:
         max-file: '3'
 
   web:
+    image: edustock-web:${IMAGE_TAG:-local}
     build:
       context: ..
       dockerfile: deploy/Dockerfile.web
