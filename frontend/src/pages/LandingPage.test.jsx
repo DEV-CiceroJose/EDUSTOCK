@@ -17,6 +17,6 @@ describe("LandingPage", () => {
     sessionStorage.setItem("edustock:auth:token", "token-valido")
     render(<MemoryRouter><LandingPage /></MemoryRouter>)
 
-    expect(screen.getAllByRole("link", { name: "Abrir painel" })[0]).toHaveAttribute("href", "/inventario")
+    expect(screen.getAllByRole("link", { name: "Abrir painel" })[0]).toHaveAttribute("href", "/dashboard")
   })
 })

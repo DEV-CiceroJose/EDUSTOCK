@@ -562,7 +562,8 @@ function previsaoMock(db, data, turno) {
   }
 }
 
-function planoMock(db, data, turno) {
+function planoMock(db, data, refeicao) {
+  const turno = "INTEGRAL"
   const total = totalFreq(db, data, turno)
   const previsao = previsaoMock(db, data, turno)
   const itens = []
@@ -587,7 +588,22 @@ function planoMock(db, data, turno) {
       gramas_por_aluno: String(f.gramas_por_aluno),
     })
   }
-  return { data, turno, total_alunos: total, previsao, itens }
+  const labels = {
+    CAFE_MANHA: "Café da manhã",
+    ALMOCO: "Almoço",
+    LANCHE_TARDE: "Lanche da tarde",
+  }
+  return {
+    data,
+    turno,
+    refeicao,
+    refeicao_label: labels[refeicao] || refeicao,
+    total_alunos: total,
+    previsao,
+    itens,
+    baixa_realizada: false,
+    status_baixa: null,
+  }
 }
 
 export const mockOperacao = {
@@ -640,17 +656,17 @@ export const mockOperacao = {
         .map(([turma, quantidade_alunos]) => ({ turma, quantidade_alunos })),
     }
   },
-  async planoDoDia({ data, turno }) {
+  async planoDoDia({ data, refeicao }) {
     await delay(180)
     const db = load()
     const d = data || new Date().toISOString().slice(0, 10)
-    return planoMock(db, d, turno)
+    return planoMock(db, d, refeicao)
   },
-  async baixaProducao({ data, turno, itens }) {
+  async baixaProducao({ operacao_id, data, refeicao, itens }) {
     await delay(200)
     const db = load()
     const d = data || new Date().toISOString().slice(0, 10)
-    const plano = planoMock(db, d, turno)
+    const plano = planoMock(db, d, refeicao)
     const overrides = {}
     for (const it of itens || []) overrides[it.produto_id] = it
     const resultados = []
@@ -671,9 +687,99 @@ export const mockOperacao = {
     }
     save(db)
     return {
-      data: d, turno, resultados,
+      operacao_id, data: d, turno: "INTEGRAL", refeicao, resultados,
       sucesso: resultados.filter((r) => r.ok).length,
       falhas: resultados.filter((r) => !r.ok).length,
+    }
+  },
+}
+
+function localDateIso(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0")
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function dashboardDate(data) {
+  return data || localDateIso()
+}
+
+function deslocarDataIso(data, dias) {
+  const [ano, mes, dia] = data.split("-").map(Number)
+  const deslocada = new Date(Date.UTC(ano, mes - 1, dia + dias))
+  const pad = (value) => String(value).padStart(2, "0")
+  return `${deslocada.getUTCFullYear()}-${pad(deslocada.getUTCMonth() + 1)}-${pad(deslocada.getUTCDate())}`
+}
+
+function dashboardTrend(data) {
+  return Array.from({ length: 7 }, (_, indice) => ({
+    data: deslocarDataIso(data, indice - 6),
+    planejadas: 120 + indice * 4,
+    produzidas: 116 + indice * 4,
+    servidas: 112 + indice * 4,
+  }))
+}
+
+export const mockDashboard = {
+  async get(data) {
+    await delay(180)
+    const d = dashboardDate(data)
+    return {
+      data: d,
+      escola: { id: 1, nome: "Escola Demonstrativa" },
+      modulos: ["alertas", "inventario", "merenda"],
+      presenca: {
+        total_alunos: 120,
+        turmas_registradas: 4,
+        turmas_esperadas: 4,
+        media_historica: 116,
+        variacao_pct: 3.45,
+      },
+      refeicoes: {
+        previstas: 120,
+        produzidas: 116,
+        servidas: 112,
+        descarte_kg: "1.250",
+        etapas: [
+          { refeicao: "CAFE_MANHA", rotulo: "Café da manhã", status: "CONCLUIDA" },
+          { refeicao: "ALMOCO", rotulo: "Almoço", status: "AGUARDANDO_BAIXA" },
+          { refeicao: "LANCHE_TARDE", rotulo: "Lanche da tarde", status: "SEM_REGISTRO" },
+        ],
+      },
+      estoque: {
+        itens: 4,
+        adequados: 2,
+        atencao: 1,
+        criticos: 1,
+        vencidos: 0,
+        proximos_vencimento: 1,
+      },
+      proximas_acoes: [
+        {
+          codigo: "REFEICAO_PENDENTE",
+          prioridade: "alta",
+          titulo: "Confirmar produção da refeição",
+          descricao: "Há uma refeição do cardápio sem baixa de produção concluída.",
+          href: "/merenda",
+        },
+        {
+          codigo: "ESTOQUE_CRITICO",
+          prioridade: "alta",
+          titulo: "Verificar estoque crítico",
+          descricao: "Há itens críticos que precisam de atenção.",
+          href: "/alertas",
+        },
+      ],
+      tendencia: dashboardTrend(d),
+      atividade_recente: [
+        {
+          id: 1,
+          acao: "criou",
+          recurso: "Produto",
+          ator: "Sistema",
+          criado_em: `${d}T09:42:00-03:00`,
+        },
+      ],
+      atualizado_em: `${d}T09:42:00-03:00`,
     }
   },
 }

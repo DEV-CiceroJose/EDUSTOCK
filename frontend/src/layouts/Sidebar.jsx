@@ -5,6 +5,7 @@ import { getModulosAtivos, ehAdmin, podeVerRede } from "../lib/auth"
 import LogoutButton from "../components/LogoutButton"
 
 const navItems = [
+  { to: "/dashboard", label: "Painel", icon: "home", section: "Operacional", modulo: null },
   { to: "/distribuicao", label: "Alunos e entregas", icon: "users", section: "Gestão", modulo: "inventario", somenteGestaoEscolar: true },
   { to: "/inventario", label: "Inventário", icon: "grid", section: "Operacional", modulo: "inventario" },
   { to: "/movimentacoes", label: "Movimentações", icon: "refresh", section: "Operacional", modulo: "movimentacoes" },

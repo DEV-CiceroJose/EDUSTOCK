@@ -4,6 +4,82 @@ export type Periodicidade = "SEMANAL" | "MENSAL" | "EVENTUAL"
 export type MovimentoTipo = "ENTRADA" | "SAIDA"
 export type Urgencia = "critico" | "alerta"
 
+export type DashboardStageStatus = "SEM_REGISTRO" | "AGUARDANDO_BAIXA" | "CONCLUIDA" | "PARCIAL"
+export type DashboardActionCode = "TURMAS_PENDENTES" | "REFEICAO_PENDENTE" | "ESTOQUE_CRITICO" | "DIVERGENCIA_ESTOQUE"
+export type DashboardActionPriority = "alta" | "media" | "baixa"
+
+export interface DashboardSchool {
+  id: Id
+  nome: string
+}
+
+export interface DashboardPresence {
+  total_alunos: number
+  turmas_registradas: number
+  turmas_esperadas: number
+  media_historica: number
+  variacao_pct: number | null
+}
+
+export interface DashboardMealStage {
+  refeicao: string
+  rotulo: string
+  status: DashboardStageStatus
+}
+
+export interface DashboardMeals {
+  previstas: number
+  produzidas: number
+  servidas: number
+  descarte_kg: string
+  etapas: DashboardMealStage[]
+}
+
+export interface DashboardStock {
+  itens: number
+  adequados: number
+  atencao: number
+  criticos: number
+  vencidos: number
+  proximos_vencimento: number
+}
+
+export interface DashboardAction {
+  codigo: DashboardActionCode
+  prioridade: DashboardActionPriority
+  titulo: string
+  descricao: string
+  href: string
+}
+
+export interface DashboardTrendPoint {
+  data: string
+  planejadas: number
+  produzidas: number
+  servidas: number
+}
+
+export interface DashboardActivity {
+  id: Id
+  acao: string
+  recurso: string
+  ator: string
+  criado_em: string
+}
+
+export interface DashboardOperacional {
+  data: string
+  escola: DashboardSchool
+  modulos: string[]
+  presenca: DashboardPresence | null
+  refeicoes: DashboardMeals | null
+  estoque: DashboardStock | null
+  proximas_acoes: DashboardAction[]
+  tendencia: DashboardTrendPoint[]
+  atividade_recente: DashboardActivity[]
+  atualizado_em: string
+}
+
 export interface Categoria {
   id: Id
   name: string

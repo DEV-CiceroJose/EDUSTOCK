@@ -77,6 +77,43 @@ async function prepararApi(
     if (path.endsWith("/alertas/")) {
       return json(route, { resumo: {}, validade: [], estoque_critico: [] })
     }
+    if (path.endsWith("/dashboard/operacao/")) {
+      return json(route, {
+        data: "2026-09-10",
+        escola: { id: 1, nome: "Escola E2E" },
+        modulos: MODULOS,
+        presenca: {
+          total_alunos: 0,
+          turmas_registradas: 0,
+          turmas_esperadas: 0,
+          media_historica: 0,
+          variacao_pct: null,
+        },
+        refeicoes: {
+          previstas: 0,
+          produzidas: 0,
+          servidas: 0,
+          descarte_kg: "0.000",
+          etapas: [
+            { refeicao: "CAFE_MANHA", rotulo: "Café da manhã", status: "SEM_REGISTRO" },
+            { refeicao: "ALMOCO", rotulo: "Almoço", status: "SEM_REGISTRO" },
+            { refeicao: "LANCHE_TARDE", rotulo: "Lanche da tarde", status: "SEM_REGISTRO" },
+          ],
+        },
+        estoque: {
+          itens: 0,
+          adequados: 0,
+          atencao: 0,
+          criticos: 0,
+          vencidos: 0,
+          proximos_vencimento: 0,
+        },
+        proximas_acoes: [],
+        tendencia: [],
+        atividade_recente: [],
+        atualizado_em: "2026-09-10T12:00:00-03:00",
+      })
+    }
     if (path.endsWith("/operacao/resumo/")) {
       return json(route, {
         total_alunos: 58,
@@ -114,8 +151,8 @@ async function entrar(page: Page) {
   await page.getByLabel("Usuário").fill("gestor")
   await page.getByRole("textbox", { name: "Senha", exact: true }).fill("segredo")
   await page.getByRole("button", { name: "Entrar" }).click()
-  await expect(page).toHaveURL(/\/inventario$/)
-  await expect(page.getByRole("heading", { name: "Inventário" })).toBeVisible()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole("heading", { name: "Bom dia, Gestor." })).toBeVisible()
 }
 
 test("landing pública e login do gestor", async ({ page }) => {
@@ -133,6 +170,8 @@ test("cria produto e registra o saldo inicial", async ({ page }) => {
   await prepararApi(page, capturas)
   await entrar(page)
 
+  await page.getByTitle("Inventário").click()
+  await expect(page.getByRole("heading", { name: "Inventário" })).toBeVisible()
   await page.getByRole("button", { name: "Adicionar", exact: true }).click()
   await page.getByLabel("Nome do item").fill("Macarrão")
   await page.getByRole("dialog").getByRole("combobox").first().selectOption("1")

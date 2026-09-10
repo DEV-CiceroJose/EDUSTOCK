@@ -22,6 +22,7 @@ const AdminUsuariosPage = lazy(() => import("./pages/AdminUsuariosPage"))
 const RedeMunicipalPage = lazy(() => import("./pages/RedeMunicipalPage"))
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"))
 const DistribuicaoPage = lazy(() => import("./pages/DistribuicaoPage"))
+const DashboardOperacionalPage = lazy(() => import("./pages/DashboardOperacionalPage"))
 
 export default function App() {
   return (
@@ -32,7 +33,8 @@ export default function App() {
         <Route path="*" element={<NotFoundPage />} />
         <Route element={<RequireAuth />}>
           <Route element={<MainLayout />}>
-            <Route path="app" element={<Navigate to="/inventario" replace />} />
+            <Route path="dashboard" element={<DashboardOperacionalPage />} />
+            <Route path="app" element={<Navigate to="/dashboard" replace />} />
 
             <Route element={<RequireModule slug="inventario" />}>
               <Route path="distribuicao" element={<DistribuicaoPage />} />

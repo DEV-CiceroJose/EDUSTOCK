@@ -94,7 +94,7 @@ function DashboardPreview() {
 }
 
 export default function LandingPage() {
-  const dashboardPath = estaAutenticado() ? "/inventario" : "/login"
+  const dashboardPath = estaAutenticado() ? "/dashboard" : "/login"
   const dashboardLabel = estaAutenticado() ? "Abrir painel" : "Acessar sistema"
 
   return (

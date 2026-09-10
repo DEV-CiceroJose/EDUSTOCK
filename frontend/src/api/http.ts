@@ -15,6 +15,7 @@ import { getToken } from "../lib/auth"
 import type {
   Alertas,
   Categoria,
+  DashboardOperacional,
   Fornecedor,
   Grupo,
   Id,
@@ -140,13 +141,18 @@ export const httpOperacao = {
     req<Record<string, unknown>>(`/operacao/contagem/`, { method: "POST", body: data }),
   resumo: (data?: string) =>
     req<Record<string, unknown>>(`/operacao/resumo/${data ? `?data=${encodeURIComponent(data)}` : ""}`),
-  planoDoDia: ({ data, turno }: { data?: string; turno: string }) => {
-    const qs = new URLSearchParams({ turno })
-    if (data) qs.set("data", data)
-    return req<Record<string, unknown>>(`/operacao/plano-do-dia/?${qs}`)
+  planoDoDia: ({ data, refeicao }: { data: string; refeicao: string }) => {
+    const qs = new URLSearchParams({ data, refeicao })
+    return req<Record<string, unknown>>(`/merenda/plano-do-dia/?${qs}`)
   },
   baixaProducao: (data: Record<string, unknown>) =>
-    req<Record<string, unknown>>(`/operacao/baixa-de-producao/`, { method: "POST", body: data }),
+    req<Record<string, unknown>>(`/merenda/baixa-de-producao/`, { method: "POST", body: data }),
+}
+
+export const httpDashboard = {
+  get: (data?: string) => req<DashboardOperacional>(
+    `/dashboard/operacao/${data ? `?data=${encodeURIComponent(data)}` : ""}`,
+  ),
 }
 
 export type IndicadoresRede = {

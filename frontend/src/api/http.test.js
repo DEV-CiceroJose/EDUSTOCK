@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { httpProdutos } from "./http"
+import { httpDashboard, httpOperacao, httpProdutos } from "./http"
 import { getToken, salvarSessao } from "../lib/auth"
 
 function resposta(data) {
@@ -57,5 +57,57 @@ describe("cliente HTTP paginado", () => {
     ])
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock.mock.calls[0][0]).toContain("/produtos/?page_size=500")
+  })
+
+  it("consulta o resumo operacional com a data e o token atual", async () => {
+    salvarSessao({ token: "token-atual", papel: "ADMIN", modulos_ativos: [] })
+    const fetchMock = vi.fn().mockResolvedValue(resposta({ data: "2026-09-08" }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await expect(httpDashboard.get("2026-09-08")).resolves.toEqual({ data: "2026-09-08" })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/dashboard/operacao/?data=2026-09-08"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Token token-atual" }),
+      }),
+    )
+  })
+
+  it("consulta o plano de produção pela rota autenticada de gestão", async () => {
+    salvarSessao({ token: "token-atual", papel: "ADMIN", modulos_ativos: ["merenda"] })
+    const fetchMock = vi.fn().mockResolvedValue(resposta({ refeicao: "ALMOCO" }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await httpOperacao.planoDoDia({ data: "2026-09-10", refeicao: "ALMOCO" })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/merenda/plano-do-dia/?data=2026-09-10&refeicao=ALMOCO"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Token token-atual" }),
+      }),
+    )
+  })
+
+  it("registra a baixa pela rota autenticada de gestão", async () => {
+    salvarSessao({ token: "token-atual", papel: "OPERADOR", modulos_ativos: ["merenda"] })
+    const fetchMock = vi.fn().mockResolvedValue(resposta({ sucesso: 0, falhas: 0 }))
+    vi.stubGlobal("fetch", fetchMock)
+    const payload = {
+      operacao_id: "85e82492-28d4-48a0-b4dc-a25cc8db4ebc",
+      data: "2026-09-10",
+      refeicao: "CAFE_MANHA",
+    }
+
+    await httpOperacao.baixaProducao(payload)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/merenda/baixa-de-producao/"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: expect.objectContaining({ Authorization: "Token token-atual" }),
+      }),
+    )
   })
 })
