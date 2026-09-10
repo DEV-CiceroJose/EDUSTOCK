@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom"
 import { useOperationalDashboard } from "../hooks/useOperationalDashboard"
 import DashboardOperacionalPage from "./DashboardOperacionalPage"
@@ -100,6 +100,50 @@ describe("DashboardOperacionalPage", () => {
     expect(screen.getByText("426")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: /Abrir plano/i })).toHaveAttribute("href", "/merenda")
     expect(screen.getByText(/Em 7 dias: 3\.080 planejadas, 3\.031 produzidas e 2\.984 servidas/i)).toBeInTheDocument()
+  })
+
+  it("não infere conclusão de presença, planejamento ou produção a partir dos números", () => {
+    const semEstadoInferido = {
+      ...dashboardCompleto,
+      presenca: {
+        ...dashboardCompleto.presenca,
+        total_alunos: 100,
+        turmas_registradas: 4,
+        turmas_esperadas: 4,
+      },
+      refeicoes: {
+        ...dashboardCompleto.refeicoes,
+        previstas: 100,
+        produzidas: 100,
+        servidas: 100,
+        etapas: dashboardCompleto.refeicoes.etapas.map((etapa) => ({
+          ...etapa,
+          status: "SEM_REGISTRO",
+        })),
+      },
+    }
+
+    renderPage({ data: semEstadoInferido, loading: false, error: null, reload: vi.fn() })
+    const fluxo = within(screen.getByRole("region", { name: "Fluxo do dia" }))
+
+    expect(fluxo.getByText("100 alunos registrados")).toBeInTheDocument()
+    expect(fluxo.getByText("4 de 4 turmas")).toBeInTheDocument()
+    expect(fluxo.getByText("100 refeições previstas")).toBeInTheDocument()
+    expect(fluxo.getByText("100 produzidas · 100 servidas")).toBeInTheDocument()
+    expect(fluxo.queryByText("Concluída")).not.toBeInTheDocument()
+    expect(fluxo.getAllByText("Sem registro")).toHaveLength(3)
+  })
+
+  it("mantém foco visível nos links das próximas ações", () => {
+    renderPage({ data: dashboardCompleto, loading: false, error: null, reload: vi.fn() })
+
+    const actionLink = screen.getByRole("link", { name: /Verificar estoque crítico/i })
+    expect(actionLink).toHaveClass(
+      "focus-visible:outline-2",
+      "focus-visible:outline-brand",
+      "focus-visible:outline-offset-2",
+    )
+    expect(actionLink).not.toHaveClass("focus-visible:outline-none")
   })
 
   it("orienta o próximo registro quando ainda não existem dados operacionais", () => {

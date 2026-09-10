@@ -38,7 +38,7 @@ export default function NextActions({ actions = [], modules = [] }) {
         <ul aria-label="Próximas ações" className="mt-5 divide-y divide-line">
           {permitidas.map((acao) => (
             <li key={`${acao.codigo}-${acao.href}`} className="py-4 first:pt-0 last:pb-0">
-              <Link to={acao.href} className="group grid grid-cols-[2rem_1fr_auto] items-start gap-3 rounded-xl focus-visible:outline-none">
+              <Link to={acao.href} className="group grid grid-cols-[2rem_1fr_auto] items-start gap-3 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
                 <span className={`grid h-8 w-8 place-items-center rounded-lg ${acao.prioridade === "alta" ? "bg-accent-tint text-accent" : "bg-brand-tint text-brand"}`} aria-hidden="true">
                   {acao.prioridade === "alta" ? Icon.alert(15) : Icon.clock(15)}
                 </span>

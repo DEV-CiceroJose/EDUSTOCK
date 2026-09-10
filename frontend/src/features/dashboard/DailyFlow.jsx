@@ -3,53 +3,63 @@ import { Icon } from "../../lib/icons"
 
 const numero = new Intl.NumberFormat("pt-BR")
 
-function situacaoPresenca(presenca) {
-  if (!presenca || presenca.turmas_registradas === 0) return ["Pendente", "Sem registro", "pending"]
-  if (presenca.turmas_registradas < presenca.turmas_esperadas) {
-    return ["Em andamento", `${presenca.turmas_registradas} de ${presenca.turmas_esperadas} turmas`, "current"]
-  }
-  return ["Concluída", `${numero.format(presenca.total_alunos)} alunos`, "done"]
+const STATUS_DA_ETAPA = {
+  SEM_REGISTRO: { label: "Sem registro", tone: "pending" },
+  AGUARDANDO_BAIXA: { label: "Aguardando baixa", tone: "current" },
+  PARCIAL: { label: "Parcial", tone: "current" },
+  CONCLUIDA: { label: "Concluída", tone: "done" },
 }
 
-function situacaoPlanejamento(refeicoes) {
-  if (!refeicoes || refeicoes.previstas === 0) return ["Pendente", "Sem previsão", "pending"]
-  return ["Concluído", `${numero.format(refeicoes.previstas)} previstas`, "done"]
-}
-
-function situacaoProducao(refeicoes) {
-  if (!refeicoes || refeicoes.produzidas === 0) return ["Aguardando", "Sem produção", "pending"]
-  if (refeicoes.previstas > 0 && refeicoes.produzidas < refeicoes.previstas) {
-    return ["Em andamento", `${numero.format(refeicoes.produzidas)} produzidas`, "current"]
-  }
-  return ["Concluída", `${numero.format(refeicoes.produzidas)} produzidas`, "done"]
-}
-
-function situacaoBaixa(refeicoes) {
-  const etapas = refeicoes?.etapas ?? []
-  const concluidas = etapas.filter((etapa) => etapa.status === "CONCLUIDA").length
-  if (etapas.length > 0 && concluidas === etapas.length) return ["Concluída", `${concluidas} refeições`, "done"]
-  if (concluidas > 0) return ["Em andamento", `${concluidas} de ${etapas.length} refeições`, "current"]
-  return ["Aguardando", "Baixa pendente", "pending"]
-}
-
-function FlowStep({ label, status }) {
-  const [title, detail, tone] = status
-  const toneClass = tone === "done"
-    ? "border-brand-300/40 bg-brand-tint text-brand"
-    : tone === "current"
-      ? "border-accent/35 bg-accent-tint text-accent"
-      : "border-white/15 bg-white/5 text-white/60"
-
+function FlowMetric({ label, value, detail, icon }) {
   return (
-    <li className="flex min-w-36 flex-1 items-start gap-3 lg:min-w-0">
-      <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border ${toneClass}`} aria-hidden="true">
-        {tone === "done" ? Icon.check(16) : tone === "current" ? Icon.clock(16) : "·"}
+    <li className="flex min-w-40 flex-1 items-start gap-3 lg:min-w-0">
+      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/15 bg-white/5 text-white/70" aria-hidden="true">
+        {icon}
       </span>
       <span>
         <span className="block text-[.68rem] font-bold uppercase tracking-wider text-white/55">{label}</span>
-        <strong className="mt-1 block text-sm text-white">{title}</strong>
+        <strong className="mt-1 block text-sm text-white">{value}</strong>
         <small className="mt-0.5 block text-xs text-white/60">{detail}</small>
       </span>
+    </li>
+  )
+}
+
+function StageStatus({ status }) {
+  const state = STATUS_DA_ETAPA[status]
+  if (!state) return null
+  const toneClass = state.tone === "done"
+    ? "bg-brand-tint text-brand"
+    : state.tone === "current"
+      ? "bg-accent-tint text-accent"
+      : "bg-white/10 text-white/70"
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[.62rem] font-bold ${toneClass}`}>
+      <span aria-hidden="true">
+        {state.tone === "done" ? Icon.check(12) : state.tone === "current" ? Icon.clock(12) : "·"}
+      </span>
+      {state.label}
+    </span>
+  )
+}
+
+function MealStages({ stages }) {
+  return (
+    <li className="min-w-52 flex-[1.35] lg:min-w-0">
+      <span className="block text-[.68rem] font-bold uppercase tracking-wider text-white/55">Baixa FEFO</span>
+      {stages.length === 0 ? (
+        <p className="mt-2 text-xs text-white/60">Nenhuma etapa informada.</p>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {stages.map((stage) => (
+            <li key={stage.refeicao} className="flex items-center justify-between gap-2 text-xs text-white/85">
+              <span>{stage.rotulo}</span>
+              <StageStatus status={stage.status} />
+            </li>
+          ))}
+        </ul>
+      )}
     </li>
   )
 }
@@ -68,10 +78,25 @@ export default function DailyFlow({ presenca, refeicoes }) {
         </Link>
       </div>
       <ol className="mt-6 flex gap-4 overflow-x-auto pb-2 lg:gap-6">
-        <FlowStep label="Presença" status={situacaoPresenca(presenca)} />
-        <FlowStep label="Planejamento" status={situacaoPlanejamento(refeicoes)} />
-        <FlowStep label="Produção" status={situacaoProducao(refeicoes)} />
-        <FlowStep label="Baixa FEFO" status={situacaoBaixa(refeicoes)} />
+        <FlowMetric
+          label="Presença"
+          value={`${numero.format(presenca.total_alunos)} alunos registrados`}
+          detail={`${presenca.turmas_registradas} de ${presenca.turmas_esperadas} turmas`}
+          icon={Icon.presence(16)}
+        />
+        <FlowMetric
+          label="Planejamento"
+          value={`${numero.format(refeicoes.previstas)} refeições previstas`}
+          detail={`Descarte: ${refeicoes.descarte_kg} kg`}
+          icon={Icon.report(16)}
+        />
+        <FlowMetric
+          label="Produção"
+          value={`${numero.format(refeicoes.produzidas)} produzidas · ${numero.format(refeicoes.servidas)} servidas`}
+          detail="Porções do resumo operacional"
+          icon={Icon.food(16)}
+        />
+        <MealStages stages={refeicoes.etapas} />
       </ol>
     </section>
   )
