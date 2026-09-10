@@ -171,7 +171,9 @@ def _proximas_acoes(*, escola, data, modulos):
                 "Há itens críticos que precisam de atenção.", "/alertas",
             ))
 
-    if "inventario" in modulos and _ha_divergencia_recente(escola=escola, data=data):
+    if {"inventario", "alertas"}.issubset(modulos) and _ha_divergencia_recente(
+        escola=escola, data=data
+    ):
         acoes.append(_acao(
             "DIVERGENCIA_ESTOQUE", "media", "Conferir divergência de estoque",
             "A última contagem física recente diverge do saldo do sistema.", "/alertas",

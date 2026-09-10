@@ -195,6 +195,37 @@ class DashboardOperacionalEscopoTest(AutenticadoAPITestCase):
                 )
                 self.assertIn(item["href"], {"/merenda", "/alertas", "/rede"})
 
+    def test_divergencia_exige_inventario_e_alertas_autorizados(self):
+        produto = self._criar_produto(nome="Produto contado", quantidade=20)
+        ContagemEstoque.objects.create(
+            escola=self.escola,
+            produto=produto,
+            data=self.data_dashboard,
+            quantidade_sistema="20.000",
+            quantidade_fisica="18.000",
+        )
+        perfil = self.user.perfil
+        perfil.papel = Perfil.OPERADOR
+        perfil.acesso_legado = False
+        perfil.save(update_fields=["papel", "acesso_legado"])
+        perfil.modulos.set([Modulo.objects.get(slug="inventario")])
+
+        somente_inventario = self.client.get("/api/dashboard/operacao/?data=2026-09-08")
+
+        self.assertNotIn(
+            "DIVERGENCIA_ESTOQUE",
+            [item["codigo"] for item in somente_inventario.json()["proximas_acoes"]],
+        )
+
+        perfil.modulos.add(Modulo.objects.get(slug="alertas"))
+
+        inventario_e_alertas = self.client.get("/api/dashboard/operacao/?data=2026-09-08")
+
+        self.assertIn(
+            "DIVERGENCIA_ESTOQUE",
+            [item["codigo"] for item in inventario_e_alertas.json()["proximas_acoes"]],
+        )
+
     def test_retorna_tendencia_de_sete_dias_e_atividade_recente_segura(self):
         RegistroRefeicao.objects.create(
             escola=self.escola,
