@@ -15,6 +15,7 @@ import { getToken } from "../lib/auth"
 import type {
   Alertas,
   Categoria,
+  DashboardOperacional,
   Fornecedor,
   Grupo,
   Id,
@@ -147,6 +148,12 @@ export const httpOperacao = {
   },
   baixaProducao: (data: Record<string, unknown>) =>
     req<Record<string, unknown>>(`/operacao/baixa-de-producao/`, { method: "POST", body: data }),
+}
+
+export const httpDashboard = {
+  get: (data?: string) => req<DashboardOperacional>(
+    `/dashboard/operacao/${data ? `?data=${encodeURIComponent(data)}` : ""}`,
+  ),
 }
 
 export type IndicadoresRede = {

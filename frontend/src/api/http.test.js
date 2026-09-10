@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { httpProdutos } from "./http"
+import { httpDashboard, httpProdutos } from "./http"
 import { getToken, salvarSessao } from "../lib/auth"
 
 function resposta(data) {
@@ -57,5 +57,20 @@ describe("cliente HTTP paginado", () => {
     ])
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock.mock.calls[0][0]).toContain("/produtos/?page_size=500")
+  })
+
+  it("consulta o resumo operacional com a data e o token atual", async () => {
+    salvarSessao({ token: "token-atual", papel: "ADMIN", modulos_ativos: [] })
+    const fetchMock = vi.fn().mockResolvedValue(resposta({ data: "2026-09-08" }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await expect(httpDashboard.get("2026-09-08")).resolves.toEqual({ data: "2026-09-08" })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/dashboard/operacao/?data=2026-09-08"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Token token-atual" }),
+      }),
+    )
   })
 })

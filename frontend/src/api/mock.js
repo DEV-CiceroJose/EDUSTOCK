@@ -678,6 +678,89 @@ export const mockOperacao = {
   },
 }
 
+function dashboardDate(data) {
+  return data || new Date().toISOString().slice(0, 10)
+}
+
+function dashboardTrend(data) {
+  const fim = new Date(`${data}T00:00:00`)
+  return Array.from({ length: 7 }, (_, indice) => {
+    const dia = new Date(fim)
+    dia.setDate(fim.getDate() - (6 - indice))
+    return {
+      data: dia.toISOString().slice(0, 10),
+      planejadas: 120 + indice * 4,
+      produzidas: 116 + indice * 4,
+      servidas: 112 + indice * 4,
+    }
+  })
+}
+
+export const mockDashboard = {
+  async get(data) {
+    await delay(180)
+    const d = dashboardDate(data)
+    return {
+      data: d,
+      escola: { id: 1, nome: "Escola Demonstrativa" },
+      modulos: ["alertas", "inventario", "merenda"],
+      presenca: {
+        total_alunos: 120,
+        turmas_registradas: 4,
+        turmas_esperadas: 4,
+        media_historica: 116,
+        variacao_pct: 3.45,
+      },
+      refeicoes: {
+        previstas: 120,
+        produzidas: 116,
+        servidas: 112,
+        descarte_kg: "1.250",
+        etapas: [
+          { refeicao: "CAFE_MANHA", rotulo: "Café da manhã", status: "CONCLUIDA" },
+          { refeicao: "ALMOCO", rotulo: "Almoço", status: "AGUARDANDO_BAIXA" },
+          { refeicao: "LANCHE_TARDE", rotulo: "Lanche da tarde", status: "SEM_REGISTRO" },
+        ],
+      },
+      estoque: {
+        itens: 4,
+        adequados: 2,
+        atencao: 1,
+        criticos: 1,
+        vencidos: 0,
+        proximos_vencimento: 1,
+      },
+      proximas_acoes: [
+        {
+          codigo: "REFEICAO_PENDENTE",
+          prioridade: "alta",
+          titulo: "Confirmar produção da refeição",
+          descricao: "Há uma refeição do cardápio sem baixa de produção concluída.",
+          href: "/merenda",
+        },
+        {
+          codigo: "ESTOQUE_CRITICO",
+          prioridade: "alta",
+          titulo: "Verificar estoque crítico",
+          descricao: "Há itens críticos que precisam de atenção.",
+          href: "/alertas",
+        },
+      ],
+      tendencia: dashboardTrend(d),
+      atividade_recente: [
+        {
+          id: 1,
+          acao: "criou",
+          recurso: "Produto",
+          ator: "Sistema",
+          criado_em: `${d}T09:42:00-03:00`,
+        },
+      ],
+      atualizado_em: `${d}T09:42:00-03:00`,
+    }
+  },
+}
+
 function normalize(data) {
   return {
     nome: data.nome,

@@ -1,8 +1,8 @@
-import { mockProdutos, mockGrupos, mockCategorias, mockFornecedores, mockMovimentacoes, mockEntradas, mockAlertas, mockRelatorios, mockOperacao } from "./mock"
-import { httpProdutos, httpGrupos, httpCategorias, httpBensPermanentes, httpFornecedores, httpMovimentacoes, httpEntradas, httpAlertas, httpRelatorios, httpOperacao, httpRede } from "./http"
+import { mockProdutos, mockGrupos, mockCategorias, mockFornecedores, mockMovimentacoes, mockEntradas, mockAlertas, mockRelatorios, mockOperacao, mockDashboard } from "./mock"
+import { httpProdutos, httpGrupos, httpCategorias, httpBensPermanentes, httpFornecedores, httpMovimentacoes, httpEntradas, httpAlertas, httpRelatorios, httpOperacao, httpRede, httpDashboard } from "./http"
 import { getConfig } from "../lib/config"
 import { getRuntimeMode } from "../lib/runtimeMode"
-import type { Alertas, Categoria, Fornecedor, Grupo, Movimentacao, Produto } from "./types"
+import type { Alertas, Categoria, DashboardOperacional, Fornecedor, Grupo, Movimentacao, Produto } from "./types"
 
 const runtimeMode = getRuntimeMode((getConfig() as { useMock: boolean }).useMock)
 const USE_MOCK = runtimeMode.useMock
@@ -19,6 +19,7 @@ export const entradasApi = USE_MOCK ? mockEntradas : httpEntradas
 export const alertasApi = (USE_MOCK ? mockAlertas : httpAlertas) as AlertasApi
 export const relatoriosApi = USE_MOCK ? mockRelatorios : httpRelatorios
 export const operacaoApi = USE_MOCK ? mockOperacao : httpOperacao
+export const dashboardApi = (USE_MOCK ? mockDashboard : httpDashboard) as typeof httpDashboard & { get: (data?: string) => Promise<DashboardOperacional> }
 export const bensApi = USE_MOCK ? null : httpBensPermanentes
 export const redeApi = httpRede
 export const isMock = USE_MOCK
