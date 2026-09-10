@@ -4,9 +4,26 @@ from django.utils import timezone
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
-from core.models import Categoria, FrequenciaDiaria, Grupo, Produto, RegistroRefeicao, Turma
+from core.models import (
+    Cardapio,
+    Categoria,
+    ContagemEstoque,
+    FrequenciaDiaria,
+    Grupo,
+    Produto,
+    Receita,
+    RegistroRefeicao,
+    Turma,
+)
 from core.tests.utils import AutenticadoAPITestCase
-from plataforma.models import Escola, Modulo, Perfil, VinculoUsuario, escola_padrao_id
+from plataforma.models import (
+    Escola,
+    Modulo,
+    Perfil,
+    RegistroAuditoria,
+    VinculoUsuario,
+    escola_padrao_id,
+)
 
 
 class DashboardOperacionalApiTest(AutenticadoAPITestCase):
@@ -21,6 +38,7 @@ class DashboardOperacionalApiTest(AutenticadoAPITestCase):
         self.assertEqual(resposta.json()["detail"], "Data inválida. Use YYYY-MM-DD.")
 
     def test_retorna_contrato_vazio_da_escola_autenticada(self):
+        Turma.objects.update(ativo=False)
         resposta = self.client.get("/api/dashboard/operacao/?data=2026-09-08")
         self.assertEqual(resposta.status_code, 200)
         corpo = resposta.json()
@@ -29,7 +47,15 @@ class DashboardOperacionalApiTest(AutenticadoAPITestCase):
         self.assertEqual(corpo["refeicoes"]["previstas"], 0)
         self.assertEqual(corpo["estoque"]["itens"], 0)
         self.assertEqual(corpo["proximas_acoes"], [])
-        self.assertEqual(corpo["tendencia"], [])
+        self.assertEqual(corpo["tendencia"], [
+            {"data": "2026-09-02", "planejadas": 0, "produzidas": 0, "servidas": 0},
+            {"data": "2026-09-03", "planejadas": 0, "produzidas": 0, "servidas": 0},
+            {"data": "2026-09-04", "planejadas": 0, "produzidas": 0, "servidas": 0},
+            {"data": "2026-09-05", "planejadas": 0, "produzidas": 0, "servidas": 0},
+            {"data": "2026-09-06", "planejadas": 0, "produzidas": 0, "servidas": 0},
+            {"data": "2026-09-07", "planejadas": 0, "produzidas": 0, "servidas": 0},
+            {"data": "2026-09-08", "planejadas": 0, "produzidas": 0, "servidas": 0},
+        ])
         self.assertEqual(corpo["atividade_recente"], [])
 
 
@@ -93,6 +119,172 @@ class DashboardOperacionalEscopoTest(AutenticadoAPITestCase):
             porcoes_servidas=alunos - 2,
             descarte_kg="1.250",
         )
+
+    def _criar_produto(self, *, nome, quantidade=0, estoque_minimo=10):
+        categoria, _ = Categoria.objects.get_or_create(
+            escola=self.escola,
+            name="Categoria do dashboard",
+        )
+        grupo, _ = Grupo.objects.get_or_create(
+            escola=self.escola,
+            categoria=categoria,
+            nome="Grupo do dashboard",
+        )
+        return Produto.objects.create(
+            escola=self.escola,
+            nome=nome,
+            grupo=grupo,
+            unidade="KG",
+            quantidade=quantidade,
+            estoque_minimo=estoque_minimo,
+        )
+
+    def _criar_dez_produtos_e_auditorias(self):
+        for indice in range(10):
+            produto = self._criar_produto(nome=f"Produto extra {indice}", quantidade=20)
+            RegistroAuditoria.objects.create(
+                user=self.user,
+                escola=self.escola,
+                acao="ATUALIZOU",
+                recurso="Produto",
+                objeto_id=str(produto.id),
+                detalhes={"quantidade": "informação restrita"},
+            )
+
+    def test_retorna_acoes_pendentes_em_ordem_deterministica(self):
+        Turma.objects.create(
+            escola=self.escola,
+            nome="Turma sem frequência",
+            curso=Turma.DS,
+            ano=1,
+            turno=Turma.INTEGRAL,
+            ativo=True,
+        )
+        receita = Receita.objects.create(
+            escola=self.escola,
+            nome="Almoço pendente",
+            refeicao="ALMOCO",
+        )
+        Cardapio.objects.create(
+            escola=self.escola,
+            data=self.data_dashboard,
+            refeicao="ALMOCO",
+            receita=receita,
+        )
+        produto = self._criar_produto(nome="Produto crítico")
+        ContagemEstoque.objects.create(
+            escola=self.escola,
+            produto=produto,
+            data=self.data_dashboard,
+            quantidade_sistema="10.000",
+            quantidade_fisica="8.000",
+        )
+
+        resposta = self.client.get("/api/dashboard/operacao/?data=2026-09-08")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        acoes = resposta.json()["proximas_acoes"]
+        self.assertEqual(
+            [item["codigo"] for item in acoes],
+            ["TURMAS_PENDENTES", "REFEICAO_PENDENTE", "ESTOQUE_CRITICO", "DIVERGENCIA_ESTOQUE"],
+        )
+        for item in acoes:
+            with self.subTest(codigo=item["codigo"]):
+                self.assertTrue(
+                    {"codigo", "prioridade", "titulo", "descricao", "href"}.issubset(item)
+                )
+                self.assertIn(item["href"], {"/merenda", "/alertas", "/rede"})
+
+    def test_retorna_tendencia_de_sete_dias_e_atividade_recente_segura(self):
+        RegistroRefeicao.objects.create(
+            escola=self.escola,
+            data=self.data_dashboard - timedelta(days=6),
+            refeicao="CAFE_MANHA",
+            porcoes_planejadas=20,
+            porcoes_produzidas=18,
+            porcoes_servidas=17,
+        )
+        RegistroRefeicao.objects.create(
+            escola=self.escola,
+            data=self.data_dashboard,
+            refeicao="ALMOCO",
+            porcoes_planejadas=30,
+            porcoes_produzidas=29,
+            porcoes_servidas=28,
+        )
+        RegistroRefeicao.objects.create(
+            escola=self.escola,
+            data=self.data_dashboard - timedelta(days=8),
+            refeicao="LANCHE_TARDE",
+            porcoes_planejadas=99,
+            porcoes_produzidas=98,
+            porcoes_servidas=97,
+        )
+        for indice in range(10):
+            RegistroAuditoria.objects.create(
+                user=self.user,
+                escola=self.escola,
+                acao="ATUALIZOU",
+                recurso=f"Recurso {indice}",
+                objeto_id=str(indice),
+                detalhes={"segredo": "não expor"},
+            )
+        RegistroAuditoria.objects.create(
+            escola=self.outra_escola,
+            acao="EXTERNA",
+            recurso="Recurso externo",
+            detalhes={"segredo": "não expor"},
+        )
+        RegistroAuditoria.objects.create(
+            user=self.user,
+            escola=self.escola,
+            acao="ATUALIZOU",
+            recurso="Produto",
+            objeto_id="autorizado",
+            detalhes={"segredo": "não expor"},
+        )
+
+        resposta = self.client.get("/api/dashboard/operacao/?data=2026-09-08")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        tendencia = resposta.json()["tendencia"]
+        self.assertEqual([item["data"] for item in tendencia], [
+            "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07", "2026-09-08",
+        ])
+        self.assertEqual(tendencia[0], {
+            "data": "2026-09-02", "planejadas": 20, "produzidas": 18, "servidas": 17,
+        })
+        self.assertEqual(tendencia[-1], {
+            "data": "2026-09-08", "planejadas": 30, "produzidas": 29, "servidas": 28,
+        })
+        for item in tendencia[1:-1]:
+            with self.subTest(data=item["data"]):
+                self.assertEqual(item["planejadas"], 0)
+                self.assertEqual(item["produzidas"], 0)
+                self.assertEqual(item["servidas"], 0)
+
+        atividade = resposta.json()["atividade_recente"]
+        self.assertLessEqual(len(atividade), 8)
+        self.assertNotIn("Recurso externo", [item["recurso"] for item in atividade])
+        self.assertNotIn("Recurso 0", [item["recurso"] for item in atividade])
+        self.assertEqual(atividade[0]["recurso"], "Produto")
+        self.assertEqual(atividade[0]["ator"], self.user.username)
+        for item in atividade:
+            with self.subTest(id=item["id"]):
+                self.assertEqual(set(item), {"id", "acao", "recurso", "ator", "criado_em"})
+
+    def test_consultas_nao_crescem_por_produto_ou_auditoria(self):
+        with CaptureQueriesContext(connection) as consultas_base:
+            resposta_base = self.client.get("/api/dashboard/operacao/?data=2026-09-08")
+
+        self.assertEqual(resposta_base.status_code, 200, resposta_base.content)
+        self._criar_dez_produtos_e_auditorias()
+
+        with CaptureQueriesContext(connection) as consultas_expandidas:
+            resposta_expandida = self.client.get("/api/dashboard/operacao/?data=2026-09-08")
+
+        self.assertEqual(resposta_expandida.status_code, 200, resposta_expandida.content)
+        self.assertLessEqual(len(consultas_expandidas), len(consultas_base) + 2)
 
     def test_retorna_apenas_dados_da_escola_do_token_ignorando_escola_id(self):
         self._criar_dados_da_escola(self.escola, alunos=31, nome="Autorizada")
