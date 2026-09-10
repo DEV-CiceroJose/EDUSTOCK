@@ -49,7 +49,7 @@ export default function LoginPage() {
       }
       const data = await resp.json()
       salvarSessao(data)
-      navigate("/inventario")
+      navigate("/dashboard")
     } catch {
       setErro("Falha na conexão.")
     } finally {
