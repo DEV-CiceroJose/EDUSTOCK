@@ -678,22 +678,29 @@ export const mockOperacao = {
   },
 }
 
+function localDateIso(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0")
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 function dashboardDate(data) {
-  return data || new Date().toISOString().slice(0, 10)
+  return data || localDateIso()
+}
+
+function deslocarDataIso(data, dias) {
+  const [ano, mes, dia] = data.split("-").map(Number)
+  const deslocada = new Date(Date.UTC(ano, mes - 1, dia + dias))
+  const pad = (value) => String(value).padStart(2, "0")
+  return `${deslocada.getUTCFullYear()}-${pad(deslocada.getUTCMonth() + 1)}-${pad(deslocada.getUTCDate())}`
 }
 
 function dashboardTrend(data) {
-  const fim = new Date(`${data}T00:00:00`)
-  return Array.from({ length: 7 }, (_, indice) => {
-    const dia = new Date(fim)
-    dia.setDate(fim.getDate() - (6 - indice))
-    return {
-      data: dia.toISOString().slice(0, 10),
-      planejadas: 120 + indice * 4,
-      produzidas: 116 + indice * 4,
-      servidas: 112 + indice * 4,
-    }
-  })
+  return Array.from({ length: 7 }, (_, indice) => ({
+    data: deslocarDataIso(data, indice - 6),
+    planejadas: 120 + indice * 4,
+    produzidas: 116 + indice * 4,
+    servidas: 112 + indice * 4,
+  }))
 }
 
 export const mockDashboard = {

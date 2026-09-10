@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { dashboardApi } from "../api"
+import type { DashboardOperacional } from "../api/types"
 import { useOperationalDashboard } from "./useOperationalDashboard"
 
 vi.mock("../api", () => ({
@@ -18,6 +19,12 @@ const dashboard = {
   tendencia: [],
   atividade_recente: [],
   atualizado_em: "2026-09-08T09:42:00-03:00",
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  const promise = new Promise<T>((nextResolve) => { resolve = nextResolve })
+  return { promise, resolve }
 }
 
 describe("useOperationalDashboard", () => {
@@ -55,5 +62,45 @@ describe("useOperationalDashboard", () => {
     expect(result.current.error).toBeNull()
     expect(result.current.loading).toBe(false)
     expect(dashboardApi.get).toHaveBeenCalledTimes(2)
+  })
+
+  it("ignores a response from the previous data after rerender", async () => {
+    const anterior = deferred<DashboardOperacional>()
+    const atual = deferred<DashboardOperacional>()
+    vi.mocked(dashboardApi.get)
+      .mockReturnValueOnce(anterior.promise)
+      .mockReturnValueOnce(atual.promise)
+
+    const { result, rerender } = renderHook(
+      ({ data }) => useOperationalDashboard(data),
+      { initialProps: { data: "2026-09-08" } },
+    )
+    rerender({ data: "2026-09-09" })
+
+    await act(async () => {
+      anterior.resolve({ ...dashboard, data: "2026-09-08" })
+      await anterior.promise
+    })
+    expect(result.current.data).toBeNull()
+
+    await act(async () => {
+      atual.resolve({ ...dashboard, data: "2026-09-09" })
+      await atual.promise
+    })
+    expect(result.current.data?.data).toBe("2026-09-09")
+  })
+
+  it("ignores a response that arrives after desmontagem", async () => {
+    const pendente = deferred<DashboardOperacional>()
+    vi.mocked(dashboardApi.get).mockReturnValueOnce(pendente.promise)
+
+    const { result, unmount } = renderHook(() => useOperationalDashboard("2026-09-08"))
+    unmount()
+
+    await act(async () => {
+      pendente.resolve(dashboard)
+      await pendente.promise
+    })
+    expect(result.current.data).toBeNull()
   })
 })
