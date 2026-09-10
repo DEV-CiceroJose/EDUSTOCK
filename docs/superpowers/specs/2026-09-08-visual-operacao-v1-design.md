@@ -1,7 +1,7 @@
 # EduStock — Visual e Operação em Movimento (Fase 1)
 
-Data: 8 de setembro de 2026  
-Responsável: DEV-CiceroJose  
+Data: 8 de setembro de 2026
+Responsável: DEV-CiceroJose
 Status: documento aprovado em 8 de setembro de 2026
 
 ## 1. Objetivo

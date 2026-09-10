@@ -562,7 +562,8 @@ function previsaoMock(db, data, turno) {
   }
 }
 
-function planoMock(db, data, turno) {
+function planoMock(db, data, refeicao) {
+  const turno = "INTEGRAL"
   const total = totalFreq(db, data, turno)
   const previsao = previsaoMock(db, data, turno)
   const itens = []
@@ -587,7 +588,22 @@ function planoMock(db, data, turno) {
       gramas_por_aluno: String(f.gramas_por_aluno),
     })
   }
-  return { data, turno, total_alunos: total, previsao, itens }
+  const labels = {
+    CAFE_MANHA: "Café da manhã",
+    ALMOCO: "Almoço",
+    LANCHE_TARDE: "Lanche da tarde",
+  }
+  return {
+    data,
+    turno,
+    refeicao,
+    refeicao_label: labels[refeicao] || refeicao,
+    total_alunos: total,
+    previsao,
+    itens,
+    baixa_realizada: false,
+    status_baixa: null,
+  }
 }
 
 export const mockOperacao = {
@@ -640,17 +656,17 @@ export const mockOperacao = {
         .map(([turma, quantidade_alunos]) => ({ turma, quantidade_alunos })),
     }
   },
-  async planoDoDia({ data, turno }) {
+  async planoDoDia({ data, refeicao }) {
     await delay(180)
     const db = load()
     const d = data || new Date().toISOString().slice(0, 10)
-    return planoMock(db, d, turno)
+    return planoMock(db, d, refeicao)
   },
-  async baixaProducao({ data, turno, itens }) {
+  async baixaProducao({ operacao_id, data, refeicao, itens }) {
     await delay(200)
     const db = load()
     const d = data || new Date().toISOString().slice(0, 10)
-    const plano = planoMock(db, d, turno)
+    const plano = planoMock(db, d, refeicao)
     const overrides = {}
     for (const it of itens || []) overrides[it.produto_id] = it
     const resultados = []
@@ -671,7 +687,7 @@ export const mockOperacao = {
     }
     save(db)
     return {
-      data: d, turno, resultados,
+      operacao_id, data: d, turno: "INTEGRAL", refeicao, resultados,
       sucesso: resultados.filter((r) => r.ok).length,
       falhas: resultados.filter((r) => !r.ok).length,
     }

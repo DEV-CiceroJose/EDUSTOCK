@@ -64,6 +64,22 @@ describe("useOperationalDashboard", () => {
     expect(dashboardApi.get).toHaveBeenCalledTimes(2)
   })
 
+  it("preserva os dados anteriores quando uma atualização falha", async () => {
+    const failure = new Error("Falha temporária")
+    vi.mocked(dashboardApi.get)
+      .mockResolvedValueOnce(dashboard)
+      .mockRejectedValueOnce(failure)
+
+    const { result } = renderHook(() => useOperationalDashboard("2026-09-08"))
+    await waitFor(() => expect(result.current.data).toEqual(dashboard))
+
+    act(() => result.current.reload())
+    await waitFor(() => expect(result.current.error).toBe(failure))
+
+    expect(result.current.loading).toBe(false)
+    expect(result.current.data).toEqual(dashboard)
+  })
+
   it("ignores a response from the previous data after rerender", async () => {
     const anterior = deferred<DashboardOperacional>()
     const atual = deferred<DashboardOperacional>()

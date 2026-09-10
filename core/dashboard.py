@@ -107,17 +107,16 @@ def _resumo_estoque(*, escola):
     alertas = coletar_alertas(escola=escola)
     itens_validade = {item["produto_id"]: item for item in alertas["validade"]}
     itens_estoque = {item["produto_id"]: item for item in alertas["estoque_critico"]}
-    itens_em_alerta = {**itens_validade, **itens_estoque}
+    ids_em_alerta = set(itens_validade) | set(itens_estoque)
     ids_criticos = {
         produto_id
-        for produto_id, item in itens_em_alerta.items()
-        if item["urgencia"] == "critico"
+        for produto_id in ids_em_alerta
+        if any(
+            item and item["urgencia"] == "critico"
+            for item in (itens_validade.get(produto_id), itens_estoque.get(produto_id))
+        )
     }
-    ids_atencao = {
-        produto_id
-        for produto_id, item in itens_em_alerta.items()
-        if item["urgencia"] == "alerta" and produto_id not in ids_criticos
-    }
+    ids_atencao = ids_em_alerta - ids_criticos
     vencidos = {
         produto_id
         for produto_id, item in itens_validade.items()
@@ -131,7 +130,7 @@ def _resumo_estoque(*, escola):
     itens = Produto.objects.filter(escola=escola).count()
     return {
         "itens": itens,
-        "adequados": max(itens - len(itens_em_alerta), 0),
+        "adequados": max(itens - len(ids_em_alerta), 0),
         "atencao": len(ids_atencao),
         "criticos": len(ids_criticos),
         "vencidos": len(vencidos),
@@ -149,17 +148,17 @@ def _proximas_acoes(*, escola, data, modulos):
                 "Há turmas ativas sem frequência registrada para hoje.", "/merenda",
             ))
 
-        baixas_concluidas = OperacaoBaixaProducao.objects.filter(
+        refeicoes_processadas = OperacaoBaixaProducao.objects.filter(
             escola=escola,
             data=data,
-            status=OperacaoBaixaProducao.CONCLUIDA,
         ).values("refeicao")
         if Cardapio.objects.filter(escola=escola, data=data).exclude(
-            refeicao__in=baixas_concluidas
+            refeicao__in=refeicoes_processadas
         ).exists():
             acoes.append(_acao(
                 "REFEICAO_PENDENTE", "alta", "Confirmar produção da refeição",
-                "Há uma refeição do cardápio sem baixa de produção concluída.", "/merenda",
+                "Há uma refeição do cardápio sem baixa de produção concluída.",
+                "/merenda?view=producao",
             ))
 
     if "alertas" in modulos:

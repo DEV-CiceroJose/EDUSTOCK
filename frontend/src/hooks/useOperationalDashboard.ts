@@ -27,7 +27,6 @@ export function useOperationalDashboard(data?: string) {
       .catch((cause) => {
         if (!active) return
         setError(cause)
-        setDashboard(null)
       })
       .finally(() => {
         if (active) setLoading(false)

@@ -39,6 +39,17 @@ describe("Sidebar", () => {
     expect(screen.getByText("Configurações")).toBeInTheDocument()
   })
 
+  it("sempre oferece retorno ao painel operacional", () => {
+    salvarSessao({ token: "abc", papel: "OPERADOR", modulos_ativos: [] })
+
+    render(<MemoryRouter><Sidebar mobile /></MemoryRouter>)
+
+    expect(screen.getByRole("link", { name: "Painel" })).toHaveAttribute(
+      "href",
+      "/dashboard",
+    )
+  })
+
   it("renderiza navegação mobile e fecha ao escolher uma rota", () => {
     const fechar = vi.fn()
     salvarSessao({ token: "abc", papel: "OPERADOR", modulos_ativos: ["inventario"] })

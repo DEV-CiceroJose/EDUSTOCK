@@ -98,7 +98,7 @@ describe("DashboardOperacionalPage", () => {
     expect(screen.getByRole("region", { name: "Fluxo do dia" })).toBeInTheDocument()
     expect(screen.getByRole("list", { name: "Próximas ações" })).toBeInTheDocument()
     expect(screen.getByText("426")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /Abrir plano/i })).toHaveAttribute("href", "/merenda")
+    expect(screen.getByRole("link", { name: /Abrir plano/i })).toHaveAttribute("href", "/merenda?view=producao")
     expect(screen.getByText(/Em 7 dias: 3\.080 planejadas, 3\.031 produzidas e 2\.984 servidas/i)).toBeInTheDocument()
   })
 

@@ -8,6 +8,7 @@ from .api_views import (
 )
 from .operacao_views import (
     ContagemView, ResumoFrequenciaView, PlanoDoDiaView, BaixaProducaoView,
+    PlanoDoDiaGestaoView, BaixaProducaoGestaoView,
     HealthCheckView, OperacaoLoginView, OperacaoLogoutView, StatusDoDiaView,
 )
 from .dashboard_views import DashboardOperacionalView
@@ -52,6 +53,10 @@ urlpatterns = [
 
     # Dashboard admin — resumo sem autenticação de perfil
     path("operacao/resumo/", ResumoFrequenciaView.as_view(), name="operacao-resumo"),
+
+    # Dashboard de gestão — usa a sessão normal de admin/operador
+    path("merenda/plano-do-dia/", PlanoDoDiaGestaoView.as_view(), name="merenda-gestao-plano"),
+    path("merenda/baixa-de-producao/", BaixaProducaoGestaoView.as_view(), name="merenda-gestao-baixa"),
 
     # app-cozinha — plano e baixa de produção (apenas COZINHA)
     path("operacao/plano-do-dia/", PlanoDoDiaView.as_view(), name="operacao-plano"),

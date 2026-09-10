@@ -73,7 +73,7 @@ export default function DailyFlow({ presenca, refeicoes }) {
           <span className="text-[.68rem] font-bold uppercase tracking-[.14em] text-brand-300">Fluxo do dia</span>
           <h2 id="daily-flow-title" className="mt-1 font-display text-lg font-bold">Da presença à baixa do estoque</h2>
         </div>
-        <Link to="/merenda" className="btn btn-accent">
+        <Link to="/merenda?view=producao" className="btn btn-accent">
           Abrir plano da merenda {Icon.chevronR(16)}
         </Link>
       </div>

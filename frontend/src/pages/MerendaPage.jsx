@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { useDashboardData } from "../hooks/useDashboardData"
 import ContagemView from "../features/merenda/ContagemView"
 import ContagemWidget from "../features/merenda/ContagemWidget"
@@ -9,7 +10,9 @@ const VIEWS = ["contagem", "producao"]
 
 export default function MerendaPage() {
   const { produtos, loading, error, carregar } = useDashboardData()
-  const [view, setView] = useState("contagem")
+  const [searchParams, setSearchParams] = useSearchParams()
+  const viewParam = searchParams.get("view")
+  const view = VIEWS.includes(viewParam) ? viewParam : "contagem"
   const [refreshKey, setRefreshKey] = useState(0)
 
   const produtosMerenda = produtos.filter((p) => 
@@ -41,7 +44,7 @@ export default function MerendaPage() {
           {VIEWS.map((v) => (
             <button
               key={v}
-              onClick={() => setView(v)}
+              onClick={() => setSearchParams(v === "producao" ? { view: v } : {})}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 view === v ? "bg-brand text-[#f4f1e7]" : "bg-surface text-ink-soft hover:bg-surface-2"
               }`}

@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from uuid import uuid4
 
 from django.utils import timezone
 from django.db import connection
@@ -10,6 +11,7 @@ from core.models import (
     ContagemEstoque,
     FrequenciaDiaria,
     Grupo,
+    OperacaoBaixaProducao,
     Produto,
     Receita,
     RegistroRefeicao,
@@ -188,12 +190,62 @@ class DashboardOperacionalEscopoTest(AutenticadoAPITestCase):
             [item["codigo"] for item in acoes],
             ["TURMAS_PENDENTES", "REFEICAO_PENDENTE", "ESTOQUE_CRITICO", "DIVERGENCIA_ESTOQUE"],
         )
+        acao_refeicao = next(
+            item for item in acoes if item["codigo"] == "REFEICAO_PENDENTE"
+        )
+        self.assertEqual(acao_refeicao["href"], "/merenda?view=producao")
         for item in acoes:
             with self.subTest(codigo=item["codigo"]):
                 self.assertTrue(
                     {"codigo", "prioridade", "titulo", "descricao", "href"}.issubset(item)
                 )
-                self.assertIn(item["href"], {"/merenda", "/alertas", "/rede"})
+                self.assertIn(
+                    item["href"],
+                    {"/merenda", "/merenda?view=producao", "/alertas", "/rede"},
+                )
+
+    def test_preserva_maior_urgencia_quando_produto_tem_dois_alertas(self):
+        produto = self._criar_produto(
+            nome="Produto vencido com estoque baixo",
+            quantidade=5,
+            estoque_minimo=10,
+        )
+        produto.validade = timezone.localdate() - timedelta(days=1)
+        produto.save(update_fields=["validade"])
+
+        resposta = self.client.get("/api/dashboard/operacao/?data=2026-09-08")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        estoque = resposta.json()["estoque"]
+        self.assertEqual(estoque["criticos"], 1)
+        self.assertEqual(estoque["atencao"], 0)
+        self.assertEqual(estoque["vencidos"], 1)
+
+    def test_baixa_parcial_nao_mantem_acao_de_confirmacao_impossivel(self):
+        receita = Receita.objects.create(
+            escola=self.escola,
+            nome="Almoço parcialmente baixado",
+            refeicao="ALMOCO",
+        )
+        Cardapio.objects.create(
+            escola=self.escola,
+            data=self.data_dashboard,
+            refeicao="ALMOCO",
+            receita=receita,
+        )
+        OperacaoBaixaProducao.objects.create(
+            escola=self.escola,
+            operacao_id=uuid4(),
+            data=self.data_dashboard,
+            refeicao="ALMOCO",
+            status=OperacaoBaixaProducao.PARCIAL,
+        )
+
+        resposta = self.client.get("/api/dashboard/operacao/?data=2026-09-08")
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        codigos = [item["codigo"] for item in resposta.json()["proximas_acoes"]]
+        self.assertNotIn("REFEICAO_PENDENTE", codigos)
 
     def test_divergencia_exige_inventario_e_alertas_autorizados(self):
         produto = self._criar_produto(nome="Produto contado", quantidade=20)

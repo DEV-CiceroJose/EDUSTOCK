@@ -6,15 +6,27 @@ import { Icon } from "../../lib/icons.jsx"
 import ConfirmDialog from "../../components/ui/ConfirmDialog"
 import { useToast } from "../../components/ui/useToast"
 
-const TURNOS = [
-  { key: "MANHA", label: "Manhã" },
-  { key: "TARDE", label: "Tarde" },
-  { key: "INTEGRAL", label: "Integral" },
+const REFEICOES = [
+  { key: "CAFE_MANHA", label: "Café da manhã" },
+  { key: "ALMOCO", label: "Almoço" },
+  { key: "LANCHE_TARDE", label: "Lanche da tarde" },
 ]
+
+function dataLocal(date = new Date()) {
+  const pad = (numero) => String(numero).padStart(2, "0")
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function refeicaoAtual(date = new Date()) {
+  if (date.getHours() < 10) return "CAFE_MANHA"
+  if (date.getHours() < 15) return "ALMOCO"
+  return "LANCHE_TARDE"
+}
 
 export default function KitchenProductionView({ onBaixaConcluida }) {
   const toast = useToast()
-  const [turno, setTurno] = useState("MANHA")
+  const [data] = useState(() => dataLocal())
+  const [refeicao, setRefeicao] = useState(() => refeicaoAtual())
   const [plano, setPlano] = useState(null)
   const [loading, setLoading] = useState(true)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -23,9 +35,8 @@ export default function KitchenProductionView({ onBaixaConcluida }) {
 
   const carregar = useCallback(async () => {
     setLoading(true)
-    setResultado(null)
     try {
-      const p = await operacaoApi.planoDoDia({ turno })
+      const p = await operacaoApi.planoDoDia({ data, refeicao })
       setPlano(p)
     } catch (err) {
       toast(String(err.message || err), "danger")
@@ -33,11 +44,11 @@ export default function KitchenProductionView({ onBaixaConcluida }) {
     } finally {
       setLoading(false)
     }
-  }, [turno, toast])
+  }, [data, refeicao, toast])
 
   useEffect(() => {
     let active = true
-    operacaoApi.planoDoDia({ turno })
+    operacaoApi.planoDoDia({ data, refeicao })
       .then((data) => {
         if (active) setPlano(data)
       })
@@ -50,19 +61,23 @@ export default function KitchenProductionView({ onBaixaConcluida }) {
         if (active) setLoading(false)
       })
     return () => { active = false }
-  }, [turno, toast])
+  }, [data, refeicao, toast])
 
-  function selecionarTurno(novoTurno) {
+  function selecionarRefeicao(novaRefeicao) {
     setLoading(true)
     setResultado(null)
-    setTurno(novoTurno)
+    setRefeicao(novaRefeicao)
   }
 
   async function executarBaixa() {
     setConfirmOpen(false)
     setBaixando(true)
     try {
-      const res = await operacaoApi.baixaProducao({ turno })
+      const res = await operacaoApi.baixaProducao({
+        operacao_id: crypto.randomUUID(),
+        data,
+        refeicao,
+      })
       setResultado(res)
       toast(
         res.falhas > 0
@@ -91,27 +106,27 @@ export default function KitchenProductionView({ onBaixaConcluida }) {
         </div>
         <button
           type="button"
-          disabled={!itens.length || baixando}
+          disabled={!itens.length || baixando || plano?.baixa_realizada}
           onClick={() => setConfirmOpen(true)}
           className="btn btn-accent px-6 py-3 text-lg disabled:opacity-40"
         >
-          Dar Baixa de Produção
+          {plano?.baixa_realizada ? "Baixa já registrada" : "Dar Baixa de Produção"}
         </button>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        {TURNOS.map((t) => (
+        {REFEICOES.map((item) => (
           <button
-            key={t.key}
+            key={item.key}
             type="button"
-            onClick={() => selecionarTurno(t.key)}
+            onClick={() => selecionarRefeicao(item.key)}
             className={`rounded-full border px-4 py-2 text-lg font-semibold ${
-              turno === t.key
+              refeicao === item.key
                 ? "border-brand bg-brand text-[#f4f1e7]"
                 : "border-line bg-surface"
             }`}
           >
-            {t.label}
+            {item.label}
           </button>
         ))}
       </div>
