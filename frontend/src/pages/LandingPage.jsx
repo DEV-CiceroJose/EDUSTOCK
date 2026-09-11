@@ -50,10 +50,13 @@ function WhatsAppIcon() {
 
 function DashboardPreview() {
   return (
-    <div className="landing-preview" aria-label="Prévia ilustrativa do painel EduStock">
+    <section className="landing-preview" aria-label="Prévia demonstrativa do painel EduStock">
       <div className="landing-preview-top">
         <span><BrandMark /> EduStock</span>
-        <span className="landing-preview-avatar">EC</span>
+        <span className="landing-preview-meta">
+          <small>Exemplo demonstrativo</small>
+          <span className="landing-preview-avatar">EC</span>
+        </span>
       </div>
       <div className="landing-preview-body">
         <aside aria-hidden="true">
@@ -100,7 +103,7 @@ function DashboardPreview() {
       <span className="landing-floating-card landing-floating-ok">
         <b>✓</b><span>Contagem da turma<br />registrada</span>
       </span>
-    </div>
+    </section>
   )
 }
 

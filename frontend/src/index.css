@@ -292,6 +292,8 @@ select.field {
 }
 .landing-preview-top > span:first-child { display: flex; align-items: center; color: var(--landing-green); font-size: .78rem; font-weight: 800; }
 .landing-preview-top .landing-brand-mark { width: 26px; height: 26px; }
+.landing-preview-meta { display: flex; align-items: center; gap: 10px; }
+.landing-preview-meta > small { border-radius: 999px; padding: 5px 8px; color: #6c7771; background: #f1f3ef; font-size: .5rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .landing-preview-avatar { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: #fff; background: #df7d43; font-size: .58rem; font-weight: 800; }
 .landing-preview-body { min-height: 430px; display: grid; grid-template-columns: 58px 1fr; }
 .landing-preview-body aside { display: flex; align-items: center; flex-direction: column; gap: 18px; border-right: 1px solid #eef0eb; padding-top: 28px; background: #fbfcf8; }
@@ -419,6 +421,7 @@ select.field {
 }
 .landing-whatsapp-float:hover { transform: translateY(-3px) scale(1.03); }
 .landing-whatsapp-float svg { width: 29px; height: 29px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.landing-shell a:focus-visible { outline: 3px solid #df7d43; outline-offset: 4px; }
 .landing-footer { min-height: 120px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0 max(20px, calc((100% - 1180px) / 2)); color: #77817c; background: #fff; font-size: .75rem; }
 .landing-footer p { margin: 0; }
 .landing-footer > a:not(.landing-brand) { color: var(--landing-green); font-weight: 750; text-decoration: none; }
@@ -447,6 +450,7 @@ select.field {
   .landing-preview { min-height: 360px; border-width: 5px; border-radius: 20px; }
   .landing-preview-body { min-height: 300px; grid-template-columns: 40px 1fr; }
   .landing-preview-content { padding: 18px 12px; }
+  .landing-preview-meta > small { max-width: 82px; text-align: center; }
   .landing-preview-stats { gap: 5px; }
   .landing-preview-stats article { min-height: 82px; padding: 8px; }
   .landing-preview-stats strong { font-size: 1.15rem; }
@@ -464,6 +468,15 @@ select.field {
   .landing-contact-notes { align-items: flex-start; flex-direction: column; }
   .landing-whatsapp-float { width: 52px; height: 52px; right: 14px; bottom: 14px; }
   .landing-footer { min-height: 180px; align-items: flex-start; justify-content: center; flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-shell *, .landing-shell *::before, .landing-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+  .landing-primary:hover, .landing-primary:hover span, .landing-whatsapp:hover, .landing-whatsapp-float:hover {
+    transform: none;
+  }
 }
 
 /* Densidade configurável dos cards de inventário */

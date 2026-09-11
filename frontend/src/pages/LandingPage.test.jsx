@@ -35,4 +35,11 @@ describe("LandingPage", () => {
     expect(whatsapp).toHaveAttribute("target", "_blank")
     expect(whatsapp).toHaveAttribute("rel", "noreferrer")
   })
+
+  it("identifica os números da prévia como dados demonstrativos", () => {
+    render(<MemoryRouter><LandingPage /></MemoryRouter>)
+
+    const preview = screen.getByRole("region", { name: "Prévia demonstrativa do painel EduStock" })
+    expect(within(preview).getByText("Exemplo demonstrativo")).toBeVisible()
+  })
 })
