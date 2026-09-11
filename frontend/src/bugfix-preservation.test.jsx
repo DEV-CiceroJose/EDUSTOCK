@@ -80,7 +80,7 @@ describe('Preservation Property Tests - Existing Correct Behaviors', () => {
     })
 
     const navigationItems = [
-      { label: 'Painel', expectedRoute: '/dashboard' },
+      { label: 'Dashboard', expectedRoute: '/dashboard' },
       { label: 'Inventário', expectedRoute: '/inventario' },
       { label: 'Movimentações', expectedRoute: '/movimentacoes' },
       { label: 'Alertas', expectedRoute: '/alertas' },
