@@ -39,12 +39,12 @@ describe("Sidebar", () => {
     expect(screen.getByText("Configurações")).toBeInTheDocument()
   })
 
-  it("sempre oferece retorno ao painel operacional", () => {
+  it("sempre oferece acesso ao dashboard pela navegação lateral", () => {
     salvarSessao({ token: "abc", papel: "OPERADOR", modulos_ativos: [] })
 
     render(<MemoryRouter><Sidebar mobile /></MemoryRouter>)
 
-    expect(screen.getByRole("link", { name: "Painel" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute(
       "href",
       "/dashboard",
     )

@@ -210,12 +210,30 @@ test("registra uma entrada de estoque com nota fiscal", async ({ page }) => {
   })
 })
 
-test("landing mantém a ação principal disponível no celular", async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 })
-  await page.goto("/")
+test("landing mantém ações e layout responsivos", async ({ page }) => {
+  for (const viewport of [
+    { width: 375, height: 812 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport)
+    await page.goto("/")
 
-  await expect(page.getByRole("heading", { name: /Mais alimento na mesa/i })).toBeVisible()
-  await expect(page.getByRole("link", { name: "Acessar sistema" }).first()).toBeVisible()
+    await expect(page.getByRole("heading", { name: /Mais alimento na mesa/i })).toBeVisible()
+    await expect(page.getByRole("link", { name: "Acessar sistema" }).first()).toBeVisible()
+    await expect(page.getByRole("link", { name: "Falar com a EduStock no WhatsApp" })).toBeVisible()
+    await expect(page.getByRole("link", { name: "Conversar no WhatsApp" })).toBeVisible()
+
+    const semRolagemHorizontal = await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    )
+    expect(semRolagemHorizontal).toBe(true)
+  }
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto("/")
+  await page.keyboard.press("Tab")
+  await expect(page.getByRole("link", { name: "EduStock, página inicial" })).toBeFocused()
 })
 
 test("operador staff não acessa módulos e usuários", async ({ page }) => {
