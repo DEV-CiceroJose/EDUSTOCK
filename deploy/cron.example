@@ -1,0 +1,8 @@
+# Copiar as linhas necessárias com `crontab -e` no usuário operacional da VPS.
+# Ajuste /opt/edustock para o caminho real e mantenha deploy/.env com permissão 600.
+
+# Backup diário às 02:15 UTC, incluindo cópia externa via rclone.
+15 2 * * * cd /opt/edustock/deploy && /bin/sh scripts/backup_postgres.sh >> /var/log/edustock-backup.log 2>&1
+
+# Todo domingo às 03:30 UTC, baixa o último backup externo e testa restauração.
+30 3 * * 0 cd /opt/edustock/deploy && /bin/sh scripts/verify_restore.sh >> /var/log/edustock-restore-check.log 2>&1

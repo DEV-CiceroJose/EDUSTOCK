@@ -62,7 +62,7 @@ acima. A validação foi feita fora da pasta sincronizada do OneDrive.
 
 - Provisionar a VPS e um PostgreSQL gerenciado ou administrado com backup.
 - Configurar DNS, HTTPS, firewall e processo supervisionado para o Django.
-- Preencher os segredos e domínios de `deploy/vps.env.example` sem reutilizar
+- Preencher os segredos e domínios de `deploy/compose.env.example` sem reutilizar
   credenciais de demonstração.
 - Executar migrações, `collectstatic`, health check e teste de reinício.
 - Criar backup inicial e comprovar uma restauração completa em ambiente separado.

@@ -1,69 +1,22 @@
 services:
   - type: web
-    name: edustock-demo-api
-    runtime: python
-    plan: free
-    buildCommand: bash build.sh
-    startCommand: gunicorn easystock.wsgi:application
-    healthCheckPath: /api/health/
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.13.5
-      - key: DATABASE_URL
-        fromDatabase:
-          name: edustock-demo-db
-          property: connectionString
-      - key: SECRET_KEY
-        generateValue: true
-      - key: PIN_LOOKUP_SECRET
-        generateValue: true
-      - key: DJANGO_SETTINGS_MODULE
-        value: easystock.settings
-      - key: APP_ENV
-        value: production
-      - key: DEBUG
-        value: "false"
-      - key: ALLOWED_HOSTS
-        value: edustock-demo-api.onrender.com
-      - key: CORS_ALLOWED_ORIGINS
-        value: https://edustock-demo-dashboard.onrender.com,https://edustock-demo-alunos.onrender.com,https://edustock-demo-cozinha.onrender.com
-      - key: CSRF_TRUSTED_ORIGINS
-        value: https://edustock-demo-dashboard.onrender.com,https://edustock-demo-alunos.onrender.com,https://edustock-demo-cozinha.onrender.com
-      - key: TRUSTED_PROXY_COUNT
-        value: 1
-      - key: LOGIN_TOKEN_TTL_HORAS
-        value: 2
-      - key: OPERACAO_TOKEN_TTL_HORAS
-        value: 2
-      - key: DEMO_MODE
-        value: "true"
-      - key: DEMO_ADMIN_USERNAME
-        sync: false
-      - key: DEMO_ADMIN_PASSWORD
-        sync: false
-      - key: DEMO_OPERATOR_USERNAME
-        sync: false
-      - key: DEMO_OPERATOR_PASSWORD
-        sync: false
-      - key: DEMO_ALUNOS_PIN
-        sync: false
-      - key: DEMO_COZINHA_PIN
-        sync: false
-      - key: DEMO_EXPIRES_AT
-        sync: false
-
-  - type: web
-    name: edustock-demo-dashboard
+    name: edustock-dashboard
     runtime: static
-    buildCommand: cd frontend && npm ci && npm run build
+    plan: free
+    autoDeployTrigger: checksPass
+    buildCommand: node deploy/validate-render-env.mjs dashboard && cd frontend && npm ci && npm run build
     staticPublishPath: frontend/dist
     envVars:
       - key: NODE_VERSION
         value: "22.22.0"
       - key: VITE_API_URL
-        value: https://edustock-demo-api.onrender.com/api
+        sync: false
       - key: VITE_DEMO_MODE
-        value: "true"
+        value: "false"
+    buildFilter:
+      paths:
+        - frontend/**
+        - deploy/validate-render-env.mjs
     routes:
       - type: rewrite
         source: /*
@@ -71,7 +24,7 @@ services:
     headers:
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://edustock-demo-api.onrender.com; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        value: "default-src 'self'; connect-src 'self' https:; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
@@ -83,15 +36,22 @@ services:
         value: camera=(), microphone=(), geolocation=()
 
   - type: web
-    name: edustock-demo-alunos
+    name: edustock-alunos
     runtime: static
-    buildCommand: cd app-alunos && npm ci && npm run build
+    plan: free
+    autoDeployTrigger: checksPass
+    buildCommand: node deploy/validate-render-env.mjs pwa && cd app-alunos && npm ci && npm run build
     staticPublishPath: app-alunos/dist
     envVars:
       - key: NODE_VERSION
         value: "22.22.0"
       - key: VITE_API_BASE
-        value: https://edustock-demo-api.onrender.com
+        sync: false
+    buildFilter:
+      paths:
+        - app-alunos/**
+        - packages/operacao-shared/**
+        - deploy/validate-render-env.mjs
     routes:
       - type: rewrite
         source: /*
@@ -99,7 +59,7 @@ services:
     headers:
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://edustock-demo-api.onrender.com; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        value: "default-src 'self'; connect-src 'self' https:; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
@@ -111,15 +71,22 @@ services:
         value: camera=(), microphone=(), geolocation=()
 
   - type: web
-    name: edustock-demo-cozinha
+    name: edustock-cozinha
     runtime: static
-    buildCommand: cd app-cozinha && npm ci && npm run build
+    plan: free
+    autoDeployTrigger: checksPass
+    buildCommand: node deploy/validate-render-env.mjs pwa && cd app-cozinha && npm ci && npm run build
     staticPublishPath: app-cozinha/dist
     envVars:
       - key: NODE_VERSION
         value: "22.22.0"
       - key: VITE_API_BASE
-        value: https://edustock-demo-api.onrender.com
+        sync: false
+    buildFilter:
+      paths:
+        - app-cozinha/**
+        - packages/operacao-shared/**
+        - deploy/validate-render-env.mjs
     routes:
       - type: rewrite
         source: /*
@@ -127,7 +94,7 @@ services:
     headers:
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; connect-src 'self' https://edustock-demo-api.onrender.com; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+        value: "default-src 'self'; connect-src 'self' https:; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
@@ -137,11 +104,3 @@ services:
       - path: /*
         name: Permissions-Policy
         value: camera=(), microphone=(), geolocation=()
-
-databases:
-  - name: edustock-demo-db
-    plan: free
-    postgresMajorVersion: "18"
-    databaseName: edustock_demo
-    user: edustock_demo
-    ipAllowList: []

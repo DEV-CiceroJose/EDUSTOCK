@@ -81,29 +81,28 @@ npm run test:e2e
 
 ## Publicação
 
-- Demonstração temporária no plano gratuito da Render:
-  [docs/DEPLOY_RENDER_FREE_DEMO.md](docs/DEPLOY_RENDER_FREE_DEMO.md).
+- Arquitetura híbrida (frontends na Render e API/banco na Hostinger):
+  [DEPLOY.md](DEPLOY.md).
+- Operação da VPS: [deploy/README.md](deploy/README.md).
 - Checklist de validação antes de compartilhar:
   [docs/CHECKLIST_GO_LIVE_DEMO.md](docs/CHECKLIST_GO_LIVE_DEMO.md).
-- Diretrizes de produção e migração para plano pago: [DEPLOY.md](DEPLOY.md).
 - Monitoramento, retenção e backup:
   [docs/OPERACAO_MONITORAMENTO_E_BACKUP.md](docs/OPERACAO_MONITORAMENTO_E_BACKUP.md).
 
-O Blueprint oficial é o arquivo `render.yaml`. Ele cria os serviços
-`edustock-demo-api`, `edustock-demo-dashboard`, `edustock-demo-alunos`,
-`edustock-demo-cozinha` e o banco `edustock-demo-db`.
+O Blueprint `render.yaml` cria somente os sites estáticos `edustock-dashboard`,
+`edustock-alunos` e `edustock-cozinha`. API Django e PostgreSQL são publicados
+na VPS com o pacote da pasta `deploy/`; somente o proxy HTTPS fica exposto.
 
 Não há `.env.production` versionado. Segredos e credenciais são configurados
-somente no painel da Render. A demonstração nunca deve receber dados pessoais,
-estoque real, documentos reais ou credenciais reutilizadas.
+somente no ambiente da VPS. A Render recebe apenas as URLs públicas da API
+necessárias durante o build dos sites.
 
 ## Apps operacionais
 
 Os detalhes de instalação PWA, rotas e comportamento offline estão em
 [APPs_ALUNO_E_COZINHA.md](APPs_ALUNO_E_COZINHA.md). PINs não ficam em arquivos
 `.env`: em uma instalação normal são administrados no Django; na demonstração
-são fornecidos à Render como variáveis secretas e aplicados pelo comando
-idempotente `preparar_demo`.
+são cadastrados por um administrador autorizado no backend.
 
 ## Licença e autoria
 
