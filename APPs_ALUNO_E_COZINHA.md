@@ -10,26 +10,25 @@ O `render.yaml` declara dois sites estáticos independentes:
 
 | App | Serviço | Origem | Publicação | Rota autenticada |
 | --- | --- | --- | --- | --- |
-| Alunos | `edustock-demo-alunos` | `app-alunos/` | `app-alunos/dist` | `/registrar` |
-| Cozinha | `edustock-demo-cozinha` | `app-cozinha/` | `app-cozinha/dist` | `/producao` |
+| Alunos | `edustock-alunos` | `app-alunos/` | `app-alunos/dist` | `/registrar` |
+| Cozinha | `edustock-cozinha` | `app-cozinha/` | `app-cozinha/dist` | `/producao` |
 
 Os dois entram por `/login`, usam `VITE_API_BASE` para localizar
-`edustock-demo-api` e possuem rewrite de SPA para `/index.html`. Não existe
-`.env.production` versionado; a URL da API é definida pelo Blueprint durante o
-build.
+o domínio HTTPS da API na Hostinger e possuem rewrite de SPA para `/index.html`.
+Não existe `.env.production` versionado; `VITE_API_BASE` é preenchida na Render
+e validada antes de cada build.
 
 ## Autenticação
 
-- Alunos usa o PIN fictício definido em `DEMO_ALUNOS_PIN`.
-- Cozinha usa o PIN fictício definido em `DEMO_COZINHA_PIN`.
+- Alunos usa um PIN criado para o perfil de acesso correspondente.
+- Cozinha usa um PIN criado para o perfil de acesso correspondente.
 - Os PINs devem ser distintos, secretos e compartilhados somente com quem fará
   a avaliação.
 - As sessões expiram e voltam ao login após inatividade.
-- Na demonstração, nunca reutilize um PIN adotado por uma escola real.
+- Em demonstrações, nunca reutilize um PIN adotado por uma escola real.
 
-O backend armazena os PINs protegidos, não em texto puro. Na demonstração, o
-comando idempotente `python manage.py preparar_demo` cria ou atualiza os acessos
-a partir das variáveis secretas da Render.
+O backend na VPS armazena os PINs protegidos, não em texto puro. Cadastre e
+revogue acessos somente pela administração autorizada do sistema.
 
 ## Instalação
 
@@ -74,9 +73,9 @@ Quando a rede falha durante um registro operacional:
 - frequência e produção usam identificadores idempotentes para evitar
   duplicidade no reenvio.
 
-O filesystem do Web Service Free da Render é efêmero, mas a fila offline fica
-no dispositivo do usuário e os registros confirmados ficam no PostgreSQL. Nem a
-fila local nem o plano gratuito devem receber dados reais nesta demonstração.
+A fila offline fica no dispositivo do usuário e os registros confirmados ficam
+no PostgreSQL da VPS. Dados locais continuam sujeitos à política de retenção e
+ao controle de acesso do dispositivo.
 
 ## Validação após cada publicação
 
@@ -92,7 +91,7 @@ fila local nem o plano gratuito devem receber dados reais nesta demonstração.
 9. Faça ao menos um teste de instalação em Android/Chrome e iPhone/Safari antes
    de uma implantação em escola.
 
-O checklist completo da demonstração está em
+O checklist completo está em
 [docs/CHECKLIST_GO_LIVE_DEMO.md](docs/CHECKLIST_GO_LIVE_DEMO.md).
 
 ## Melhorias futuras

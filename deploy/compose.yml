@@ -9,11 +9,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Informe a senha do banco}
     volumes:
       - postgres_data:/var/lib/postgresql
+    networks:
+      - backend
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U edustock -d edustock"]
       interval: 10s
       timeout: 5s
       retries: 10
+    security_opt:
+      - no-new-privileges:true
     logging:
       options:
         max-size: 10m
@@ -25,22 +29,60 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.api
     restart: unless-stopped
+    init: true
     environment:
       SECRET_KEY: ${SECRET_KEY:?Informe SECRET_KEY}
       PIN_LOOKUP_SECRET: ${PIN_LOOKUP_SECRET:?Informe PIN_LOOKUP_SECRET}
       APP_ENV: production
       DEBUG: 'False'
       DATABASE_URL: postgresql://edustock:${POSTGRES_PASSWORD}@db:5432/edustock
-      ALLOWED_HOSTS: ${API_HOST}
-      CORS_ALLOWED_ORIGINS: https://${PAINEL_HOST},https://${ALUNOS_HOST},https://${COZINHA_HOST}
-      CSRF_TRUSTED_ORIGINS: https://${API_HOST}
+      ALLOWED_HOSTS: ${API_HOST:?Informe o host da API}
+      CORS_ALLOWED_ORIGINS: ${DASHBOARD_ORIGIN:?Informe a origem do Dashboard},${ALUNOS_ORIGIN:?Informe a origem de Alunos},${COZINHA_ORIGIN:?Informe a origem da Cozinha}
+      CSRF_TRUSTED_ORIGINS: ${DASHBOARD_ORIGIN:?Informe a origem do Dashboard},${ALUNOS_ORIGIN:?Informe a origem de Alunos},${COZINHA_ORIGIN:?Informe a origem da Cozinha}
       TRUSTED_PROXY_COUNT: '1'
       SECURE_HSTS_SECONDS: ${SECURE_HSTS_SECONDS:-3600}
-      SECURE_HSTS_PRELOAD: 'False'
+      SECURE_HSTS_PRELOAD: ${SECURE_HSTS_PRELOAD:-False}
+      LOGIN_TOKEN_TTL_HORAS: ${LOGIN_TOKEN_TTL_HORAS:-12}
+      OPERACAO_TOKEN_TTL_HORAS: ${OPERACAO_TOKEN_TTL_HORAS:-12}
       DEMO_MODE: 'False'
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - backend
+      - edge
+    healthcheck:
+      test: [CMD-SHELL, "python -c 'import os,urllib.request; r=urllib.request.Request(\"http://127.0.0.1:8000/api/health/\",headers={\"Host\":os.environ[\"ALLOWED_HOSTS\"],\"X-Forwarded-Proto\":\"https\"}); assert urllib.request.urlopen(r,timeout=5).status == 200'"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 45s
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    logging:
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      API_HOST: ${API_HOST:?Informe o host da API}
+      ACME_EMAIL: ${ACME_EMAIL:?Informe o e-mail para certificados}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - edge
     security_opt:
       - no-new-privileges:true
     logging:
@@ -48,31 +90,10 @@ services:
         max-size: 10m
         max-file: '3'
 
-  web:
-    image: edustock-web:${IMAGE_TAG:-local}
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.web
-      args:
-        API_ORIGIN: https://${API_HOST:?Informe o host da API}
-    restart: unless-stopped
-    environment:
-      API_HOST: ${API_HOST}
-      PAINEL_HOST: ${PAINEL_HOST}
-      ALUNOS_HOST: ${ALUNOS_HOST}
-      COZINHA_HOST: ${COZINHA_HOST}
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - api
-    logging:
-      options:
-        max-size: 10m
-        max-file: '3'
+networks:
+  backend:
+    internal: true
+  edge:
 
 volumes:
   postgres_data:

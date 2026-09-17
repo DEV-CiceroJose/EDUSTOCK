@@ -118,8 +118,8 @@ Cozinha: `http://127.0.0.1:5175/login`
 ## Variáveis e arquivos locais
 
 Arquivos `.env.local` são ignorados pelo Git. Não crie nem versione
-`.env.production`: a configuração de produção fica no `render.yaml` e os
-segredos ficam no painel da hospedagem.
+`.env.production`: as URLs públicas dos builds ficam nas variáveis da Render e
+os segredos do backend ficam somente no ambiente protegido da VPS.
 
 Para simular produção localmente, defina todas as configurações de segurança de
 forma explícita. Não use `APP_ENV=production` com chaves fracas, SQLite, hosts
@@ -133,5 +133,4 @@ locais ou origens HTTP; o backend rejeita uma configuração insegura.
 4. Entre em Alunos e Cozinha com os respectivos PINs.
 5. Registre somente dados locais de teste.
 
-Para publicar a demonstração gratuita, não replique esta configuração manual:
-use [docs/DEPLOY_RENDER_FREE_DEMO.md](docs/DEPLOY_RENDER_FREE_DEMO.md).
+Para publicar, use a arquitetura híbrida documentada em [DEPLOY.md](DEPLOY.md).

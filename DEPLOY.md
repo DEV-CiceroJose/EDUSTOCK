@@ -1,98 +1,104 @@
-# Deploy do EduStock
+# Deploy híbrido do EduStock
 
-Este documento define o caminho de publicação. Para montar agora uma
-demonstração descartável no plano gratuito, siga o roteiro específico em
-[docs/DEPLOY_RENDER_FREE_DEMO.md](docs/DEPLOY_RENDER_FREE_DEMO.md).
+Este é o desenho oficial de publicação do projeto:
 
-## Arquitetura declarada
-
-O `render.yaml` é a fonte de verdade do deploy e usa Python 3.13, Node 22.22.0
-nos três sites estáticos e PostgreSQL 18. A versão do Node é fixada pela
-variável `NODE_VERSION` de cada serviço, mecanismo suportado oficialmente pela
-Render.
-
-| Recurso | Nome no Blueprint | Tipo |
+| Camada | Hospedagem | Exposição pública |
 | --- | --- | --- |
-| API Django | `edustock-demo-api` | Web Service |
-| Dashboard | `edustock-demo-dashboard` | Static Site |
-| App Alunos | `edustock-demo-alunos` | Static Site |
-| App Cozinha | `edustock-demo-cozinha` | Static Site |
-| Banco | `edustock-demo-db` | Render Postgres |
+| Dashboard React | Render Static Site | HTTPS |
+| App Alunos | Render Static Site | HTTPS |
+| App Cozinha | Render Static Site | HTTPS |
+| API Django/Gunicorn | VPS Hostinger | HTTPS, somente pelo Caddy |
+| PostgreSQL | VPS Hostinger | Sem porta pública |
 
-O backend executa `build.sh`, que instala dependências, coleta arquivos
-estáticos, aplica migrations e, quando `DEMO_MODE=true`, executa
-`python manage.py preparar_demo`. O processo web usa
-`gunicorn easystock.wsgi:application` e o health check é `GET /api/health/`.
+O `render.yaml` cria somente os três sites estáticos. A pasta `deploy/` contém
+o pacote Docker da API, PostgreSQL e proxy HTTPS da VPS. A separação evita pagar
+um serviço de backend na Render e mantém o banco próximo da API, sem expô-lo à
+internet.
 
-## Configuração segura
+## Endereços
 
-- Não versionar `.env`, `.env.local` ou `.env.production`.
-- Manter `SECRET_KEY` e `PIN_LOOKUP_SECRET` estáveis, distintos e secretos.
-- Usar `APP_ENV=production`, `DEBUG=false` e hosts/origens explícitos.
-- Manter `DATABASE_URL` ligada ao banco pelo Blueprint.
-- Nunca escrever senhas, PINs, tokens ou URLs internas nos logs.
-- Em demonstração, usar somente dados fictícios e credenciais exclusivas.
+Antes da publicação, confirme os endereços definitivos. Um exemplo de matriz é:
 
-As sete variáveis `sync: false` da demonstração devem ser preenchidas no painel
-da Render, sem adicioná-las ao repositório:
+| Uso | Exemplo | Destino DNS |
+| --- | --- | --- |
+| Dashboard | `painel.seudominio.com.br` | Render |
+| Alunos | `alunos.seudominio.com.br` | Render |
+| Cozinha | `cozinha.seudominio.com.br` | Render |
+| API | `api.seudominio.com.br` | IP público da VPS |
 
-```text
-DEMO_ADMIN_USERNAME
-DEMO_ADMIN_PASSWORD
-DEMO_OPERATOR_USERNAME
-DEMO_OPERATOR_PASSWORD
-DEMO_ALUNOS_PIN
-DEMO_COZINHA_PIN
-DEMO_EXPIRES_AT
-```
+Os nomes acima são exemplos. Não publique o sistema com `example.com` ou
+`seudominio.com.br` nas configurações.
 
-`DEMO_EXPIRES_AT` deve ser uma data/hora futura em ISO 8601, com fuso. O comando
-de preparação falha se uma variável estiver ausente, se a data tiver expirado
-ou se credenciais que deveriam ser distintas forem iguais.
+## Ordem de implantação
 
-## Demonstração gratuita versus produção
+1. Provisione a VPS, instale Docker com Compose e limite o firewall a SSH
+   administrativo e portas públicas 80/443.
+2. Crie o registro DNS da API apontando para a VPS.
+3. Copie `deploy/compose.env.example` para `deploy/.env`, preencha todos os
+   valores e restrinja esse arquivo ao administrador do servidor.
+4. Suba `db`, `api` e `proxy` conforme [deploy/README.md](deploy/README.md).
+5. Confirme `https://api.DOMINIO/api/health/` antes de criar os sites.
+6. Na Render, aplique o Blueprint da raiz e preencha as variáveis obrigatórias:
+   - Dashboard: `VITE_API_URL=https://api.DOMINIO/api`
+   - Alunos e Cozinha: `VITE_API_BASE=https://api.DOMINIO`
+7. Confirme as três origens geradas pela Render. Grave exatamente essas origens
+   em `DASHBOARD_ORIGIN`, `ALUNOS_ORIGIN` e `COZINHA_ORIGIN` na VPS e reinicie a
+   API. Se usar domínios próprios, troque os endereços `.onrender.com` pelos
+   domínios finais.
+8. Valide login, permissões, PINs, produção, estoque, relatórios, CORS, CSRF e
+   fila offline nos endereços reais.
 
-O plano Free serve para avaliação e apresentação, não para operação escolar. O
-Web Service gratuito pode adormecer após 15 minutos sem tráfego e leva cerca de
-um minuto para despertar. O filesystem é efêmero. O PostgreSQL Free tem 1 GB,
-expira 30 dias após a criação e não oferece backup gerenciado nem recuperação.
-Cada workspace pode manter somente um Render Postgres Free ativo. Se já houver
-um banco gratuito, preserve-o quando pertencer a outro sistema e use outro
-workspace ou migre deliberadamente um dos bancos para uma instância paga.
+As URLs da API são incorporadas ao JavaScript no build. Uma alteração nelas
+exige novo deploy dos sites. As variáveis são públicas por natureza; nenhum
+segredo deve começar com `VITE_`.
 
-Antes de qualquer uso real:
+## Render
 
-1. migrar API e banco para instâncias pagas compatíveis com a carga;
-2. habilitar e testar recuperação e backups;
-3. trocar todas as credenciais e desabilitar `DEMO_MODE`;
-4. remover dados fictícios ou criar um banco limpo;
-5. revisar domínio, CORS, CSRF, observabilidade e alertas;
-6. executar o checklist completo de homologação;
-7. definir responsáveis, retenção, resposta a incidentes e janela de mudança.
+O Blueprint declara os serviços `edustock-dashboard`, `edustock-alunos` e
+`edustock-cozinha`. Cada site:
 
-A Render informa que bancos pagos recebem recuperação point-in-time conforme o
-plano do workspace. A migração deve ser agendada porque a alteração do tipo da
-instância pode causar alguns minutos de indisponibilidade.
+- instala dependências com lockfile e gera o build Vite;
+- falha antes do build se a URL da API estiver ausente, for HTTP, apontar para
+  localhost ou ainda for um endereço de exemplo;
+- possui fallback de SPA para que rotas internas possam ser atualizadas;
+- publica cabeçalhos básicos de segurança;
+- só faz deploy automático depois que as verificações do commit passam.
 
-## Atualizações
+Enquanto o domínio definitivo da API não estiver definido, a política CSP
+aceita conexões HTTPS em geral. Antes do go-live definitivo, substitua
+`connect-src 'self' https:` no `render.yaml` pelo host exato da API.
 
-Publicações devem partir de uma branch revisada e com CI verde. Após o merge, a
-Render pode redeployar os serviços ligados ao repositório. Alterações em
-variáveis de build dos sites estáticos também exigem novo deploy.
+## Hostinger
 
-Depois de cada atualização:
+Somente o Caddy publica portas na VPS. API e banco conversam por redes Docker;
+o PostgreSQL não possui mapeamento de porta no host. O Caddy emite e renova o
+certificado TLS quando DNS, portas e e-mail ACME estiverem corretos.
 
-1. acompanhar o build e procurar falhas de migration;
-2. validar `GET /api/health/`;
-3. executar [docs/CHECKLIST_GO_LIVE_DEMO.md](docs/CHECKLIST_GO_LIVE_DEMO.md);
-4. confirmar que os logs não contêm segredos;
-5. registrar a versão publicada e o responsável.
+Configurações obrigatórias incluem segredos diferentes para Django, PINs e
+banco, `APP_ENV=production`, `DEBUG=False`, host da API e as três origens HTTPS.
+Não troque `PIN_LOOKUP_SECRET` depois de cadastrar PINs: isso impede a
+localização dos registros existentes.
 
-## Fontes oficiais
+## Backups e atualização
 
-- [Deploy gratuito e limitações](https://render.com/docs/free)
-- [Planos do Render Postgres](https://render.com/docs/postgresql-refresh)
-- [Recuperação e backups do PostgreSQL](https://render.com/docs/postgresql-backups)
-- [Deploy de Django na Render](https://render.com/docs/deploy-django)
-- [Referência do Blueprint](https://render.com/docs/blueprint-spec)
-- [Configuração da versão do Node.js](https://render.com/docs/node-version)
+O pacote inclui backup lógico com checksum e cópia externa por `rclone`, além
+de restauração de teste em banco isolado. Configure as rotinas de
+`deploy/cron.example` somente após executar ambas manualmente com sucesso.
+
+Antes de atualizar:
+
+1. gere um backup externo e valide o checksum;
+2. confira migrations e compatibilidade da versão;
+3. publique uma imagem identificada por revisão, não apenas `latest`;
+4. aplique a atualização e acompanhe os logs;
+5. valide health, autenticação e um fluxo crítico completo.
+
+Não use `docker compose down --volumes` em uma instalação com dados. Voltar a
+imagem antiga não desfaz automaticamente migrations do banco.
+
+## Estado da entrega
+
+Este repositório prepara e valida a configuração. Provisionamento da VPS,
+configuração dos domínios, segredos, cópia externa e homologação autenticada nos
+endereços reais continuam sendo ações de implantação e não são comprovadas por
+testes locais ou CI.

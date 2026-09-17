@@ -1,99 +1,88 @@
-# Operação, monitoramento e backup do EduStock
+# Operação, monitoramento e backup
 
-## Saúde do serviço
+Este guia cobre a arquitetura com frontends na Render e API/PostgreSQL na VPS
+Hostinger.
 
-O backend oferece `GET /api/health/` sem autenticação. A resposta confirma banco
-e cache sem expor credenciais ou detalhes internos. O serviço
-`edustock-demo-api` usa essa rota como `healthCheckPath` no `render.yaml`.
+## Indicadores mínimos
 
-Na demonstração Free, o primeiro acesso após 15 minutos sem tráfego pode levar
-cerca de um minuto enquanto o serviço desperta. Durante esse intervalo, não
-trate a demora inicial isolada como indisponibilidade definitiva. Depois do
-despertar, uma resposta diferente de HTTP 200 exige investigação.
+- `GET /api/health/` deve responder HTTP 200 e confirmar banco e cache;
+- containers `db`, `api` e `proxy` devem permanecer saudáveis;
+- uso de disco da VPS e do volume PostgreSQL deve ter margem para crescimento;
+- certificados HTTPS não podem se aproximar da expiração;
+- respostas 5xx, falhas repetidas de login e erros de sincronização devem gerar
+  investigação;
+- builds e deploys dos três sites Render precisam estar na mesma revisão
+  aprovada da API.
 
-## Rotina da demonstração
+Não exponha senha, PIN, token, `SECRET_KEY`, `PIN_LOOKUP_SECRET`, `.env` ou
+`DATABASE_URL` em logs, capturas e chamados.
 
-Antes de compartilhar:
+## Rotina operacional
 
-1. verificar o deploy mais recente dos quatro serviços;
-2. abrir `/api/health/` e confirmar HTTP 200;
-3. testar login administrativo e os dois logins por PIN;
-4. executar os fluxos do checklist de go-live;
-5. inspecionar os logs em busca de erros, sem copiar segredos;
-6. conferir a data de `DEMO_EXPIRES_AT` e a data de expiração do banco Free;
-7. confirmar que todo conteúdo exibido é fictício.
+Diariamente:
 
-Durante a avaliação:
+1. verificar health e estado dos containers;
+2. confirmar sucesso do backup externo;
+3. revisar erros recentes da API e do proxy;
+4. observar espaço em disco e crescimento do banco.
 
-- respostas 429 indicam excesso de tentativas; não aumente limites sem análise;
-- PIN exposto deve ser rotacionado imediatamente;
-- falha de banco ou cache deve manter o health check fora de HTTP 200;
-- nunca registrar senha, PIN, token, `SECRET_KEY`, `PIN_LOOKUP_SECRET` ou
-  `DATABASE_URL` em chamados e capturas;
-- monitorar as 750 horas mensais do workspace e os limites de banda e build.
+Semanalmente:
 
-O plano gratuito é apropriado para demonstração, não para produção. A Render
-pode reiniciar instâncias Free e o filesystem do Web Service é efêmero. Dados
-duráveis devem estar no PostgreSQL, nunca em SQLite local, uploads locais ou
-arquivos gerados no processo web.
+1. executar a restauração automatizada em banco temporário;
+2. testar login administrativo e por PIN;
+3. confirmar uma operação crítica de estoque/merenda em homologação;
+4. verificar os deploys e certificados.
 
-## Expiração e descarte
+Mensalmente:
 
-O PostgreSQL Free tem 1 GB e expira 30 dias após a criação. Após expirar, há um
-período de 14 dias para upgrade; depois disso, a Render remove o banco e os
-dados. Registre a data de criação e configure aviso antes da expiração.
-Um workspace só pode manter um Render Postgres Free ativo. Se outro projeto já
-ocupar essa cota, use outro workspace ou migre conscientemente um dos bancos
-para um plano pago; nunca exclua ou reutilize um banco de outra aplicação para
-forçar a criação da demo.
+1. revisar acessos administrativos e remover contas desnecessárias;
+2. atualizar imagens e dependências após CI e homologação;
+3. revisar retenção, capacidade, incidentes e tempo real de recuperação.
 
-Ao encerrar a demonstração:
+## Backup
 
-1. revogue ou troque todas as credenciais compartilhadas;
-2. remova acessos e dados fictícios que não precisam ser preservados;
-3. desligue ou exclua os recursos conforme a política do projeto;
-4. não transforme o banco demonstrativo em produção por conveniência.
+`deploy/scripts/backup_postgres.sh` cria um dump PostgreSQL no formato custom,
+valida o catálogo, gera checksum SHA-256 e envia a cópia para o remote definido
+em `BACKUP_REMOTE`. O diretório local e o destino externo não podem apontar
+para locais genéricos ou públicos.
 
-## Backups
+Mantenha ao menos:
 
-O Render Postgres Free não possui recuperação point-in-time nem backups
-lógicos gerenciados. Como a demonstração contém somente dados descartáveis e
-fictícios, a recuperação esperada é recriar o banco pelo Blueprint e executar
-novamente `preparar_demo`.
+- uma cópia externa à VPS;
+- criptografia e controle de acesso no destino;
+- retenção compatível com a política de dados;
+- registro de sucesso e falha de cada execução;
+- uma versão conhecida do `.env` e procedimentos guardados em cofre seguro.
 
-Se for necessário preservar uma demonstração específica, faça um `pg_dump` por
-uma máquina autorizada usando a URL externa temporariamente e armazene o arquivo
-fora do repositório, criptografado e com acesso restrito. Nunca inclua dumps em
-commits, e-mails ou chamados públicos.
+Os exemplos usam backup diário e restauração semanal. RPO e RTO definitivos
+dependem da operação escolar e devem ser aprovados pelo responsável do serviço.
 
-## Migração para produção paga
+## Restauração
 
-Antes de receber dados reais:
+`deploy/scripts/verify_restore.sh` baixa a cópia externa `latest`, valida seu
+checksum e restaura em um banco temporário. A verificação procura a tabela de
+migrations e remove o banco temporário ao terminar.
 
-1. atualizar `edustock-demo-api` e `edustock-demo-db` para instâncias pagas;
-2. definir capacidade, retenção e janela de recuperação;
-3. habilitar e testar recuperação point-in-time e exportações lógicas;
-4. realizar uma restauração em ambiente isolado;
-5. trocar todas as credenciais, definir `DEMO_MODE=false` e usar banco limpo;
-6. revisar CORS, CSRF, domínios, logs, alertas e responsáveis;
-7. executar homologação completa antes da liberação.
+Em um incidente real:
 
-Bancos pagos recebem recuperação contínua de acordo com o plano do workspace.
-A troca do tipo de instância pode causar alguns minutos de indisponibilidade e
-deve ter janela de mudança comunicada.
+1. interrompa novas movimentações e registre o horário;
+2. preserve evidências e identifique a última cópia válida;
+3. restaure em banco separado, nunca diretamente sobre o banco danificado;
+4. confira migrations e dados críticos com responsáveis da operação;
+5. aponte a API para a instância recuperada em janela controlada;
+6. valide health, logins, isolamento e fluxos críticos;
+7. libere o acesso e documente causa, impacto e ações preventivas.
 
-## Recuperação de uma instalação paga
+Uma restauração sem erro técnico ainda precisa de validação funcional dos
+dados. Snapshot da Hostinger e volume Docker não substituem teste de restauração
+de uma cópia independente.
 
-1. interromper novas movimentações;
-2. restaurar para uma nova instância isolada;
-3. validar os dados antes de alterar `DATABASE_URL`;
-4. aplicar migrations da mesma versão da aplicação;
-5. validar `/api/health/`, logins e operações críticas;
-6. apontar os serviços para a instância recuperada;
-7. liberar o acesso e registrar o incidente.
+## Alertas e limites
 
-## Fontes oficiais
+Até existir uma ferramenta de monitoramento dedicada, configure ao menos um
+monitor HTTP externo para `/api/health/` e alertas de disco/CPU/memória da VPS.
+Não use tráfego sintético para executar ações autenticadas ou alterar estoque.
 
-- [Limitações dos serviços e bancos Free](https://render.com/docs/free)
-- [Planos do Render Postgres](https://render.com/docs/postgresql-refresh)
-- [Recuperação, backup lógico e pg_dump](https://render.com/docs/postgresql-backups)
+Se o health falhar, verifique na ordem: resolução DNS/TLS, proxy, API, conexão
+PostgreSQL, migrations e recursos da VPS. Evite reinícios sucessivos sem guardar
+os logs que expliquem a falha.
