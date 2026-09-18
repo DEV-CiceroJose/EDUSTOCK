@@ -83,6 +83,8 @@ npm run test:e2e
 
 - Arquitetura híbrida (frontends na Render e API/banco na Hostinger):
   [DEPLOY.md](DEPLOY.md).
+- Decisões de domínio, responsabilidades e critérios da publicação definitiva:
+  [docs/ACORDO_PUBLICACAO_HOSTINGER_RENDER.md](docs/ACORDO_PUBLICACAO_HOSTINGER_RENDER.md).
 - Operação da VPS: [deploy/README.md](deploy/README.md).
 - Checklist de validação antes de compartilhar:
   [docs/CHECKLIST_GO_LIVE_DEMO.md](docs/CHECKLIST_GO_LIVE_DEMO.md).
