@@ -40,7 +40,17 @@ describe('PinLogin (app-cozinha)', () => {
       fireEvent.click(screen.getByRole('button', { name: digito }))
     })
 
-    expect(login).toHaveBeenCalledWith('1234')
+    expect(login).toHaveBeenCalledWith('1234', 'COZINHA')
+  })
+
+  it('permite entrar com o perfil de nutricionista', () => {
+    login.mockResolvedValue({ token: 'abc', perfil: 'NUTRICIONISTA' })
+    render(<MemoryRouter><PinLogin /></MemoryRouter>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nutricionista' }))
+    ;['1', '2', '3', '4'].forEach((digito) => fireEvent.click(screen.getByRole('button', { name: digito })))
+
+    expect(login).toHaveBeenCalledWith('1234', 'NUTRICIONISTA')
   })
 
   it('bloqueia o teclado quando o dispositivo está sem conexão', () => {

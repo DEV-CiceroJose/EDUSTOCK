@@ -11,7 +11,8 @@ const REFEICOES = [
 function mensagemErro(erro) {
   if (!erro?.data || typeof erro.data === 'string') return erro?.message || 'Não foi possível salvar a receita.'
   const valor = Object.values(erro.data)[0]
-  return Array.isArray(valor) ? valor[0] : String(valor)
+  if (Array.isArray(valor)) return typeof valor[0] === 'object' ? JSON.stringify(valor[0]) : valor[0]
+  return valor == null ? (erro?.message || 'Não foi possível salvar a receita.') : String(valor)
 }
 
 export default function ReceitasView() {
@@ -90,7 +91,14 @@ export default function ReceitasView() {
       <label className="block font-semibold">Refeição<select className={campo} value={refeicao} onChange={(e) => setRefeicao(e.target.value)}>{REFEICOES.map(([valor, label]) => <option key={valor} value={valor}>{label}</option>)}</select></label>
       <fieldset className="space-y-3"><legend className="font-semibold">Ingredientes</legend>
         {ingredientes.map((item, indice) => <div className="grid gap-2 rounded-xl bg-canvas p-3 sm:grid-cols-[1fr_10rem_auto]" key={indice}>
-          <label>Produto<select required className={campo} value={item.produto} onChange={(e) => atualizarIngrediente(indice, 'produto', e.target.value)}><option value="">Selecione</option>{produtos.map((produto) => <option key={produto.id} value={produto.id}>{produto.nome} ({produto.unidade_consumo})</option>)}</select></label>
+          <label>Produto<select required className={campo} value={item.produto} onChange={(e) => {
+            const produto = produtos.find((opcao) => String(opcao.id) === e.target.value)
+            setIngredientes((atuais) => atuais.map((ingrediente, i) => i === indice ? {
+              ...ingrediente,
+              produto: e.target.value,
+              quantidade_por_aluno: produto?.quantidade_por_aluno ?? ingrediente.quantidade_por_aluno,
+            } : ingrediente))
+          }}><option value="">Selecione</option>{produtos.map((produto) => <option key={produto.id} value={produto.id}>{produto.nome} ({produto.unidade_consumo})</option>)}</select></label>
           <label>Por aluno<input required min="0.01" step="0.01" inputMode="decimal" type="number" className={campo} value={item.quantidade_por_aluno} onChange={(e) => atualizarIngrediente(indice, 'quantidade_por_aluno', e.target.value)} /></label>
           {ingredientes.length > 1 && <button type="button" className="self-end rounded-xl border border-line px-3 py-3" onClick={() => setIngredientes((atuais) => atuais.filter((_, i) => i !== indice))}>Remover</button>}
         </div>)}

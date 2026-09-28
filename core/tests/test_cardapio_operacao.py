@@ -3,8 +3,8 @@ from decimal import Decimal
 from django.utils import timezone
 from rest_framework.test import APITestCase, APIClient
 
-from core.models import Categoria, Grupo, Produto, Receita
-from core.operacao_auth import PERFIL_ALUNO, PERFIL_COZINHA, criar_token
+from core.models import Categoria, FatorConsumo, Grupo, PinAcesso, Produto, Receita
+from core.operacao_auth import PERFIL_ALUNO, PERFIL_COZINHA, PERFIL_NUTRICIONISTA, criar_token
 from plataforma.models import Escola, Modulo, Municipio
 
 
@@ -45,6 +45,10 @@ class CardapioOperacaoAPITests(APITestCase):
         self.aluno = APIClient()
         self.aluno.credentials(HTTP_X_OPERACAO_TOKEN=criar_token(
             PERFIL_ALUNO, escola_id=self.escola.id
+        ))
+        self.nutricionista = APIClient()
+        self.nutricionista.credentials(HTTP_X_OPERACAO_TOKEN=criar_token(
+            PERFIL_NUTRICIONISTA, escola_id=self.escola.id
         ))
 
     def test_cozinha_cadastra_receita_e_define_cardapio(self):
@@ -121,3 +125,39 @@ class CardapioOperacaoAPITests(APITestCase):
         receitas = self.cozinha.get("/api/operacao/receitas/")
         self.assertEqual([item["id"] for item in produtos.data], [self.produto.id])
         self.assertEqual(receitas.data, [])
+
+    def test_nutricionista_configura_conversao_e_porcao(self):
+        resposta = self.nutricionista.post("/api/operacao/nutricao/produtos/", {
+            "produto": self.produto.id,
+            "unidade_consumo": "G",
+            "conteudo_por_unidade": "1000.000",
+            "quantidade_por_aluno": "80.00",
+        }, format="json")
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        self.assertEqual(resposta.data["quantidade_por_aluno"], "80.00")
+        self.assertEqual(
+            FatorConsumo.objects.get(produto=self.produto).quantidade_por_aluno,
+            Decimal("80.00"),
+        )
+
+        produtos_receita = self.cozinha.get("/api/operacao/produtos-receita/")
+        self.assertEqual(produtos_receita.data[0]["quantidade_por_aluno"], "80.00")
+
+    def test_cozinha_nao_pode_configurar_porcao_da_nutricionista(self):
+        resposta = self.cozinha.post("/api/operacao/nutricao/produtos/", {}, format="json")
+        self.assertEqual(resposta.status_code, 403)
+
+    def test_login_aceita_pin_da_nutricionista(self):
+        PinAcesso.objects.create(
+            escola=self.escola,
+            papel=PinAcesso.NUTRICIONISTA,
+            pin="6789",
+            titular="Nutricionista",
+        )
+        resposta = APIClient().post("/api/operacao/auth/", {
+            "pin": "6789",
+            "perfil": "NUTRICIONISTA",
+            "escola": self.escola.slug,
+        }, format="json")
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        self.assertEqual(resposta.data["perfil"], "NUTRICIONISTA")

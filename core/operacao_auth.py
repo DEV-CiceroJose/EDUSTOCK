@@ -35,7 +35,8 @@ CHAVE_SESSAO_PREFIXO = "operacao:sessao:"
 
 PERFIL_ALUNO = "ALUNO_REP"
 PERFIL_COZINHA = "COZINHA"
-PERFIS_VALIDOS = {PERFIL_ALUNO, PERFIL_COZINHA}
+PERFIL_NUTRICIONISTA = "NUTRICIONISTA"
+PERFIS_VALIDOS = {PERFIL_ALUNO, PERFIL_COZINHA, PERFIL_NUTRICIONISTA}
 
 
 # --------------------------------------------------------------------------
@@ -151,10 +152,10 @@ def _dados_pin_aluno(pin: str, escola: str = "") -> dict | None:
     }
 
 
-def _pin_cozinha(pin: str, escola: str = ""):
+def _pin_equipe(perfil: str, pin: str, escola: str = ""):
     from core.models import PinAcesso
 
-    pin_acesso = _consulta_pin(pin, PinAcesso.COZINHA, escola)
+    pin_acesso = _consulta_pin(pin, perfil, escola)
     return pin_acesso if pin_acesso and pin_acesso.confere_pin(pin) else None
 
 
@@ -173,12 +174,12 @@ def autenticar_pin(perfil: str, pin: str, escola: str = "") -> dict | None:
             return None
         return {"perfil": PERFIL_ALUNO, **dados}
 
-    if perfil == PERFIL_COZINHA:
-        pin_acesso = _pin_cozinha(pin, escola)
+    if perfil in {PERFIL_COZINHA, PERFIL_NUTRICIONISTA}:
+        pin_acesso = _pin_equipe(perfil, pin, escola)
         if not pin_acesso:
             return None
         return {
-            "perfil": PERFIL_COZINHA,
+            "perfil": perfil,
             "turma": "",
             "turno": "",
             "pin_acesso_id": pin_acesso.id,

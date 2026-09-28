@@ -16,6 +16,7 @@ vi.mock("../api", () => ({
     baixaProducao: vi.fn(),
     resumo: vi.fn(),
     registrarContagem: vi.fn(),
+    historicoFrequencia: vi.fn(),
   },
 }))
 
@@ -46,6 +47,14 @@ describe("MerendaPage", () => {
       alerta_reducao: false,
       turmas: [],
     })
+    vi.mocked(operacaoApi.historicoFrequencia).mockResolvedValue({
+      data: "2026-09-25",
+      total_alunos: 31,
+      turmas_registradas: 1,
+      turmas_esperadas: 12,
+      registros: [{ id: 1, turma: "1º DS-A", turno_label: "Integral", quantidade_alunos: 31 }],
+      turmas_sem_registro: ["1º DS-B"],
+    })
   })
 
   it("abre diretamente a produção quando a URL solicita essa visão", async () => {
@@ -60,5 +69,17 @@ describe("MerendaPage", () => {
     expect(
       await screen.findByRole("heading", { name: "Produção do dia" }),
     ).toBeInTheDocument()
+  })
+
+  it("abre o relatório histórico por turma", async () => {
+    render(
+      <MemoryRouter initialEntries={["/merenda?view=historico"]}>
+        <ToastProvider><MerendaPage /></ToastProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole("heading", { name: "Histórico de presença por turma" })).toBeInTheDocument()
+    expect(screen.getByText("1º DS-A")).toBeInTheDocument()
+    expect(screen.getAllByText("31")).toHaveLength(2)
   })
 })

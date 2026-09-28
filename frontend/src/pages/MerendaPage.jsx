@@ -4,9 +4,11 @@ import { useDashboardData } from "../hooks/useDashboardData"
 import ContagemView from "../features/merenda/ContagemView"
 import ContagemWidget from "../features/merenda/ContagemWidget"
 import KitchenProductionView from "../features/merenda/KitchenProductionView"
+import FrequenciaHistoricoView from "../features/merenda/FrequenciaHistoricoView"
 import DataLoadError from "../components/ui/DataLoadError"
 
-const VIEWS = ["contagem", "producao"]
+const VIEWS = ["contagem", "producao", "historico"]
+const VIEW_LABELS = { contagem: "Contagem", producao: "Produção", historico: "Histórico" }
 
 export default function MerendaPage() {
   const { produtos, loading, error, carregar } = useDashboardData()
@@ -44,12 +46,12 @@ export default function MerendaPage() {
           {VIEWS.map((v) => (
             <button
               key={v}
-              onClick={() => setSearchParams(v === "producao" ? { view: v } : {})}
+              onClick={() => setSearchParams(v === "contagem" ? {} : { view: v })}
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 view === v ? "bg-brand text-[#f4f1e7]" : "bg-surface text-ink-soft hover:bg-surface-2"
               }`}
             >
-              {v === "contagem" ? "Contagem" : "Produção"}
+              {VIEW_LABELS[v]}
             </button>
           ))}
         </div>
@@ -60,8 +62,10 @@ export default function MerendaPage() {
           <ContagemView onRegistrado={handleRegistrado} />
           <ContagemWidget refreshKey={refreshKey} />
         </div>
-      ) : (
+      ) : view === "producao" ? (
         <KitchenProductionView onBaixaConcluida={handleRegistrado} />
+      ) : (
+        <FrequenciaHistoricoView />
       )}
     </div>
   )

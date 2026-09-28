@@ -11,6 +11,8 @@ from .operacao_views import (
     PlanoDoDiaGestaoView, BaixaProducaoGestaoView,
     HealthCheckView, OperacaoLoginView, OperacaoLogoutView, StatusDoDiaView,
     CardapioOperacaoView, ProdutosReceitaOperacaoView, ReceitasOperacaoView,
+    NutricaoProdutosOperacaoView,
+    FrequenciaHistoricoGestaoView,
 )
 from .dashboard_views import DashboardOperacionalView
 from .rede_views import (
@@ -54,6 +56,7 @@ urlpatterns = [
     path("operacao/produtos-receita/", ProdutosReceitaOperacaoView.as_view(), name="operacao-produtos-receita"),
     path("operacao/receitas/", ReceitasOperacaoView.as_view(), name="operacao-receitas"),
     path("operacao/cardapio/", CardapioOperacaoView.as_view(), name="operacao-cardapio"),
+    path("operacao/nutricao/produtos/", NutricaoProdutosOperacaoView.as_view(), name="operacao-nutricao-produtos"),
 
     # Dashboard admin — resumo sem autenticação de perfil
     path("operacao/resumo/", ResumoFrequenciaView.as_view(), name="operacao-resumo"),
@@ -61,6 +64,7 @@ urlpatterns = [
     # Dashboard de gestão — usa a sessão normal de admin/operador
     path("merenda/plano-do-dia/", PlanoDoDiaGestaoView.as_view(), name="merenda-gestao-plano"),
     path("merenda/baixa-de-producao/", BaixaProducaoGestaoView.as_view(), name="merenda-gestao-baixa"),
+    path("merenda/frequencia-historico/", FrequenciaHistoricoGestaoView.as_view(), name="merenda-frequencia-historico"),
 
     # app-cozinha — plano e baixa de produção (apenas COZINHA)
     path("operacao/plano-do-dia/", PlanoDoDiaView.as_view(), name="operacao-plano"),

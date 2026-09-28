@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from django.utils import timezone
 
-from core.models import OperacaoBaixaProducao
+from core.models import FrequenciaDiaria, OperacaoBaixaProducao, Turma
 from core.tests.utils import AutenticadoAPITestCase
 from plataforma.models import Escola, Modulo, Perfil, escola_padrao_id
 
@@ -98,3 +98,38 @@ class MerendaGestaoApiTest(AutenticadoAPITestCase):
 
         self.assertEqual(resposta.status_code, 403)
         self.assertFalse(OperacaoBaixaProducao.objects.exists())
+
+    def test_operador_consulta_historico_por_turma_e_data(self):
+        perfil = self.user.perfil
+        perfil.papel = Perfil.OPERADOR
+        perfil.save(update_fields=["papel"])
+        perfil.modulos.set(Modulo.objects.filter(slug__in=["inventario", "merenda"]))
+        data = self.hoje.replace(day=25)
+        Turma.objects.create(
+            escola=self.escola, nome="1º DS-A Histórico", curso=Turma.DS, ano=1
+        )
+        Turma.objects.create(
+            escola=self.escola, nome="1º DS-B Histórico", curso=Turma.DS, ano=1
+        )
+        FrequenciaDiaria.objects.create(
+            escola=self.escola,
+            data=data,
+            turno=FrequenciaDiaria.INTEGRAL,
+            turma="1º DS-A Histórico",
+            quantidade_alunos=31,
+        )
+
+        resposta = self.client.get(
+            "/api/merenda/frequencia-historico/", {"data": data.isoformat()}
+        )
+
+        self.assertEqual(resposta.status_code, 200, resposta.content)
+        self.assertEqual(resposta.json()["data"], data.isoformat())
+        self.assertEqual(resposta.json()["total_alunos"], 31)
+        self.assertEqual(resposta.json()["registros"][0]["turma"], "1º DS-A Histórico")
+        self.assertIn("1º DS-B Histórico", resposta.json()["turmas_sem_registro"])
+
+    def test_historico_exige_login(self):
+        self.client.credentials()
+        resposta = self.client.get("/api/merenda/frequencia-historico/")
+        self.assertEqual(resposta.status_code, 401)

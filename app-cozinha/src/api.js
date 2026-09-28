@@ -24,21 +24,21 @@ export const filaBaixas = createOfflineQueue({
   },
 })
 
-export async function login(pin) {
+export async function login(pin, perfil = "COZINHA") {
   const escola = import.meta.env.VITE_ESCOLA_CODIGO
   const data = await http.request("POST", "/api/operacao/auth/", {
     pin,
-    perfil: "COZINHA",
+    perfil,
     ...(escola ? { escola } : {}),
   })
 
-  if (!data?.token || data?.perfil !== "COZINHA") {
-    throw new Error("Não foi possível iniciar uma sessão válida para a cozinha.")
+  if (!data?.token || data?.perfil !== perfil) {
+    throw new Error("Não foi possível iniciar uma sessão válida para este perfil.")
   }
 
   http.setToken(data.token)
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ perfil: data.perfil, escola: data.escola }))
-  void sincronizarBaixasPendentes()
+  if (perfil === "COZINHA") void sincronizarBaixasPendentes()
   return data
 }
 
@@ -145,6 +145,20 @@ export const salvarCardapio = (cardapio) => http.request(
   "POST",
   "/api/operacao/cardapio/",
   cardapio,
+  { retry: false },
+)
+
+export const listarConfiguracoesNutricao = () => http.request(
+  "GET",
+  "/api/operacao/nutricao/produtos/",
+  undefined,
+  { retry: true },
+)
+
+export const salvarConfiguracaoNutricao = (configuracao) => http.request(
+  "POST",
+  "/api/operacao/nutricao/produtos/",
+  configuracao,
   { retry: false },
 )
 

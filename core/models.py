@@ -631,13 +631,18 @@ class Turma(models.Model):
 class PinAcesso(models.Model):
     ALUNO_REP = "ALUNO_REP"
     COZINHA = "COZINHA"
-    PAPEL_CHOICES = [(ALUNO_REP, "Representante de turma"), (COZINHA, "Equipe da cozinha")]
+    NUTRICIONISTA = "NUTRICIONISTA"
+    PAPEL_CHOICES = [
+        (ALUNO_REP, "Representante de turma"),
+        (COZINHA, "Equipe da cozinha"),
+        (NUTRICIONISTA, "Nutricionista"),
+    ]
 
     escola = models.ForeignKey(
         "plataforma.Escola", on_delete=models.PROTECT, related_name="pins_acesso",
         default=escola_padrao_id,
     )
-    papel = models.CharField(max_length=10, choices=PAPEL_CHOICES, default=ALUNO_REP)
+    papel = models.CharField(max_length=15, choices=PAPEL_CHOICES, default=ALUNO_REP)
     turma = models.ForeignKey(
         Turma, on_delete=models.CASCADE, null=True, blank=True, related_name="pins"
     )
@@ -667,14 +672,16 @@ class PinAcesso(models.Model):
             models.CheckConstraint(
                 condition=(
                     Q(papel="ALUNO_REP", turma__isnull=False)
-                    | Q(papel="COZINHA", turma__isnull=True)
+                    | Q(papel__in=["COZINHA", "NUTRICIONISTA"], turma__isnull=True)
                 ),
                 name="turma_obrigatoria_apenas_para_aluno_rep",
             )
         ]
 
     def __str__(self):
-        alvo = self.turma.nome if self.turma else "Cozinha"
+        alvo = self.turma.nome if self.turma else (
+            "Cozinha" if self.papel == self.COZINHA else "Nutricionista"
+        )
         return f"{alvo} — PIN protegido"
 
     @staticmethod
@@ -730,9 +737,11 @@ class PinAcesso(models.Model):
             raise ValidationError(
                 "Representante de turma exige uma turma selecionada."
             )
-        if self.papel == self.COZINHA and self.turma_id is not None:
+        if self.papel in {self.COZINHA, self.NUTRICIONISTA} and self.turma_id is not None:
             raise ValidationError(
                 "PIN de cozinha não deve ter turma vinculada."
+                if self.papel == self.COZINHA
+                else "PIN de nutricionista não deve ter turma vinculada."
             )
 
 

@@ -656,6 +656,27 @@ export const mockOperacao = {
         .map(([turma, quantidade_alunos]) => ({ turma, quantidade_alunos })),
     }
   },
+  async historicoFrequencia(data) {
+    await delay(100)
+    const db = load()
+    const d = data || new Date().toISOString().slice(0, 10)
+    const registros = db.frequencias
+      .filter((frequencia) => frequencia.data === d)
+      .sort((a, b) => a.turma.localeCompare(b.turma, "pt-BR"))
+      .map((frequencia) => ({
+        ...frequencia,
+        turno_label: frequencia.turno === "INTEGRAL" ? "Integral" : frequencia.turno,
+        registrado_em: `${d}T08:00:00`,
+      }))
+    return {
+      data: d,
+      total_alunos: registros.reduce((total, item) => total + Number(item.quantidade_alunos), 0),
+      turmas_registradas: new Set(registros.map((item) => item.turma)).size,
+      turmas_esperadas: 12,
+      registros,
+      turmas_sem_registro: [],
+    }
+  },
   async planoDoDia({ data, refeicao }) {
     await delay(180)
     const db = load()

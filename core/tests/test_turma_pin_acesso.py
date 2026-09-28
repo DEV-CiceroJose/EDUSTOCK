@@ -35,6 +35,13 @@ class PinAcessoModelTest(TestCase):
         self.assertTrue(p.confere_pin("9999"))
         self.assertEqual(str(p), "Cozinha — PIN protegido")
 
+    def test_pin_de_nutricionista_valido(self):
+        p = PinAcesso.objects.create(
+            papel=PinAcesso.NUTRICIONISTA, turma=None, pin="8888"
+        )
+        self.assertTrue(p.confere_pin("8888"))
+        self.assertEqual(str(p), "Nutricionista — PIN protegido")
+
     def test_aluno_rep_sem_turma_falha(self):
         with self.assertRaises(IntegrityError):
             PinAcesso.objects.create(papel=PinAcesso.ALUNO_REP, turma=None, pin="1111")
@@ -42,6 +49,12 @@ class PinAcessoModelTest(TestCase):
     def test_cozinha_com_turma_falha(self):
         with self.assertRaises(IntegrityError):
             PinAcesso.objects.create(papel=PinAcesso.COZINHA, turma=self.turma, pin="2222")
+
+    def test_nutricionista_com_turma_falha(self):
+        with self.assertRaises(IntegrityError):
+            PinAcesso.objects.create(
+                papel=PinAcesso.NUTRICIONISTA, turma=self.turma, pin="7777"
+            )
 
     def test_pin_duplicado_falha(self):
         PinAcesso.objects.create(papel=PinAcesso.ALUNO_REP, turma=self.turma, pin="1234")
