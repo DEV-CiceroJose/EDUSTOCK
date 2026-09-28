@@ -696,6 +696,54 @@ class ResumoFrequenciaView(APIView):
         return Response(calcular_resumo_dia(data, escola=escola_do_request(request)))
 
 
+class FrequenciaHistoricoGestaoView(APIView):
+    """Relatório diário de presença por turma para o operador do dashboard."""
+
+    authentication_classes = [TokenAcessoAuthentication]
+    permission_classes = [IsAuthenticated, RequerModuloAtivo("merenda")]
+
+    def get(self, request):
+        data, err = _parse_date(request.query_params.get("data"), default_today=True)
+        if err:
+            return err
+        escola = escola_do_request(request)
+        if escola is None:
+            return Response(
+                {"detail": "Nenhuma escola autorizada para este usuário."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        frequencias = list(
+            FrequenciaDiaria.objects.filter(escola=escola, data=data)
+            .order_by("turma", "turno")
+        )
+        turmas_registradas = {item.turma for item in frequencias}
+        turmas_sem_registro = list(
+            Turma.objects.filter(escola=escola, ativo=True)
+            .exclude(nome__in=turmas_registradas)
+            .order_by("curso", "ano", "nome")
+            .values_list("nome", flat=True)
+        )
+        return Response({
+            "data": data.isoformat(),
+            "total_alunos": sum(item.quantidade_alunos for item in frequencias),
+            "turmas_registradas": len(turmas_registradas),
+            "turmas_esperadas": Turma.objects.filter(escola=escola, ativo=True).count(),
+            "registros": [
+                {
+                    "id": item.id,
+                    "turma": item.turma,
+                    "turno": item.turno,
+                    "turno_label": item.get_turno_display(),
+                    "quantidade_alunos": item.quantidade_alunos,
+                    "registrado_em": item.criado_em.isoformat(),
+                }
+                for item in frequencias
+            ],
+            "turmas_sem_registro": turmas_sem_registro,
+        })
+
+
 # --------------------------------------------------------------------------
 # Produção da merenda — dashboard autenticado
 # --------------------------------------------------------------------------

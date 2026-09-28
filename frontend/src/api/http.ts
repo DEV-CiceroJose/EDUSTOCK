@@ -141,6 +141,8 @@ export const httpOperacao = {
     req<Record<string, unknown>>(`/operacao/contagem/`, { method: "POST", body: data }),
   resumo: (data?: string) =>
     req<Record<string, unknown>>(`/operacao/resumo/${data ? `?data=${encodeURIComponent(data)}` : ""}`),
+  historicoFrequencia: (data?: string) =>
+    req<Record<string, unknown>>(`/merenda/frequencia-historico/${data ? `?data=${encodeURIComponent(data)}` : ""}`),
   planoDoDia: ({ data, refeicao }: { data: string; refeicao: string }) => {
     const qs = new URLSearchParams({ data, refeicao })
     return req<Record<string, unknown>>(`/merenda/plano-do-dia/?${qs}`)

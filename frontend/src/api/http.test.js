@@ -89,6 +89,21 @@ describe("cliente HTTP paginado", () => {
     )
   })
 
+  it("consulta o histórico de frequência pela data escolhida", async () => {
+    salvarSessao({ token: "token-atual", papel: "OPERADOR", modulos_ativos: ["merenda"] })
+    const fetchMock = vi.fn().mockResolvedValue(resposta({ data: "2026-09-25", total_alunos: 31 }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await httpOperacao.historicoFrequencia("2026-09-25")
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/merenda/frequencia-historico/?data=2026-09-25"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Token token-atual" }),
+      }),
+    )
+  })
+
   it("registra a baixa pela rota autenticada de gestão", async () => {
     salvarSessao({ token: "token-atual", papel: "OPERADOR", modulos_ativos: ["merenda"] })
     const fetchMock = vi.fn().mockResolvedValue(resposta({ sucesso: 0, falhas: 0 }))
