@@ -21,8 +21,6 @@ export default function FrequenciaHistoricoView() {
 
   useEffect(() => {
     let ativo = true
-    setCarregando(true)
-    setErro("")
     operacaoApi.historicoFrequencia(data)
       .then((resultado) => { if (ativo) setRelatorio(resultado) })
       .catch((e) => { if (ativo) setErro(e.message || "Não foi possível carregar o relatório.") })
@@ -30,11 +28,17 @@ export default function FrequenciaHistoricoView() {
     return () => { ativo = false }
   }, [data])
 
+  function alterarData(valor) {
+    setErro("")
+    setCarregando(true)
+    setData(valor)
+  }
+
   return <section className="space-y-5" aria-labelledby="titulo-historico-frequencia">
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><h2 id="titulo-historico-frequencia" className="font-display text-2xl font-bold">Histórico de presença por turma</h2><p className="mt-1 text-sm text-ink-faint">Consulte quantos alunos compareceram em qualquer dia.</p></div>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="block text-sm font-semibold">Data<input aria-label="Data do relatório" className="field mt-1" type="date" value={data} onChange={(e) => setData(e.target.value)} /></label>
+        <label className="block text-sm font-semibold">Data<input aria-label="Data do relatório" className="field mt-1" type="date" value={data} onChange={(e) => alterarData(e.target.value)} /></label>
         <button type="button" className="btn btn-outline" onClick={() => window.print()}>Imprimir</button>
       </div>
     </div>
