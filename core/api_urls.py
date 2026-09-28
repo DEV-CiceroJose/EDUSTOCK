@@ -10,6 +10,7 @@ from .operacao_views import (
     ContagemView, ResumoFrequenciaView, PlanoDoDiaView, BaixaProducaoView,
     PlanoDoDiaGestaoView, BaixaProducaoGestaoView,
     HealthCheckView, OperacaoLoginView, OperacaoLogoutView, StatusDoDiaView,
+    CardapioOperacaoView, ProdutosReceitaOperacaoView, ReceitasOperacaoView,
 )
 from .dashboard_views import DashboardOperacionalView
 from .rede_views import (
@@ -50,6 +51,9 @@ urlpatterns = [
     # app-alunos — contagem de frequência (POST: ALUNO_REP / GET: ALUNO_REP + COZINHA)
     path("operacao/contagem/", ContagemView.as_view(), name="operacao-contagem"),
     path("operacao/status-do-dia/", StatusDoDiaView.as_view(), name="operacao-status-dia"),
+    path("operacao/produtos-receita/", ProdutosReceitaOperacaoView.as_view(), name="operacao-produtos-receita"),
+    path("operacao/receitas/", ReceitasOperacaoView.as_view(), name="operacao-receitas"),
+    path("operacao/cardapio/", CardapioOperacaoView.as_view(), name="operacao-cardapio"),
 
     # Dashboard admin — resumo sem autenticação de perfil
     path("operacao/resumo/", ResumoFrequenciaView.as_view(), name="operacao-resumo"),

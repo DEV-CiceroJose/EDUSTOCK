@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, NavLink } from 're
 import EntregasView from './EntregasView.jsx'
 import PinLogin from './PinLogin.jsx'
 import ContagemView from './ContagemView.jsx'
+import CardapioView from './CardapioView.jsx'
 import { getSessao, logout } from './api.js'
 import { useIdleLogout } from './useIdleLogout.js'
 
@@ -18,7 +19,8 @@ function Protegido({ children }) {
     })
   })
 
-  return getSessao() ? <><nav aria-label="Serviços da turma" className="mx-auto flex max-w-xl gap-3 px-4 pt-4"><NavLink className="rounded-lg border border-line px-4 py-2" to="/registrar">Presença</NavLink><NavLink className="rounded-lg border border-line px-4 py-2" to="/entregas">Entregas</NavLink></nav>{children}</> : <Navigate to="/login" replace />
+  const classeLink = ({ isActive }) => `whitespace-nowrap rounded-lg border px-4 py-2 font-semibold ${isActive ? 'border-brand bg-brand text-white' : 'border-line bg-white'}`
+  return getSessao() ? <><nav aria-label="Serviços da turma" className="mx-auto flex max-w-xl gap-3 overflow-x-auto px-4 pt-4"><NavLink className={classeLink} to="/registrar">Presença</NavLink><NavLink className={classeLink} to="/cardapio">Cardápio</NavLink><NavLink className={classeLink} to="/entregas">Entregas</NavLink></nav>{children}</> : <Navigate to="/login" replace />
 }
 
 export default function App() {
@@ -27,6 +29,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<PinLogin />} />
         <Route path="/entregas" element={<Protegido><EntregasView /></Protegido>} />
+        <Route path="/cardapio" element={<Protegido><CardapioView /></Protegido>} />
         <Route
           path="/registrar"
           element={

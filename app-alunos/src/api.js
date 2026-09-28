@@ -115,5 +115,10 @@ export async function getStatusDoDia(data) {
   return http.request("GET", `/api/operacao/status-do-dia/${query}`)
 }
 
+export async function getCardapio(data) {
+  const query = data ? `?data=${encodeURIComponent(data)}` : ""
+  return http.request("GET", `/api/operacao/cardapio/${query}`)
+}
+
 export const listarEntregas = () => http.request('GET', '/api/distribuicao/operacao/')
 export const confirmarEntrega = (destinatario) => http.request('POST', '/api/distribuicao/operacao/', { destinatario }, { retry: false })

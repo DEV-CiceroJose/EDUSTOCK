@@ -329,10 +329,11 @@ class ReceitaSerializer(serializers.ModelSerializer):
 
     def validate_ingredientes(self, ingredientes):
         escola = escola_do_request(self.context.get("request"))
+        escola_id = self.context.get("escola_id") or getattr(escola, "pk", None)
         ids = []
         for item in ingredientes:
             produto = item["produto"]
-            if escola and produto.escola_id != escola.pk:
+            if escola_id and produto.escola_id != escola_id:
                 raise serializers.ValidationError("Todos os produtos devem pertencer à escola autenticada.")
             ids.append(produto.pk)
         if len(ids) != len(set(ids)):
@@ -373,6 +374,7 @@ class CardapioSerializer(serializers.ModelSerializer):
         if receita and refeicao and receita.refeicao != refeicao:
             raise serializers.ValidationError({"receita": "A receita deve pertencer à mesma refeição."})
         escola = escola_do_request(self.context.get("request"))
-        if escola and receita and receita.escola_id != escola.pk:
+        escola_id = self.context.get("escola_id") or getattr(escola, "pk", None)
+        if escola_id and receita and receita.escola_id != escola_id:
             raise serializers.ValidationError({"receita": "Receita não pertence à escola autenticada."})
         return attrs
