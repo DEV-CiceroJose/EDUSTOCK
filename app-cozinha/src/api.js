@@ -113,6 +113,41 @@ export async function getStatusDoDia(data) {
   )
 }
 
+export const listarProdutosReceita = () => http.request(
+  "GET",
+  "/api/operacao/produtos-receita/",
+  undefined,
+  { retry: true },
+)
+
+export const listarReceitas = () => http.request(
+  "GET",
+  "/api/operacao/receitas/",
+  undefined,
+  { retry: true },
+)
+
+export const criarReceita = (receita) => http.request(
+  "POST",
+  "/api/operacao/receitas/",
+  receita,
+  { retry: false },
+)
+
+export const getCardapio = (data) => http.request(
+  "GET",
+  `/api/operacao/cardapio/?data=${encodeURIComponent(data)}`,
+  undefined,
+  { retry: true },
+)
+
+export const salvarCardapio = (cardapio) => http.request(
+  "POST",
+  "/api/operacao/cardapio/",
+  cardapio,
+  { retry: false },
+)
+
 export async function baixaProducao(data, refeicao, itens, operacaoId = obterOperacaoPendente(data, refeicao)) {
   const body = { data, refeicao, operacao_id: operacaoId }
   if (itens) body.itens = itens

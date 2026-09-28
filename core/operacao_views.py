@@ -20,7 +20,7 @@ from plataforma.authentication import TokenAcessoAuthentication
 from plataforma.permissions import RequerModuloAtivo, escola_do_request
 from plataforma.models import Escola
 
-from .models import FrequenciaDiaria, OperacaoBaixaProducao, Turma
+from .models import Cardapio, FrequenciaDiaria, OperacaoBaixaProducao, Produto, Receita, Turma
 from .operacao import (
     OperacaoIdReutilizado,
     RefeicaoJaBaixada,
@@ -35,8 +35,10 @@ from .operacao_auth import (
 from .services import calcular_previsao_producao, calcular_resumo_dia, total_frequencia
 from .serializers import (
     BaixaProducaoRequestSerializer,
+    CardapioSerializer,
     ConsultaBaixaProducaoSerializer,
     PlanoProducaoQuerySerializer,
+    ReceitaSerializer,
 )
 
 
@@ -486,6 +488,124 @@ class StatusDoDiaView(APIView):
             for item in OperacaoBaixaProducao.objects.filter(escola_id=escola_id).order_by("-data", "-atualizado_em")[:15]
         ]
         return Response(resposta)
+
+
+class ProdutosReceitaOperacaoView(APIView):
+    """Produtos disponíveis para compor receitas no aplicativo da cozinha."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
+
+    @requer_perfil_operacao(PERFIL_COZINHA)
+    def get(self, request):
+        produtos = Produto.objects.filter(
+            escola_id=request.sessao_operacao["escola_id"],
+            unidade_consumo__isnull=False,
+            conteudo_por_unidade__isnull=False,
+        ).exclude(unidade_consumo="").order_by("nome")
+        return Response([
+            {
+                "id": produto.id,
+                "nome": produto.nome,
+                "unidade": produto.unidade,
+                "unidade_consumo": produto.unidade_consumo,
+                "unidade_consumo_label": produto.get_unidade_consumo_display(),
+            }
+            for produto in produtos
+        ])
+
+
+class ReceitasOperacaoView(APIView):
+    """Lista e cadastra receitas da escola usando a sessão por PIN da cozinha."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
+
+    @requer_perfil_operacao(PERFIL_COZINHA)
+    def get(self, request):
+        receitas = Receita.objects.filter(
+            escola_id=request.sessao_operacao["escola_id"]
+        ).prefetch_related("ingredientes__produto")
+        return Response(ReceitaSerializer(receitas, many=True).data)
+
+    @requer_perfil_operacao(PERFIL_COZINHA)
+    def post(self, request):
+        escola_id = request.sessao_operacao["escola_id"]
+        serializer = ReceitaSerializer(
+            data=request.data,
+            context={"request": request, "escola_id": escola_id},
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            receita = serializer.save(escola_id=escola_id)
+        except IntegrityError:
+            return Response(
+                {"nome": ["Já existe uma receita com este nome nesta escola."]},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(
+            ReceitaSerializer(receita).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CardapioOperacaoView(APIView):
+    """Consulta o cardápio por PIN e permite à cozinha definir o menu diário."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
+
+    @requer_perfil_operacao(PERFIL_ALUNO, PERFIL_COZINHA)
+    def get(self, request):
+        data, err = _parse_date(request.query_params.get("data"), default_today=True)
+        if err:
+            return err
+        itens = Cardapio.objects.filter(
+            escola_id=request.sessao_operacao["escola_id"],
+            data=data,
+        ).select_related("receita").order_by("refeicao")
+        return Response({
+            "data": data.isoformat(),
+            "refeicoes": [
+                {
+                    "id": item.id,
+                    "refeicao": item.refeicao,
+                    "refeicao_label": item.get_refeicao_display(),
+                    "receita": item.receita_id,
+                    "receita_nome": item.receita.nome,
+                    "observacao": item.observacao,
+                }
+                for item in itens
+            ],
+        })
+
+    @requer_perfil_operacao(PERFIL_COZINHA)
+    def post(self, request):
+        escola_id = request.sessao_operacao["escola_id"]
+        existente = Cardapio.objects.filter(
+            escola_id=escola_id,
+            data=request.data.get("data"),
+            refeicao=request.data.get("refeicao"),
+        ).first()
+        serializer = CardapioSerializer(
+            existente,
+            data=request.data,
+            context={"request": request, "escola_id": escola_id},
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            item = serializer.save(escola_id=escola_id)
+        except IntegrityError:
+            return Response(
+                {"detail": "Já existe um cardápio para esta refeição e data."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(
+            CardapioSerializer(item).data,
+            status=status.HTTP_200_OK if existente else status.HTTP_201_CREATED,
+        )
 
 
 # --------------------------------------------------------------------------
