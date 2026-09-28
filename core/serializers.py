@@ -41,6 +41,17 @@ class CamposFinanceirosProtegidosMixin:
         return fields
 
 
+class ConfiguracaoNutricaoSerializer(serializers.Serializer):
+    produto = serializers.IntegerField(min_value=1)
+    unidade_consumo = serializers.ChoiceField(choices=Produto.UNIDADE_CONSUMO_CHOICES)
+    conteudo_por_unidade = serializers.DecimalField(
+        max_digits=12, decimal_places=3, min_value=Decimal("0.001")
+    )
+    quantidade_por_aluno = serializers.DecimalField(
+        max_digits=6, decimal_places=2, min_value=Decimal("0.01")
+    )
+
+
 class BaixaProducaoItemSerializer(serializers.Serializer):
     produto_id = serializers.IntegerField(min_value=1)
     quantidade_override = serializers.DecimalField(

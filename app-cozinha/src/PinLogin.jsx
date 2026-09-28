@@ -1,4 +1,4 @@
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { Backspace } from "@phosphor-icons/react/Backspace"
 import { ChefHat } from "@phosphor-icons/react/ChefHat"
@@ -10,24 +10,32 @@ export default function PinLogin() {
   const navigate = useNavigate()
   const location = useLocation()
   const pwa = usePwaLifecycle()
+  const [perfil, setPerfil] = useState("COZINHA")
   const onSuccess = useCallback(
-    () => navigate("/producao", { replace: true }),
+    (sessao) => navigate(sessao.perfil === "NUTRICIONISTA" ? "/nutricao" : "/producao", { replace: true }),
     [navigate],
   )
 
   return (
     <OperationPinLogin
-      title="EduStock Cozinha"
-      subtitle="Digite o PIN da cozinha"
+      key={perfil}
+      title={perfil === "NUTRICIONISTA" ? "EduStock Nutrição" : "EduStock Cozinha"}
+      subtitle={perfil === "NUTRICIONISTA" ? "Digite o PIN da nutricionista" : "Digite o PIN da cozinha"}
       icon={<ChefHat size={34} weight="duotone" data-testid="icone-cabecalho" />}
       iconClassName="bg-accent"
-      login={login}
+      login={(pin) => login(pin, perfil)}
       onSuccess={onSuccess}
       notice={location.state?.message}
       fallbackError="Falha na conexão."
       disabled={!pwa.online}
       disabledNotice="Sem conexão. Conecte o dispositivo à internet para entrar."
-      footer={<PwaControls pwa={pwa} />}
+      footer={<>
+        <div className="mt-6 grid w-full grid-cols-2 gap-2" aria-label="Tipo de acesso">
+          <button type="button" className={`rounded-xl border px-3 py-2 font-semibold ${perfil === "COZINHA" ? "border-brand bg-brand text-white" : "border-line bg-white"}`} onClick={() => setPerfil("COZINHA")}>Cozinha</button>
+          <button type="button" className={`rounded-xl border px-3 py-2 font-semibold ${perfil === "NUTRICIONISTA" ? "border-brand bg-brand text-white" : "border-line bg-white"}`} onClick={() => setPerfil("NUTRICIONISTA")}>Nutricionista</button>
+        </div>
+        <PwaControls pwa={pwa} />
+      </>}
       backspaceIcon={<Backspace size={22} weight="bold" />}
     />
   )

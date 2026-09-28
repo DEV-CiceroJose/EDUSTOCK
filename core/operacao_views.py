@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import IntegrityError, connection
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import status
@@ -20,7 +20,7 @@ from plataforma.authentication import TokenAcessoAuthentication
 from plataforma.permissions import RequerModuloAtivo, escola_do_request
 from plataforma.models import Escola
 
-from .models import Cardapio, FrequenciaDiaria, OperacaoBaixaProducao, Produto, Receita, Turma
+from .models import Cardapio, FatorConsumo, FrequenciaDiaria, OperacaoBaixaProducao, Produto, Receita, Turma
 from .operacao import (
     OperacaoIdReutilizado,
     RefeicaoJaBaixada,
@@ -28,7 +28,7 @@ from .operacao import (
     gerar_plano_do_dia,
 )
 from .operacao_auth import (
-    PERFIL_ALUNO, PERFIL_COZINHA,
+    PERFIL_ALUNO, PERFIL_COZINHA, PERFIL_NUTRICIONISTA,
     autenticar_pin, criar_token, invalidar_token,
     requer_perfil_operacao,
 )
@@ -36,6 +36,7 @@ from .services import calcular_previsao_producao, calcular_resumo_dia, total_fre
 from .serializers import (
     BaixaProducaoRequestSerializer,
     CardapioSerializer,
+    ConfiguracaoNutricaoSerializer,
     ConsultaBaixaProducaoSerializer,
     PlanoProducaoQuerySerializer,
     ReceitaSerializer,
@@ -502,7 +503,7 @@ class ProdutosReceitaOperacaoView(APIView):
             escola_id=request.sessao_operacao["escola_id"],
             unidade_consumo__isnull=False,
             conteudo_por_unidade__isnull=False,
-        ).exclude(unidade_consumo="").order_by("nome")
+        ).exclude(unidade_consumo="").select_related("fator_consumo").order_by("nome")
         return Response([
             {
                 "id": produto.id,
@@ -510,9 +511,81 @@ class ProdutosReceitaOperacaoView(APIView):
                 "unidade": produto.unidade,
                 "unidade_consumo": produto.unidade_consumo,
                 "unidade_consumo_label": produto.get_unidade_consumo_display(),
+                "quantidade_por_aluno": (
+                    str(produto.fator_consumo.quantidade_por_aluno)
+                    if hasattr(produto, "fator_consumo") and produto.fator_consumo.ativo
+                    else None
+                ),
             }
             for produto in produtos
         ])
+
+
+def _produto_nutricao_payload(produto):
+    fator = produto.fator_consumo if hasattr(produto, "fator_consumo") else None
+    unidade_fixa = Produto.CONVERSOES_DIMENSIONAIS_FIXAS.get(produto.unidade)
+    unidades = [unidade_fixa] if unidade_fixa else [item[0] for item in Produto.UNIDADE_CONSUMO_CHOICES]
+    return {
+        "id": produto.id,
+        "nome": produto.nome,
+        "unidade": produto.unidade,
+        "unidade_label": produto.get_unidade_display(),
+        "unidade_consumo": produto.unidade_consumo or "",
+        "conteudo_por_unidade": (
+            str(produto.conteudo_por_unidade) if produto.conteudo_por_unidade is not None else ""
+        ),
+        "quantidade_por_aluno": (
+            str(fator.quantidade_por_aluno) if fator and fator.ativo else ""
+        ),
+        "unidades_consumo_permitidas": unidades,
+    }
+
+
+class NutricaoProdutosOperacaoView(APIView):
+    """Configuração técnica de conversão e porção pelo PIN da nutricionista."""
+
+    authentication_classes = []
+    permission_classes = [AllowAny, RequerModuloAtivo("merenda")]
+
+    @requer_perfil_operacao(PERFIL_NUTRICIONISTA)
+    def get(self, request):
+        produtos = Produto.objects.filter(
+            escola_id=request.sessao_operacao["escola_id"]
+        ).select_related("fator_consumo").order_by("nome")
+        return Response([_produto_nutricao_payload(produto) for produto in produtos])
+
+    @requer_perfil_operacao(PERFIL_NUTRICIONISTA)
+    @transaction.atomic
+    def post(self, request):
+        serializer = ConfiguracaoNutricaoSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        dados = serializer.validated_data
+        produto = Produto.objects.filter(
+            pk=dados["produto"],
+            escola_id=request.sessao_operacao["escola_id"],
+        ).first()
+        if not produto:
+            return Response(
+                {"produto": ["Produto não encontrado nesta escola."]},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        produto.unidade_consumo = dados["unidade_consumo"]
+        produto.conteudo_por_unidade = dados["conteudo_por_unidade"]
+        try:
+            produto.full_clean(exclude=["criado_por", "atualizado_por"])
+        except DjangoValidationError as exc:
+            return Response(
+                getattr(exc, "message_dict", {"detail": exc.messages}),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        produto.save(update_fields=["unidade_consumo", "conteudo_por_unidade", "atualizado_em"])
+        FatorConsumo.objects.update_or_create(
+            produto=produto,
+            defaults={"quantidade_por_aluno": dados["quantidade_por_aluno"], "ativo": True},
+        )
+        produto = Produto.objects.select_related("fator_consumo").get(pk=produto.pk)
+        return Response(_produto_nutricao_payload(produto))
 
 
 class ReceitasOperacaoView(APIView):

@@ -11,6 +11,7 @@ from .operacao_views import (
     PlanoDoDiaGestaoView, BaixaProducaoGestaoView,
     HealthCheckView, OperacaoLoginView, OperacaoLogoutView, StatusDoDiaView,
     CardapioOperacaoView, ProdutosReceitaOperacaoView, ReceitasOperacaoView,
+    NutricaoProdutosOperacaoView,
 )
 from .dashboard_views import DashboardOperacionalView
 from .rede_views import (
@@ -54,6 +55,7 @@ urlpatterns = [
     path("operacao/produtos-receita/", ProdutosReceitaOperacaoView.as_view(), name="operacao-produtos-receita"),
     path("operacao/receitas/", ReceitasOperacaoView.as_view(), name="operacao-receitas"),
     path("operacao/cardapio/", CardapioOperacaoView.as_view(), name="operacao-cardapio"),
+    path("operacao/nutricao/produtos/", NutricaoProdutosOperacaoView.as_view(), name="operacao-nutricao-produtos"),
 
     # Dashboard admin — resumo sem autenticação de perfil
     path("operacao/resumo/", ResumoFrequenciaView.as_view(), name="operacao-resumo"),
